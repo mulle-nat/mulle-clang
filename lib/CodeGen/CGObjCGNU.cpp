@@ -2845,6 +2845,7 @@ clang::CodeGen::CreateGNUObjCRuntime(CodeGenModule &CGM) {
   case ObjCRuntime::FragileMacOSX:
   case ObjCRuntime::MacOSX:
   case ObjCRuntime::iOS:
+  case ObjCRuntime::Mulle:
     llvm_unreachable("these runtimes are not GNU runtimes");
   }
   llvm_unreachable("bad runtime");

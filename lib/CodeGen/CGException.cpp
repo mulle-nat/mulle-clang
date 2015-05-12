@@ -137,6 +137,7 @@ namespace {
     static const EHPersonality GNU_CPlusPlus;
     static const EHPersonality GNU_CPlusPlus_SJLJ;
     static const EHPersonality GNU_CPlusPlus_SEH;
+    static const EHPersonality Mulle_ObjC;
   };
 }
 
@@ -159,6 +160,8 @@ const EHPersonality
 EHPersonality::GNU_ObjCXX = { "__gnustep_objcxx_personality_v0", nullptr };
 const EHPersonality
 EHPersonality::GNUstep_ObjC = { "__gnustep_objc_personality_v0", nullptr };
+const EHPersonality
+EHPersonality::Mulle_ObjC = { "__mulle_objc_personality_v0", nullptr };
 
 /// On Win64, use libgcc's SEH personality function. We fall back to dwarf on
 /// other platforms, unless the user asked for SjLj exceptions.
@@ -190,6 +193,8 @@ static const EHPersonality &getObjCPersonality(const llvm::Triple &T,
   case ObjCRuntime::GCC:
   case ObjCRuntime::ObjFW:
     return EHPersonality::GNU_ObjC;
+  case ObjCRuntime::Mulle:
+    return EHPersonality::Mulle_ObjC;
   }
   llvm_unreachable("bad runtime kind");
 }
@@ -227,6 +232,8 @@ static const EHPersonality &getObjCXXPersonality(const llvm::Triple &T,
     return EHPersonality::GNU_ObjC;
   case ObjCRuntime::GNUstep:
     return EHPersonality::GNU_ObjCXX;
+  case ObjCRuntime::Mulle:
+    return EHPersonality::Mulle_ObjC;
   }
   llvm_unreachable("bad runtime kind");
 }

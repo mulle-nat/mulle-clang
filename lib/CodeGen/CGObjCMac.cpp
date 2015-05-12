@@ -224,7 +224,7 @@ public:
   /// PropertyListPtrTy - LLVM type for struct objc_property_list*.
   llvm::Type *PropertyListPtrTy;
 
-  // MethodTy - LLVM type for struct objc_method.
+  // DefTy - LLVM type for struct objc_method.
   llvm::StructType *MethodTy;
 
   /// CacheTy - LLVM type for struct objc_cache.
@@ -7042,6 +7042,7 @@ CodeGen::CreateMacObjCRuntime(CodeGen::CodeGenModule &CGM) {
   case ObjCRuntime::GNUstep:
   case ObjCRuntime::GCC:
   case ObjCRuntime::ObjFW:
+  case ObjCRuntime::Mulle:
     llvm_unreachable("these runtimes are not Mac runtimes");
   }
   llvm_unreachable("bad runtime");

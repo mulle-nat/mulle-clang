@@ -5838,7 +5838,7 @@ TypedefDecl *ASTContext::getObjCIdDecl() const {
 
 TypedefDecl *ASTContext::getObjCSelDecl() const {
   if (!ObjCSelDecl) {
-    QualType T = getPointerType(ObjCBuiltinSelTy);
+     QualType T = UnsignedLongTy; // getPointerType(ObjCBuiltinSelTy);
     ObjCSelDecl = buildImplicitTypedef(T, "SEL");
   }
   return ObjCSelDecl;

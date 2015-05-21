@@ -203,7 +203,7 @@ bool ToolChain::isCrossCompiling() const {
 }
 
 ObjCRuntime ToolChain::getDefaultObjCRuntime(bool isNonFragile) const {
-  return ObjCRuntime(isNonFragile ? ObjCRuntime::GNUstep : ObjCRuntime::GCC,
+  return ObjCRuntime(isNonFragile ? ObjCRuntime::GNUstep : ObjCRuntime::Mulle,
                      VersionTuple());
 }
 

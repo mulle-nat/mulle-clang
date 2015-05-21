@@ -25,6 +25,7 @@
 #include "llvm/IR/CallSite.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/InlineAsm.h"
+
 using namespace clang;
 using namespace CodeGen;
 
@@ -498,7 +499,12 @@ static llvm::Value *emitARCRetainLoadOfScalar(CodeGenFunction &CGF,
 /// Generate an Objective-C method.  An Objective-C method is a C function with
 /// its pointer, name, and types registered in the class struture.
 void CodeGenFunction::GenerateObjCMethod(const ObjCMethodDecl *OMD) {
-  StartObjCMethod(OMD, OMD->getClassInterface());
+
+   // here the mulle runtime patches in and possibly rewrites the OMD
+   if( ! CGM.getObjCRuntime().WillGenerateObjCMethod( *this, OMD))
+      return;
+   
+   StartObjCMethod(OMD, OMD->getClassInterface());
   PGO.assignRegionCounters(OMD, CurFn);
   assert(isa<CompoundStmt>(OMD->getBody()));
   RegionCounter Cnt = getPGORegionCounter(OMD->getBody());

@@ -381,4 +381,12 @@ CGObjCRuntime::getMessageSendInfo(const ObjCMethodDecl *method,
     CGM.getTypes().GetFunctionType(argsInfo)->getPointerTo();
   return MessageSendInfo(argsInfo, signatureType);
 }
- 
+
+
+bool   CGObjCRuntime::WillGenerateObjCMethod( CodeGen::CodeGenFunction &CGF,
+                                              const ObjCMethodDecl *method)
+{
+   return( true);  // default: just do it
+}
+
+

@@ -289,6 +289,9 @@ public:
   unsigned ComputeBitfieldBitOffset(CodeGen::CodeGenModule &CGM,
                                     const ObjCInterfaceDecl *ID,
                                     const ObjCIvarDecl *Ivar);
+   
+  virtual bool   WillGenerateObjCMethod( CodeGen::CodeGenFunction &CGF,
+                                         const ObjCMethodDecl *method);
 };
 
 /// Creates an instance of an Objective-C runtime class.

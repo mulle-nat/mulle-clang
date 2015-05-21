@@ -52,7 +52,7 @@ public:
     ObjFW,
 
     /// 'mulle' is the runtime from Mulle kybernetiK. It's old fashioned and 
-    /// fragile and very, very fast
+    /// fragile and hopefully very fast
     Mulle
   };
 

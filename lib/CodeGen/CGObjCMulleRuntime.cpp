@@ -1,4 +1,4 @@
-//===------- CGObjCMulleRuntime.cpp - Emit LLVM Code from ASTs for a Module --------===//
+//===--- CGObjCMulleRuntime.cpp - Emit LLVM Code from ASTs for a Module ---===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,14 +7,15 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This provides Objective-C code generation targeting the Mulle ObjC runtime.  
-// The class in this file generates structures used by the Mulle Objective-C 
-// runtime library.  These structures are defined elsewhere :)
-// This is a tweaked copy off CGObjCMac.cpp. Because those files are as private
+// This provides Objective-C code generation targeting the Mulle ObjC runtime.
+//
+// http://www.mulle-kybernetik.com/software/mulle-objc-runtime
+//
+// This is a tweaked copy of CGObjCMac.cpp. Because those files are as private
 // as possible for some reason, inheritance is difficult and not very much
 // future proof.
 //
-// Then stuff got started thrown out and tweaked to taste. OK this is cargo
+// Then stuff got started thrown out and tweaked to taste. OK, this is cargo
 // cult programming :)
 //===----------------------------------------------------------------------===//
 
@@ -107,6 +108,7 @@ namespace {
       llvm::Type *PtrObjectPtrTy;
       
       // mulle specific stuff for the various hashes
+      // no energy for "pe" after "Ty" :D
       llvm::Type *ParamsPtrTy;
       
       llvm::Type *ClassIDTy;
@@ -118,7 +120,12 @@ namespace {
       llvm::Type *CategoryIDTyPtrTy;
       llvm::Type *SelectorIDTyPtrTy;
       llvm::Type *ProtocolIDPtrTy;
-
+   
+      // the structures that get exported
+      llvm::Type *ClassListTy;
+      llvm::Type *CategoryListTy;
+      llvm::Type *LoadInfoTy;
+      
    private:
       /// ProtocolPtrTy - LLVM type for external protocol handles
       /// (typeof(Protocol))
@@ -174,6 +181,7 @@ namespace {
                                           "_mulle_objc_object_get_class");
       }
       
+      // TODO: this is too slow use inlinable method
       llvm::Constant *getGetRuntimeClassFn() {
          llvm::Type *params[] = { ClassIDTy };
          
@@ -182,6 +190,9 @@ namespace {
                                           "mulle_objc_unfailing_get_class");
       }
       
+      /*
+       * Properties will be supported sometime
+       */
       llvm::Constant *getGetPropertyFn() {
          CodeGen::CodeGenTypes &Types = CGM.getTypes();
          ASTContext &Ctx = CGM.getContext();
@@ -197,7 +208,7 @@ namespace {
          Types.GetFunctionType(Types.arrangeLLVMFunctionInfo(
                                                              IdType, false, false, Params, FunctionType::ExtInfo(),
                                                              RequiredArgs::All));
-         return CGM.CreateRuntimeFunction(FTy, "mulle_objc_class_get_property");
+         return CGM.CreateRuntimeFunction(FTy, "mulle_objc_object_get_property");
       }
       
       llvm::Constant *getSetPropertyFn() {
@@ -217,12 +228,13 @@ namespace {
          Types.GetFunctionType(Types.arrangeLLVMFunctionInfo(
                                                              Ctx.VoidTy, false, false, Params, FunctionType::ExtInfo(),
                                                              RequiredArgs::All));
-         return CGM.CreateRuntimeFunction(FTy, "mulle_objc_class_set_property");
+         return CGM.CreateRuntimeFunction(FTy, "mulle_objc_object_set_property");
       }
       
       llvm::Constant *getOptimizedSetPropertyFn(bool atomic, bool copy) {
          CodeGen::CodeGenTypes &Types = CGM.getTypes();
          ASTContext &Ctx = CGM.getContext();
+         
          // void objc_setProperty_atomic(id self, SEL _cmd,
          //                              id newValue, ptrdiff_t offset);
          // void objc_setProperty_nonatomic(id self, SEL _cmd,
@@ -245,17 +257,20 @@ namespace {
                                                              RequiredArgs::All));
          const char *name;
          if (atomic && copy)
-            name = "objc_setProperty_atomic_copy";
+            name = "mulle_objc_object_set_property_atomic_copy";
          else if (atomic && !copy)
-            name = "objc_setProperty_atomic";
+            name = "mulle_objc_object_set_property_atomic";
          else if (!atomic && copy)
-            name = "objc_setProperty_nonatomic_copy";
+            name = "mulle_objc_object_set_property_nonatomic_copy";
          else
-            name = "objc_setProperty_nonatomic";
+            name = "mulle_objc_object_set_property_nonatomic";
          
          return CGM.CreateRuntimeFunction(FTy, name);
       }
       
+      /*
+       * Support for all the following Functions is kinda doubtful ATM
+       */
       llvm::Constant *getCopyStructFn() {
          CodeGen::CodeGenTypes &Types = CGM.getTypes();
          ASTContext &Ctx = CGM.getContext();
@@ -270,7 +285,7 @@ namespace {
          Types.GetFunctionType(Types.arrangeLLVMFunctionInfo(
                                                              Ctx.VoidTy, false, false, Params, FunctionType::ExtInfo(),
                                                              RequiredArgs::All));
-         return CGM.CreateRuntimeFunction(FTy, "objc_copyStruct");
+         return CGM.CreateRuntimeFunction(FTy, "mulle_objc_copy_struct");
       }
       
       /// This routine declares and returns address of:
@@ -290,7 +305,7 @@ namespace {
                                                              Params,
                                                              FunctionType::ExtInfo(),
                                                              RequiredArgs::All));
-         return CGM.CreateRuntimeFunction(FTy, "objc_copyCppObjectAtomic");
+         return CGM.CreateRuntimeFunction(FTy, "mulle_objc_copy_cpp_object_atomic");
       }
       
       llvm::Constant *getEnumerationMutationFn() {
@@ -303,7 +318,7 @@ namespace {
          Types.GetFunctionType(Types.arrangeLLVMFunctionInfo(
                                                              Ctx.VoidTy, false, false, Params, FunctionType::ExtInfo(),
                                                              RequiredArgs::All));
-         return CGM.CreateRuntimeFunction(FTy, "objc_enumerationMutation");
+         return CGM.CreateRuntimeFunction(FTy, "mulle_objc_enumeration_mutation");
       }
       
       /// GcReadWeakFn -- LLVM objc_read_weak (id *src) function.
@@ -312,7 +327,7 @@ namespace {
          llvm::Type *args[] = { ObjectPtrTy->getPointerTo() };
          llvm::FunctionType *FTy =
          llvm::FunctionType::get(ObjectPtrTy, args, false);
-         return CGM.CreateRuntimeFunction(FTy, "objc_read_weak");
+         return CGM.CreateRuntimeFunction(FTy, "mulle_objc_read_weak");
       }
       
       /// GcAssignWeakFn -- LLVM objc_assign_weak function.
@@ -321,7 +336,7 @@ namespace {
          llvm::Type *args[] = { ObjectPtrTy, ObjectPtrTy->getPointerTo() };
          llvm::FunctionType *FTy =
          llvm::FunctionType::get(ObjectPtrTy, args, false);
-         return CGM.CreateRuntimeFunction(FTy, "objc_assign_weak");
+         return CGM.CreateRuntimeFunction(FTy, "mulle_objc_assign_weak");
       }
       
       /// GcAssignGlobalFn -- LLVM objc_assign_global function.
@@ -330,7 +345,7 @@ namespace {
          llvm::Type *args[] = { ObjectPtrTy, ObjectPtrTy->getPointerTo() };
          llvm::FunctionType *FTy =
          llvm::FunctionType::get(ObjectPtrTy, args, false);
-         return CGM.CreateRuntimeFunction(FTy, "objc_assign_global");
+         return CGM.CreateRuntimeFunction(FTy, "mulle_objc_assign_global");
       }
       
       /// GcAssignThreadLocalFn -- LLVM objc_assign_threadlocal function.
@@ -339,7 +354,7 @@ namespace {
          llvm::Type *args[] = { ObjectPtrTy, ObjectPtrTy->getPointerTo() };
          llvm::FunctionType *FTy =
          llvm::FunctionType::get(ObjectPtrTy, args, false);
-         return CGM.CreateRuntimeFunction(FTy, "objc_assign_threadlocal");
+         return CGM.CreateRuntimeFunction(FTy, "mulle_objc_assign_threadlocal");
       }
       
       /// GcAssignIvarFn -- LLVM objc_assign_ivar function.
@@ -349,7 +364,7 @@ namespace {
             CGM.PtrDiffTy };
          llvm::FunctionType *FTy =
          llvm::FunctionType::get(ObjectPtrTy, args, false);
-         return CGM.CreateRuntimeFunction(FTy, "objc_assign_ivar");
+         return CGM.CreateRuntimeFunction(FTy, "mulle_objc_assign_ivar");
       }
       
       /// GcMemmoveCollectableFn -- LLVM objc_memmove_collectable function.
@@ -357,7 +372,7 @@ namespace {
          // void *objc_memmove_collectable(void *dst, const void *src, size_t size)
          llvm::Type *args[] = { Int8PtrTy, Int8PtrTy, LongTy };
          llvm::FunctionType *FTy = llvm::FunctionType::get(Int8PtrTy, args, false);
-         return CGM.CreateRuntimeFunction(FTy, "objc_memmove_collectable");
+         return CGM.CreateRuntimeFunction(FTy, "mulle_objc_memmove_collectable");
       }
       
       /// GcAssignStrongCastFn -- LLVM objc_assign_strongCast function.
@@ -366,7 +381,7 @@ namespace {
          llvm::Type *args[] = { ObjectPtrTy, ObjectPtrTy->getPointerTo() };
          llvm::FunctionType *FTy =
          llvm::FunctionType::get(ObjectPtrTy, args, false);
-         return CGM.CreateRuntimeFunction(FTy, "objc_assign_strongCast");
+         return CGM.CreateRuntimeFunction(FTy, "mulle_objc_assign_strong_cast");
       }
       
       /// ExceptionThrowFn - LLVM objc_exception_throw function.
@@ -375,14 +390,14 @@ namespace {
          llvm::Type *args[] = { ObjectPtrTy };
          llvm::FunctionType *FTy =
          llvm::FunctionType::get(CGM.VoidTy, args, false);
-         return CGM.CreateRuntimeFunction(FTy, "objc_exception_throw");
+         return CGM.CreateRuntimeFunction(FTy, "mulle_objc_exception_throw");
       }
       
       /// ExceptionRethrowFn - LLVM objc_exception_rethrow function.
       llvm::Constant *getExceptionRethrowFn() {
          // void objc_exception_rethrow(void)
          llvm::FunctionType *FTy = llvm::FunctionType::get(CGM.VoidTy, false);
-         return CGM.CreateRuntimeFunction(FTy, "objc_exception_rethrow");
+         return CGM.CreateRuntimeFunction(FTy, "mulle_objc_exception_rethrow");
       }
       
       /// SyncEnterFn - LLVM object_sync_enter function.
@@ -391,7 +406,7 @@ namespace {
          llvm::Type *args[] = { ObjectPtrTy };
          llvm::FunctionType *FTy =
          llvm::FunctionType::get(CGM.IntTy, args, false);
-         return CGM.CreateRuntimeFunction(FTy, "objc_sync_enter");
+         return CGM.CreateRuntimeFunction(FTy, "mulle_objc_sync_enter");
       }
       
       /// SyncExitFn - LLVM object_sync_exit function.
@@ -400,7 +415,7 @@ namespace {
          llvm::Type *args[] = { ObjectPtrTy };
          llvm::FunctionType *FTy =
          llvm::FunctionType::get(CGM.IntTy, args, false);
-         return CGM.CreateRuntimeFunction(FTy, "objc_sync_exit");
+         return CGM.CreateRuntimeFunction(FTy, "mulle_objc_sync_exit");
       }
       
       ObjCCommonTypesHelper(CodeGen::CodeGenModule &cgm);
@@ -955,6 +970,18 @@ namespace {
       llvm::Constant *EmitSelector(CodeGenFunction &CGF, Selector Sel,
                                 bool lval=false);
       
+      llvm::Constant *EmitClassList(Twine Name,
+                                    const char *Section,
+                                    ArrayRef<llvm::Constant*> Classes);
+      llvm::Constant *EmitCategoryList(Twine Name,
+                                       const char *Section,
+                                       ArrayRef<llvm::Constant*> Categories);
+      llvm::Constant *EmitLoadInfoList(Twine Name,
+                                          const char *Section,
+                                          llvm::Constant *ClassList,
+                                          llvm::Constant *CategoryList);
+
+     
    public:
       CGObjCMulleRuntime(CodeGen::CodeGenModule &cgm);
       
@@ -2579,13 +2606,13 @@ llvm::Constant *CGObjCMulleRuntime::EmitMethodList(Twine Name,
    // Return null for empty list.
    if (Methods.empty())
       return llvm::Constant::getNullValue(ObjCTypes.MethodListPtrTy);
-   
-   llvm::Constant *Values[3];
-   Values[0] = llvm::Constant::getNullValue(ObjCTypes.Int8PtrTy);
-   Values[1] = llvm::ConstantInt::get(ObjCTypes.IntTy, Methods.size());
-   llvm::ArrayType *AT = llvm::ArrayType::get(ObjCTypes.MethodTy,
+
+   llvm::Constant *Values[2];
+   Values[0] = llvm::ConstantInt::get(ObjCTypes.IntTy, Methods.size());
+   llvm::ArrayType *AT = llvm::ArrayType::get(ObjCTypes.MethodPtrTy,
                                               Methods.size());
-   Values[2] = llvm::ConstantArray::get(AT, Methods);
+   
+   Values[1] = llvm::ConstantArray::get(AT, Methods);
    llvm::Constant *Init = llvm::ConstantStruct::getAnon(Values);
    
    llvm::GlobalVariable *GV = CreateMetadataVar(Name, Init, Section, 4, true);
@@ -2628,13 +2655,126 @@ llvm::GlobalVariable *CGObjCCommonMulleRuntime::CreateMetadataVar(Twine Name,
    return GV;
 }
 
+
+llvm::Constant *CGObjCMulleRuntime::EmitClassList(Twine Name,
+                                          const char *Section,
+                                          ArrayRef<llvm::Constant*> Classes)
+{
+   // Return null for empty list.
+   if (Classes.empty())
+      return llvm::Constant::getNullValue( llvm::PointerType::getUnqual( ObjCTypes.ClassListTy));
+   
+   llvm::Constant *Values[2];
+   Values[0] = llvm::ConstantInt::get(ObjCTypes.IntTy, Classes.size());
+   llvm::ArrayType *AT = llvm::ArrayType::get(ObjCTypes.ClassPtrTy,
+                                              Classes.size());
+   Values[1] = llvm::ConstantArray::get(AT, Classes);
+   llvm::Constant *Init = llvm::ConstantStruct::getAnon(Values);
+   
+   llvm::GlobalVariable *GV = CreateMetadataVar( Name, Init, Section, 4, true);
+   return llvm::ConstantExpr::getBitCast(GV, llvm::PointerType::getUnqual( ObjCTypes.ClassListTy));
+}
+
+
+llvm::Constant *CGObjCMulleRuntime::EmitCategoryList(Twine Name,
+                                          const char *Section,
+                                          ArrayRef<llvm::Constant*> Categories)
+{
+   // Return null for empty list.
+   if (Categories.empty())
+      return llvm::Constant::getNullValue( llvm::PointerType::getUnqual( ObjCTypes.CategoryListTy));
+   
+   llvm::Constant *Values[2];
+   Values[0] = llvm::ConstantInt::get(ObjCTypes.IntTy, Categories.size());
+   llvm::ArrayType *AT = llvm::ArrayType::get( llvm::PointerType::getUnqual( ObjCTypes.CategoryTy),
+                                              Categories.size());
+   Values[1] = llvm::ConstantArray::get(AT, Categories);
+   llvm::Constant *Init = llvm::ConstantStruct::getAnon(Values);
+   
+   llvm::GlobalVariable *GV = CreateMetadataVar( Name, Init, Section, 4, true);
+   return llvm::ConstantExpr::getBitCast(GV, llvm::PointerType::getUnqual( ObjCTypes.CategoryListTy));
+}
+
+
+llvm::Constant *CGObjCMulleRuntime::EmitLoadInfoList(Twine Name,
+                                          const char *Section,
+                                          llvm::Constant *ClassList,
+                                          llvm::Constant *CategoryList)
+{
+   
+   llvm::Constant *Values[3];
+   
+   Values[0] = llvm::ConstantInt::get(ObjCTypes.IntTy, 0);  // version
+   Values[1] = ClassList;
+   Values[2] = CategoryList;
+
+   llvm::Constant *Init = llvm::ConstantStruct::getAnon(Values);
+   
+   llvm::GlobalVariable *GV = CreateMetadataVar( Name, Init, Section, 4, true);
+   return llvm::ConstantExpr::getBitCast(GV, llvm::PointerType::getUnqual( ObjCTypes.LoadInfoTy));
+}
+
+
+
 llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
    // Abuse this interface function as a place to finalize.
    // Although it's called init, it's being called during
    // CodeGenModule::Release so it's certainly not too early (but maybe too
    // late ?)
    FinishModule();
-   return nullptr;
+   
+  if( ImplementedClasses.empty() && DefinedCategories.empty())
+    return nullptr;
+   
+   // build up the necessary info structure now and emit it
+   llvm::Constant  *expr;
+   
+   SmallVector<llvm::Constant *, 16> LoadClasses, LoadCategories;
+   for (auto *I : DefinedClasses)
+   {
+      // Instance methods should always be defined.
+      expr = llvm::ConstantExpr::getBitCast( I, llvm::PointerType::getUnqual( ObjCTypes.ClassTy));
+      LoadClasses.push_back( expr);
+   }
+
+   for (auto *I : DefinedCategories)
+   {
+      // Instance methods should always be defined.
+      expr = llvm::ConstantExpr::getBitCast( I, llvm::PointerType::getUnqual( ObjCTypes.CategoryTy));
+      LoadCategories.push_back( expr);
+   }
+   
+  llvm::Constant *ClassList = EmitClassList( "OBJC_CLASS_LOADS", "__DATA,_objc_load_info", LoadClasses);
+  llvm::Constant *CategoryList = EmitCategoryList( "OBJC_CATEGORY_LOADS", "__DATA,_objc_load_info", LoadCategories);
+
+  llvm::Constant *LoadInfo = EmitLoadInfoList( "OBJC_LOAD_INFO", "__DATA,_objc_load_info", ClassList, CategoryList);
+
+  
+   // take collected initializers and create a __attribute__(constructor)
+   // static void   __load() function
+   // that does the appropriate calls to setup the runtime
+   // Now this I could handily steal from CGObjCGnu.cpp
+
+  llvm::Function * LoadFunction = llvm::Function::Create(
+      llvm::FunctionType::get(llvm::Type::getVoidTy(VMContext), false),
+      llvm::GlobalValue::InternalLinkage, "__load",
+      &CGM.getModule());
+
+  // (nat) i have no idea, what this is for
+  llvm::BasicBlock *EntryBB =
+      llvm::BasicBlock::Create(VMContext, "entry", LoadFunction);
+   
+  CGBuilderTy Builder(VMContext);
+  Builder.SetInsertPoint(EntryBB);
+
+  llvm::FunctionType *FT =
+    llvm::FunctionType::get(Builder.getVoidTy(),
+                            llvm::PointerType::getUnqual(ObjCTypes.LoadInfoTy), true);
+  llvm::Value *Register = CGM.CreateRuntimeFunction( FT, "mulle_objc_load_info_unfailing_enqueue");
+  Builder.CreateCall( Register, LoadInfo);
+  Builder.CreateRetVoid();
+
+  return LoadFunction;
 }
 
 llvm::Constant *CGObjCMulleRuntime::GetPropertyGetFunction() {
@@ -4186,11 +4326,6 @@ void CGObjCCommonMulleRuntime::GetNameForMethod(const ObjCMethodDecl *D,
 }
 
 void CGObjCMulleRuntime::FinishModule() {
-
-   // take collected initializers and create a __attribute__(constructor)
-   // static void   __load() function
-   // that does the appropriate calls to setup the runtime
-   
 }
 
 
@@ -4478,7 +4613,7 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
    
    // FIXME: This is the size of the setjmp buffer and should be target
    // specific. 18 is what's used on 32-bit X86.
-   uint64_t SetJmpBufferSize = 18;
+   uint64_t SetJmpBufferSize = 18;   // TODO: OBVIOUSLY NEED TO FIX!!!
    
    // Exceptions
    llvm::Type *StackPtrTy = llvm::ArrayType::get(CGM.Int8PtrTy, 4);
@@ -4487,7 +4622,20 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
    llvm::StructType::create("struct._objc_exception_data",
                             llvm::ArrayType::get(CGM.Int32Ty,SetJmpBufferSize),
                             StackPtrTy, nullptr);
-   
+
+   //
+   // some stuff we only use to emit the structure as input to load
+   //
+   ClassListTy = llvm::StructType::create("struct._mulle_objc_load_class_list",
+                            IntTy, llvm::PointerType::getUnqual( ClassPtrTy), nullptr);
+
+   CategoryListTy = llvm::StructType::create("struct._mulle_objc_load_category_list",
+                            IntTy, llvm::PointerType::getUnqual( llvm::PointerType::getUnqual( CategoryTy)), nullptr);
+
+   LoadInfoTy = llvm::StructType::create("struct._mulle_objc_load_category_list",
+                            llvm::PointerType::getUnqual( ClassListTy),
+                            llvm::PointerType::getUnqual( CategoryListTy),
+                            nullptr);
 }
 
 

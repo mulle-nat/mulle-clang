@@ -173,6 +173,8 @@ private:
   void *ParamsAndSelLocs;
   unsigned NumParams;
 
+  RecordDecl    *ParamRecord;
+   
   /// List of attributes for this method declaration.
   SourceLocation DeclEndLoc; // the location of the ';' or '{'.
 
@@ -239,10 +241,13 @@ private:
         RelatedResultType(HasRelatedResultType),
         SelLocsKind(SelLoc_StandardNoSpace), IsOverriding(0), HasSkippedBody(0),
         MethodDeclType(T), ReturnTInfo(ReturnTInfo), ParamsAndSelLocs(nullptr),
-        NumParams(0), DeclEndLoc(endLoc), Body(), SelfDecl(nullptr),
-        CmdDecl(nullptr) {
-    setImplicit(isImplicitlyDeclared);
-  }
+        NumParams(0),
+        DeclEndLoc(endLoc), Body(), SelfDecl(nullptr),
+        CmdDecl(nullptr)
+   {
+      ParamRecord = nullptr;
+      setImplicit(isImplicitlyDeclared);
+   }
 
   /// \brief A definition will return its interface declaration.
   /// An interface declaration will return its definition.
@@ -267,11 +272,19 @@ public:
   }
 
   ObjCDeclQualifier getObjCDeclQualifier() const {
-    return ObjCDeclQualifier(objcDeclQualifier);
+      return ObjCDeclQualifier(objcDeclQualifier);
   }
   void setObjCDeclQualifier(ObjCDeclQualifier QV) { objcDeclQualifier = QV; }
+   
+  RecordDecl   *getParamRecord() const {
+     return ParamRecord;
+   }
+   void setParamRecord( RecordDecl  *RD)
+   {
+      ParamRecord = RD;
+   }
 
-  /// \brief Determine whether this method has a result type that is related
+   /// \brief Determine whether this method has a result type that is related
   /// to the message receiver's type.
   bool hasRelatedResultType() const { return RelatedResultType; }
 

@@ -2609,7 +2609,7 @@ llvm::Constant *CGObjCMulleRuntime::EmitMethodList(Twine Name,
 
    llvm::Constant *Values[2];
    Values[0] = llvm::ConstantInt::get(ObjCTypes.IntTy, Methods.size());
-   llvm::ArrayType *AT = llvm::ArrayType::get(ObjCTypes.MethodPtrTy,
+   llvm::ArrayType *AT = llvm::ArrayType::get(ObjCTypes.MethodTy,
                                               Methods.size());
    
    Values[1] = llvm::ConstantArray::get(AT, Methods);

@@ -7215,6 +7215,10 @@ public:
                                           ObjCMethodDecl *Method,
                                           MultiExprArg Args);
 
+  bool  CheckMulleObjCFunctionDefined( Scope *S,
+                                       SourceLocation Loc,
+                                       char *Name);
+
   ExprResult ActOnInstanceMessage(Scope *S,
                                   Expr *Receiver,
                                   Selector Sel,

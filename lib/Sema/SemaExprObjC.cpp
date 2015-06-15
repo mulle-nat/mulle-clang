@@ -2812,6 +2812,36 @@ static void RemoveSelectorFromWarningCache(Sema &S, Expr* Arg) {
   }
 }
 
+
+bool Sema::CheckMulleObjCFunctionDefined( Scope *S, SourceLocation Loc, char *Name)
+{
+   DeclContext               *E;
+   DeclarationName           DN;
+   DeclContextLookupResult   R;
+   ASTContext                *Ctx;
+   IdentifierInfo            *II;
+   
+   // hacked together without a clue
+   E   = S->getEntity();
+   Ctx = &E->getParentASTContext();
+   II  = &Ctx->Idents.get( Name);
+   DN  = DeclarationName( II);
+   
+   //
+   // create result first, but feed it with partial search parameters
+   // then use LookupName with this object as first parameter passed by reference
+   // TODO: try to make this even more obsure just for C++'s sake
+   //
+   LookupResult   Result( *this, DN, Loc, LookupOrdinaryName);
+   LookupName(Result, S, false);
+   
+   if( Result.getResultKind() == LookupResult::Found)
+      return( true);
+   
+   Diag( Loc, diag::err_function_mulle_objc_missing) << DN;
+   return( false);
+}
+
 // ActOnInstanceMessage - used for both unary and keyword messages.
 // ArgExprs is optional - if it is present, the number of expressions
 // is obtained from Sel.getNumArgs().
@@ -2839,6 +2869,12 @@ ExprResult Sema::ActOnInstanceMessage(Scope *S,
   if (Sel == RespondsToSelectorSel)
     RemoveSelectorFromWarningCache(*this, Args[0]);
 
+  // (nat) check now that method dispatcher function is enabled
+  // if we do this during code generation, it's too late. We don't have the
+  // lookup and error facilities easily available
+  if( ! CheckMulleObjCFunctionDefined( S, LBracLoc, "mulle_objc_object_inline_call"))
+     return ExprError();
+  
   return BuildInstanceMessage(Receiver, Receiver->getType(),
                               /*SuperLoc=*/SourceLocation(), Sel,
                               /*Method=*/nullptr, LBracLoc, SelectorLocs,

@@ -2872,7 +2872,7 @@ ExprResult Sema::ActOnInstanceMessage(Scope *S,
   // (nat) check now that method dispatcher function is enabled
   // if we do this during code generation, it's too late. We don't have the
   // lookup and error facilities easily available
-  if( ! CheckMulleObjCFunctionDefined( S, LBracLoc, "mulle_objc_object_inline_call"))
+  if( ! CheckMulleObjCFunctionDefined( S, LBracLoc, (char *) "mulle_objc_object_inline_call"))
      return ExprError();
   
   return BuildInstanceMessage(Receiver, Receiver->getType(),

@@ -2078,7 +2078,7 @@ Sema::ActOnIdExpression(Scope *S, CXXScopeSpec &SS,
     // If this reference is in an Objective-C method, then we need to do
     // some special Objective-C lookup, too.
     if (IvarLookupFollowUp) {
-      ExprResult E(LookupInObjCMethod(R, S, II, true));
+      ExprResult E(LookupInObjCMethod(R, S, SS, II, true));
       if (E.isInvalid())
         return ExprError();
 
@@ -2160,7 +2160,7 @@ Sema::ActOnIdExpression(Scope *S, CXXScopeSpec &SS,
     // reference the ivar.
     if (ObjCIvarDecl *Ivar = R.getAsSingle<ObjCIvarDecl>()) {
       R.clear();
-      ExprResult E(LookupInObjCMethod(R, S, Ivar->getIdentifier()));
+      ExprResult E(LookupInObjCMethod(R, S, SS, Ivar->getIdentifier()));
       // In a hopelessly buggy code, Objective-C instance variable
       // lookup fails and no expression will be built to reference it.
       if (!E.isInvalid() && !E.get())
@@ -2313,6 +2313,31 @@ Sema::BuildQualifiedDeclarationNameExpr(CXXScopeSpec &SS,
   return BuildDeclarationNameExpr(SS, R, /* ADL */ false);
 }
 
+
+ExprResult   Sema::GetMulle_paramExpr( Scope *S, CXXScopeSpec &SS, SourceLocation Loc, char *Name)
+{
+   ASTContext        *Ctx;
+   DeclContext       *E;
+   DeclarationName   DN;
+   ExprResult        BaseExpr;
+   IdentifierInfo    *II;
+   
+   // hacked together without a clue
+   E   = S->getEntity();
+   Ctx = &E->getParentASTContext();
+   II  = &Ctx->Idents.get( Name);
+   DN  = DeclarationName( II);
+   
+   LookupResult R(*this, DN, Loc, LookupOrdinaryName);
+   LookupParsedName( R, S, &SS, false);
+   if( ! R.empty())
+      return( BuildDeclarationNameExpr( SS, R, false));
+   
+   // this can't really happen
+   return ExprError();
+}
+
+
 /// LookupInObjCMethod - The parser has read a name in, and Sema has
 /// detected that we're currently inside an ObjC method.  Perform some
 /// additional lookup.
@@ -2322,7 +2347,7 @@ Sema::BuildQualifiedDeclarationNameExpr(CXXScopeSpec &SS,
 ///
 /// Returns a null sentinel to indicate trivial success.
 ExprResult
-Sema::LookupInObjCMethod(LookupResult &Lookup, Scope *S,
+Sema::LookupInObjCMethod(LookupResult &Lookup, Scope *S, CXXScopeSpec &SS,
                          IdentifierInfo *II, bool AllowBuiltinCreation) {
   SourceLocation Loc = Lookup.getNameLoc();
   ObjCMethodDecl *CurMethod = getCurMethodDecl();
@@ -2350,6 +2375,33 @@ Sema::LookupInObjCMethod(LookupResult &Lookup, Scope *S,
   else
     LookForIvars = (Lookup.isSingleResult() &&
                     Lookup.getFoundDecl()->isDefinedOutsideFunctionOrMethod());
+   
+   //
+  // (nat) lookup if this is one of our parameters
+  //
+   
+  if( CurMethod->FindParamRecordField( II))
+  {
+     ExprResult BaseExpr =
+         GetMulle_paramExpr( S, SS, Loc, (char *) "_param");
+   
+     ExprResult result =
+         BuildMemberReferenceExpr( BaseExpr.get(),
+                                   BaseExpr.get()->getType(), // why ??
+                                   Loc,
+                                   true, // IsArrow,
+                                   SS,
+                                   Loc,
+                                   nullptr,
+                                   Lookup, // fake and wrong
+                                   nullptr,
+                                   true,
+                                   nullptr);
+     
+     
+     return( result); // placeholder code
+  }
+   
   ObjCInterfaceDecl *IFace = nullptr;
   if (LookForIvars) {
     IFace = CurMethod->getClassInterface();

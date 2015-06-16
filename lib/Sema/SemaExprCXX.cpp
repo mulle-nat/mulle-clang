@@ -6027,7 +6027,7 @@ static ExprResult attemptRecovery(Sema &SemaRef,
             NewSS, /*TemplateKWLoc*/ SourceLocation(), R,
             /*TemplateArgs*/ nullptr);
     } else if (auto *Ivar = dyn_cast<ObjCIvarDecl>(ND)) {
-      return SemaRef.LookupInObjCMethod(R, Consumer.getScope(),
+      return SemaRef.LookupInObjCMethod(R, Consumer.getScope(), NewSS,
                                         Ivar->getIdentifier());
     }
   }

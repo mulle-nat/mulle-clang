@@ -891,6 +891,13 @@ ObjCMethodFamily ObjCMethodDecl::getMethodFamily() const {
   return family;
 }
 
+
+bool   ObjCMethodDecl::FindParamRecordField( IdentifierInfo *II) 
+{
+   return( false);
+}
+
+
 void ObjCMethodDecl::createImplicitParams(ASTContext &Context,
                                           const ObjCInterfaceDecl *OID) {
   QualType selfTy;

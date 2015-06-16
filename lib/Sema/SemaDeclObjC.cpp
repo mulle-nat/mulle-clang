@@ -330,8 +330,11 @@ void Sema::ActOnStartOfObjCMethodDef(Scope *FnBodyScope, Decl *D) {
       Diag(Param->getLocation(), diag::warn_arc_strong_pointer_objc_pointer) <<
             Param->getType();
     
-    if (Param->getIdentifier())
-      PushOnScopeChains(Param, FnBodyScope);
+     // (nat) pushing the param identifier on the scope is done here
+     // and wrongly done again in Sema::ActOnMethodDeclaration (I think).
+     // Do-Not-Want. Therefore commented out
+     // if (Param->getIdentifier())
+     // PushOnScopeChains(Param, FnBodyScope);
   }
 
   // In ARC, disallow definition of retain/release/autorelease/retainCount
@@ -3177,8 +3180,12 @@ Decl *Sema::ActOnMethodDeclaration(
       Diag(Param->getLocation(), diag::err_block_on_nonlocal);
       Param->setInvalidDecl();
     }
-    S->AddDecl(Param);
-    IdResolver.AddDecl(Param);
+     
+     // (nat) interestingly enough, removing Params from the scope doesn't
+     // mean, they aren't found
+     //    S->AddDecl(Param);
+     // Scope, IdResolver ??
+     //    IdResolver.AddDecl(Param);
 
     Params.push_back(Param);
   }

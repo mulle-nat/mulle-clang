@@ -2338,6 +2338,7 @@ ExprResult   Sema::GetMulle_paramExpr( Scope *S, CXXScopeSpec &SS, SourceLocatio
 }
 
 
+
 /// LookupInObjCMethod - The parser has read a name in, and Sema has
 /// detected that we're currently inside an ObjC method.  Perform some
 /// additional lookup.
@@ -2351,7 +2352,8 @@ Sema::LookupInObjCMethod(LookupResult &Lookup, Scope *S, CXXScopeSpec &SS,
                          IdentifierInfo *II, bool AllowBuiltinCreation) {
   SourceLocation Loc = Lookup.getNameLoc();
   ObjCMethodDecl *CurMethod = getCurMethodDecl();
-  
+  FieldDecl      *FD;
+   
   // Check for error condition which is already reported.
   if (!CurMethod)
     return ExprError();
@@ -2376,30 +2378,38 @@ Sema::LookupInObjCMethod(LookupResult &Lookup, Scope *S, CXXScopeSpec &SS,
     LookForIvars = (Lookup.isSingleResult() &&
                     Lookup.getFoundDecl()->isDefinedOutsideFunctionOrMethod());
    
-   //
+  //
   // (nat) lookup if this is one of our parameters
   //
    
-  if( CurMethod->FindParamRecordField( II))
+  FD = CurMethod->FindParamRecordField( II);
+  if( FD)
   {
+     // this couldn't be any easier... 
      ExprResult BaseExpr =
          GetMulle_paramExpr( S, SS, Loc, (char *) "_param");
-   
-     ExprResult result =
-         BuildMemberReferenceExpr( BaseExpr.get(),
-                                   BaseExpr.get()->getType(), // why ??
-                                   Loc,
-                                   true, // IsArrow,
-                                   SS,
-                                   Loc,
-                                   nullptr,
-                                   Lookup, // fake and wrong
-                                   nullptr,
-                                   true,
-                                   nullptr);
+
+     DeclarationNameInfo memberNameInfo( FD->getDeclName(), Loc);
+     DeclAccessPair fakeFoundDecl = DeclAccessPair::make(FD, FD->getAccess());
+     ASTContext        *Ctx;
+     DeclContext       *E;
+
+     E   = S->getEntity();
+     Ctx = &E->getParentASTContext();
+     ExprResult result = MemberExpr::Create(*Ctx,
+                                            BaseExpr.get(),
+                                            true,
+                                            SS.getWithLocInContext(*Ctx),
+                                            Loc,
+                                            FD,
+                                            fakeFoundDecl,
+                                            memberNameInfo,
+                                            nullptr,
+                                            FD->getType().getNonReferenceType(),
+                                            VK_LValue,
+                                            OK_Ordinary);
      
-     
-     return( result); // placeholder code
+     return( result); 
   }
    
   ObjCInterfaceDecl *IFace = nullptr;

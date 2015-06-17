@@ -892,9 +892,21 @@ ObjCMethodFamily ObjCMethodDecl::getMethodFamily() const {
 }
 
 
-bool   ObjCMethodDecl::FindParamRecordField( IdentifierInfo *II) 
+FieldDecl  *ObjCMethodDecl::FindParamRecordField( IdentifierInfo *II)
 {
-   return( false);
+   IdentifierInfo   *FII;
+   
+   if( ! ParamRecord)
+      return( nullptr);
+   
+   for (RecordDecl::field_iterator Field = ParamRecord->field_begin(),
+        FieldEnd = ParamRecord->field_end(); Field != FieldEnd; ++Field)
+   {
+      FII = Field->getIdentifier();
+      if( FII == II)
+         return( Field->getCanonicalDecl());
+   }
+   return( nullptr);
 }
 
 

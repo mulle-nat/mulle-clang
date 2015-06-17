@@ -1332,6 +1332,7 @@ CGObjCMulleRuntime::GenerateMessageSendSuper(CodeGen::CodeGenFunction &CGF,
                           true, CallArgs, Method, ObjCTypes);
 }
 
+
 /// Generate code for a message send expression.
 CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction &CGF,
                                                ReturnValueSlot Return,
@@ -1364,14 +1365,11 @@ CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction
    
    NullReturnState nullReturn;
    
-   llvm::Constant *Fn = nullptr;
    if (CGM.ReturnSlotInterferesWithArgs(MSI.CallInfo))
    {
          nullReturn.init(CGF, Arg0);
    }
-   
-   Fn = ObjCTypes.getMessageSendFn();
-   
+
    bool requiresnullCheck = false;
    
    if (CGM.getLangOpts().ObjCAutoRefCount && Method)
@@ -1385,13 +1383,42 @@ CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction
             break;
          }
       }
+
+   //
+   // synthesize call to mulle_objc_object_inline_call, which must have been
+   // included already
+   //
+   IdentifierInfo *msgSendIdent = &CGM.getContext().Idents.get("mulle_objc_object_inline_call");
+   SmallVector<QualType, 16> ArgTys;
+   QualType argT = CGM.getContext().VoidPtrTy;
+   assert(!argT.isNull() && "Can't find 'id' type");
+   ArgTys.push_back(argT);
+   argT = CGM.getContext().getObjCSelType();
+   assert(!argT.isNull() && "Can't find 'SEL' type");
+   ArgTys.push_back(argT);
+   argT = CGM.getContext().VoidPtrTy;
+   ArgTys.push_back(argT);
    
-   Fn = llvm::ConstantExpr::getBitCast(Fn, MSI.MessengerType);
+   FunctionProtoType::ExtProtoInfo fpi;
+   fpi.Variadic = false;
+
+   QualType msgSendType = CGM.getContext().getFunctionType( CGM.getContext().VoidPtrTy, ArgTys, fpi);
+   FunctionDecl   *FD = FunctionDecl::Create(CGM.getContext(), CGM.getContext().getTranslationUnitDecl(),
+                                                   SourceLocation(),
+                                                   SourceLocation(),
+                                                   msgSendIdent, msgSendType,
+                                                   nullptr, SC_Static);
+   GlobalDecl     globalDecl( FD);
+   llvm::Constant *Fn;
+
+   Fn = CGM.GetAddrOfGlobal( globalDecl);
+//   Fn = llvm::ConstantExpr::getBitCast(Fn, MSI.MessengerType);
    RValue rvalue = CGF.EmitCall(MSI.CallInfo, Fn, Return, ActualArgs);
    
    return nullReturn.complete(CGF, rvalue, ResultType, CallArgs,
                               requiresnullCheck ? Method : nullptr);
 }
+
 
 CodeGen::RValue
 CGObjCCommonMulleRuntime::EmitMessageSend(CodeGen::CodeGenFunction &CGF,

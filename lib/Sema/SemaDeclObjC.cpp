@@ -332,7 +332,7 @@ void Sema::ActOnStartOfObjCMethodDef(Scope *FnBodyScope, Decl *D) {
     
      // (nat) pushing the param identifier on the scope is done here
      // and wrongly done again in Sema::ActOnMethodDeclaration (I think).
-     // Do-Not-Want. Therefore commented out
+     // Do-Not-Want.
      // if (Param->getIdentifier())
      // PushOnScopeChains(Param, FnBodyScope);
   }
@@ -3181,8 +3181,8 @@ Decl *Sema::ActOnMethodDeclaration(
       Param->setInvalidDecl();
     }
      
-     // (nat) interestingly enough, removing Params from the scope doesn't
-     // mean, they aren't found
+     // (nat) This is done before already.... but we don't want it anyway.
+     //       Keep regular parameters outside of the scopes.
      //    S->AddDecl(Param);
      // Scope, IdResolver ??
      //    IdResolver.AddDecl(Param);
@@ -3192,6 +3192,7 @@ Decl *Sema::ActOnMethodDeclaration(
   
   for (unsigned i = 0, e = CNumArgs; i != e; ++i) {
     ParmVarDecl *Param = cast<ParmVarDecl>(CParamInfo[i].Param);
+     // this ArgType code appears to be completely superflous
     QualType ArgType = Param->getType();
     if (ArgType.isNull())
       ArgType = Context.getObjCIdType();
@@ -3199,11 +3200,81 @@ Decl *Sema::ActOnMethodDeclaration(
       // Perform the default array/function conversions (C99 6.7.5.3p[7,8]).
       ArgType = Context.getAdjustedParameterType(ArgType);
 
-    Param->setDeclContext(ObjCMethod);
-    Params.push_back(Param);
+     Param->setDeclContext(ObjCMethod);
+     Params.push_back(Param);
   }
-  
-  ObjCMethod->setMethodParams(Context, Params, SelectorLocs);
+
+   ObjCMethod->setMethodParams(Context, Params, SelectorLocs);
+
+  //
+  // the params are what is used for syntax checks and all the
+  // other good stuff.
+  //
+  // The actual ParameterBlock that is used for code generation
+  // is kept separately. For now we assume that there
+  // is alwas a _param block, except if there are not arguments.
+  // The optimization for one parameter fitting into a void *,
+  // is done a) during call  and  b) during access of the parameter
+  //
+   if( Params.size())
+   {
+      StringRef  RecordName;
+      
+      //
+      // this could be trouble, if someone has declared the same method
+      // already ? check this
+      //
+      RecordName = "__objc_param__" + Sel.getAsString();
+      IdentifierInfo  *RecordID = &Context.Idents.get( RecordName);
+      
+      RecordDecl  *RD = RecordDecl::Create( Context, TTK_Struct, CurContext, MethodLoc, EndLoc, RecordID);
+      
+      for (unsigned i = 0, e = Params.size(); i != e; ++i)
+      {
+         ParmVarDecl *Param = Params[ i];
+         FieldDecl   *FD;
+         
+         FD = FieldDecl::Create( Context, RD,
+                                Param->getLocation(), Param->getLocEnd(),
+                                Param->getIdentifier(),
+                                Param->getType(),
+                                Param->getTypeSourceInfo(),
+                                Param->getDefaultArg(),
+                                false,  // Mutable... only for C++
+                                ICIS_NoInit);
+         RD->addDecl( FD);
+      }
+      RD->completeDefinition();
+
+      // some voodoo, blindly copied
+      AddAlignmentAttributesForRecord(RD);
+      AddMsStructLayoutForRecord(RD);
+      
+      ObjCMethod->setParamRecord( RD);
+
+   // (nat) fake it up, so that ever method looks exactly alike
+   //       add our _param implicit decl now.
+   //
+      SmallVector<ParmVarDecl*, 1> FakeParams;
+      SourceLocation StartLoc = SelectorLocs[ 0];
+      ArrayRef<SourceLocation> Locs( StartLoc);
+      
+      // convert record to a QualType
+      QualType RecTy = Context.getTagDeclType(RD);
+      QualType PtrTy = Context.getPointerType( RecTy);
+
+      ImplicitParamDecl  *Param = ImplicitParamDecl::Create(Context,
+                                                            ObjCMethod,
+                                                            StartLoc,
+                                                            &Context.Idents.get("_param"),
+                                                            PtrTy);
+      // not so sure about this...
+      IdResolver.AddDecl(Param);
+      ObjCMethod->setParamDecl( Param);
+   }
+   
+   // DONE
+   
   ObjCMethod->setObjCDeclQualifier(
     CvtQTToAstBitMask(ReturnQT.getObjCDeclQualifier()));
 

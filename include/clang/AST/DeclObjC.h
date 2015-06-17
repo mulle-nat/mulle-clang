@@ -173,6 +173,8 @@ private:
   void *ParamsAndSelLocs;
   unsigned NumParams;
 
+  RecordDecl    *ParamRecord;
+   
   /// List of attributes for this method declaration.
   SourceLocation DeclEndLoc; // the location of the ';' or '{'.
 
@@ -185,6 +187,9 @@ private:
   /// CmdDecl - Decl for the implicit _cmd parameter. This is lazily
   /// constructed by createImplicitParams.
   ImplicitParamDecl *CmdDecl;
+   /// Para,Decl - Decl for the implicit _param parameter. This is lazily
+   /// constructed by ActOnMethodDeclaration.
+  ImplicitParamDecl *ParamDecl;
 
   SelectorLocationsKind getSelLocsKind() const {
     return (SelectorLocationsKind)SelLocsKind;
@@ -239,10 +244,14 @@ private:
         RelatedResultType(HasRelatedResultType),
         SelLocsKind(SelLoc_StandardNoSpace), IsOverriding(0), HasSkippedBody(0),
         MethodDeclType(T), ReturnTInfo(ReturnTInfo), ParamsAndSelLocs(nullptr),
-        NumParams(0), DeclEndLoc(endLoc), Body(), SelfDecl(nullptr),
-        CmdDecl(nullptr) {
-    setImplicit(isImplicitlyDeclared);
-  }
+        NumParams(0),
+        DeclEndLoc(endLoc), Body(), SelfDecl(nullptr),
+        CmdDecl(nullptr),
+        ParamDecl( nullptr)
+   {
+      ParamRecord = nullptr;
+      setImplicit(isImplicitlyDeclared);
+   }
 
   /// \brief A definition will return its interface declaration.
   /// An interface declaration will return its definition.
@@ -267,11 +276,19 @@ public:
   }
 
   ObjCDeclQualifier getObjCDeclQualifier() const {
-    return ObjCDeclQualifier(objcDeclQualifier);
+      return ObjCDeclQualifier(objcDeclQualifier);
   }
   void setObjCDeclQualifier(ObjCDeclQualifier QV) { objcDeclQualifier = QV; }
+   
+  RecordDecl   *getParamRecord() const {
+     return ParamRecord;
+  }
+  void setParamRecord( RecordDecl  *RD)
+  {
+    ParamRecord = RD;
+  }
 
-  /// \brief Determine whether this method has a result type that is related
+   /// \brief Determine whether this method has a result type that is related
   /// to the message receiver's type.
   bool hasRelatedResultType() const { return RelatedResultType; }
 
@@ -393,7 +410,7 @@ public:
     return llvm::map_iterator(param_end(), deref_fun(&ParmVarDecl::getType));
   }
 
-  bool   FindParamRecordField( IdentifierInfo *II);
+  FieldDecl  *FindParamRecordField( IdentifierInfo *II);
    
   /// createImplicitParams - Used to lazily create the self and cmd
   /// implict parameters. This must be called prior to using getSelfDecl()
@@ -405,6 +422,8 @@ public:
   void setSelfDecl(ImplicitParamDecl *SD) { SelfDecl = SD; }
   ImplicitParamDecl * getCmdDecl() const { return CmdDecl; }
   void setCmdDecl(ImplicitParamDecl *CD) { CmdDecl = CD; }
+  ImplicitParamDecl * getParamDecl() const { return ParamDecl; }
+  void setParamDecl(ImplicitParamDecl *PD) { ParamDecl = PD; }
 
   /// Determines the family of this method.
   ObjCMethodFamily getMethodFamily() const;

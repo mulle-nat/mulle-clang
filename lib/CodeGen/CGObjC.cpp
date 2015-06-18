@@ -365,8 +365,14 @@ RValue CodeGenFunction::EmitObjCMessageExpr(const ObjCMessageExpr *E,
 
   QualType ResultType = method ? method->getReturnType() : E->getType();
 
-  CallArgList Args;
-  EmitCallArgs(Args, method, E->arg_begin(), E->arg_end());
+  
+  // @mulle-objc@
+  // take arguments, push it into one big struct
+  // Emit this argument
+  //
+  CallArgList   Args;  // this contains llvm stuff
+
+  Runtime.GenerateCallArgs( Args, *this, E);
 
   // For delegate init calls in ARC, do an unsafe store of null into
   // self.  This represents the call taking direct ownership of that
@@ -423,6 +429,9 @@ RValue CodeGenFunction::EmitObjCMessageExpr(const ObjCMessageExpr *E,
     Builder.CreateStore(newSelf, selfAddr);
   }
 
+// leak for now
+//  delete Args;
+  
   return AdjustRelatedResultType(*this, E->getType(), method, result);
 }
 

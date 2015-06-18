@@ -159,6 +159,12 @@ public:
                       const ObjCInterfaceDecl *Class = nullptr,
                       const ObjCMethodDecl *Method = nullptr) = 0;
 
+   /* @mulle-objc@ */
+   virtual void   GenerateCallArgs( CallArgList &Args,
+                                    CodeGenFunction &CGF,
+                                    const ObjCMessageExpr *Expr);
+
+  
   /// Generate an Objective-C message send operation to the super
   /// class initiated in a method for Class and with the given Self
   /// object.

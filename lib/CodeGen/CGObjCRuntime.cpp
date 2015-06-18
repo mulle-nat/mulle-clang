@@ -382,3 +382,13 @@ CGObjCRuntime::getMessageSendInfo(const ObjCMethodDecl *method,
   return MessageSendInfo(argsInfo, signatureType);
 }
 
+/* @mulle-objc@ 
+   this is done differently in mulle-objc so this little code 
+   snippet is placed into the runtime
+*/
+void  CGObjCRuntime::GenerateCallArgs( CallArgList &Args,
+                                       CodeGenFunction &CGF,
+                                       const ObjCMessageExpr *Expr)
+{
+  CGF.EmitCallArgs( Args, Expr->getMethodDecl(), Expr->arg_begin(), Expr->arg_end());
+}

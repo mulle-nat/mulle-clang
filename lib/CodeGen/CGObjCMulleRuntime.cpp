@@ -17,6 +17,8 @@
 //
 // Then stuff got started thrown out and tweaked to taste. OK, this is cargo
 // cult programming :)
+//
+// @mulle-objc@ other code places, that I modified, should be marked with this
 //===----------------------------------------------------------------------===//
 
 #include "CGObjCRuntime.h"

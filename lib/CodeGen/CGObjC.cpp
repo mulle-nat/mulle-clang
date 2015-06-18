@@ -499,12 +499,7 @@ static llvm::Value *emitARCRetainLoadOfScalar(CodeGenFunction &CGF,
 /// Generate an Objective-C method.  An Objective-C method is a C function with
 /// its pointer, name, and types registered in the class struture.
 void CodeGenFunction::GenerateObjCMethod(const ObjCMethodDecl *OMD) {
-
-   // here the mulle runtime patches in and possibly rewrites the OMD
-   if( ! CGM.getObjCRuntime().WillGenerateObjCMethod( *this, OMD))
-      return;
-   
-   StartObjCMethod(OMD, OMD->getClassInterface());
+  StartObjCMethod(OMD, OMD->getClassInterface());
   PGO.assignRegionCounters(OMD, CurFn);
   assert(isa<CompoundStmt>(OMD->getBody()));
   RegionCounter Cnt = getPGORegionCounter(OMD->getBody());

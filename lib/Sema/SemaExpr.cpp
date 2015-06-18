@@ -2379,6 +2379,7 @@ Sema::LookupInObjCMethod(LookupResult &Lookup, Scope *S, CXXScopeSpec &SS,
                     Lookup.getFoundDecl()->isDefinedOutsideFunctionOrMethod());
    
   //
+  // @mulle-objc@
   // (nat) lookup if this is one of our parameters
   //
    

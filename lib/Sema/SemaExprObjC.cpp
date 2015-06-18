@@ -2869,6 +2869,7 @@ ExprResult Sema::ActOnInstanceMessage(Scope *S,
   if (Sel == RespondsToSelectorSel)
     RemoveSelectorFromWarningCache(*this, Args[0]);
 
+   // @mulle-objc@
   // (nat) check now that method dispatcher function is enabled
   // if we do this during code generation, it's too late. We don't have the
   // lookup and error facilities easily available

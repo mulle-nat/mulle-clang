@@ -382,11 +382,3 @@ CGObjCRuntime::getMessageSendInfo(const ObjCMethodDecl *method,
   return MessageSendInfo(argsInfo, signatureType);
 }
 
-
-bool   CGObjCRuntime::WillGenerateObjCMethod( CodeGen::CodeGenFunction &CGF,
-                                              const ObjCMethodDecl *method)
-{
-   return( true);  // default: just do it
-}
-
-

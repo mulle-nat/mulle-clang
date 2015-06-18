@@ -50,9 +50,10 @@ public:
 
     /// 'objfw' is the Objective-C runtime included in ObjFW
     ObjFW,
-
-    /// 'mulle' is the runtime from Mulle kybernetiK. It's old fashioned and 
-    /// fragile and hopefully very fast
+   
+    /// @mulle-objc@
+    /// 'mulle' is the runtime from Mulle kybernetiK. It's fragile and
+    /// hopefully very fast
     Mulle
   };
 

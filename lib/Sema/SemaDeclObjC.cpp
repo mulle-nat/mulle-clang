@@ -330,6 +330,7 @@ void Sema::ActOnStartOfObjCMethodDef(Scope *FnBodyScope, Decl *D) {
       Diag(Param->getLocation(), diag::warn_arc_strong_pointer_objc_pointer) <<
             Param->getType();
     
+     // @mulle-objc@
      // (nat) pushing the param identifier on the scope is done here
      // and wrongly done again in Sema::ActOnMethodDeclaration (I think).
      // Do-Not-Want.

@@ -366,7 +366,7 @@ RValue CodeGenFunction::EmitObjCMessageExpr(const ObjCMessageExpr *E,
   QualType ResultType = method ? method->getReturnType() : E->getType();
 
   
-  // @mulle-objc@
+  // @mulle-objc@ Patchpoint for GenerateCallArgs
   // take arguments, push it into one big struct
   // Emit this argument
   //
@@ -481,13 +481,19 @@ void CodeGenFunction::StartObjCMethod(const ObjCMethodDecl *OMD,
 
   args.push_back(OMD->getSelfDecl());
   args.push_back(OMD->getCmdDecl());
+ // @mulle-objc@ Push ParmamDecl on args Decl
+ // Ignore others
+  if( OMD->getParamDecl())
+     args.push_back(OMD->getParamDecl());
 
-  for (const auto *PI : OMD->params())
-    args.push_back(PI);
+   //  for (const auto *PI : OMD->params())
+   // args.push_back(PI);
 
   CurGD = OMD;
   CurEHLocation = OMD->getLocEnd();
 
+   // create a FunctionDecl that mimics what we are actually about
+  
   StartFunction(OMD, OMD->getReturnType(), Fn, FI, args,
                 OMD->getLocation(), StartLoc);
 

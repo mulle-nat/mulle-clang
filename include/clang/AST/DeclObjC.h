@@ -173,7 +173,9 @@ private:
   void *ParamsAndSelLocs;
   unsigned NumParams;
 
+  // @mulle-objc@ New variables for parameter hackage
   RecordDecl    *ParamRecord;
+   void          *ParamScope; // void coz to lazy to include scope
    
   /// List of attributes for this method declaration.
   SourceLocation DeclEndLoc; // the location of the ';' or '{'.
@@ -250,6 +252,7 @@ private:
         ParamDecl( nullptr)
    {
       ParamRecord = nullptr;
+      ParamScope  = nullptr;
       setImplicit(isImplicitlyDeclared);
    }
 
@@ -410,6 +413,11 @@ public:
     return llvm::map_iterator(param_end(), deref_fun(&ParmVarDecl::getType));
   }
 
+   void * getParamScope() const { return ParamScope; }
+   void setParamScope(void *Scope) { ParamScope = Scope; }
+   
+   
+   
   FieldDecl  *FindParamRecordField( IdentifierInfo *II);
    
   /// createImplicitParams - Used to lazily create the self and cmd

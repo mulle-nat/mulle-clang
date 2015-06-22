@@ -2379,7 +2379,7 @@ Sema::LookupInObjCMethod(LookupResult &Lookup, Scope *S, CXXScopeSpec &SS,
                     Lookup.getFoundDecl()->isDefinedOutsideFunctionOrMethod());
    
   //
-  // @mulle-objc@
+  // @mulle-objc@ Create MemberExpr for _param-><name>
   // (nat) lookup if this is one of our parameters
   //
    
@@ -2387,30 +2387,34 @@ Sema::LookupInObjCMethod(LookupResult &Lookup, Scope *S, CXXScopeSpec &SS,
   if( FD)
   {
      // this couldn't be any easier... 
-     ExprResult BaseExpr =
-         GetMulle_paramExpr( S, SS, Loc, (char *) "_param");
 
-     DeclarationNameInfo memberNameInfo( FD->getDeclName(), Loc);
-     DeclAccessPair fakeFoundDecl = DeclAccessPair::make(FD, FD->getAccess());
-     ASTContext        *Ctx;
-     DeclContext       *E;
+     DeclarationNameInfo   memberNameInfo( FD->getDeclName(), Loc);
+     DeclAccessPair        fakeFoundDecl = DeclAccessPair::make(FD, FD->getAccess());
+     ASTContext            *Ctx;
+     DeclContext           *E;
 
      E   = S->getEntity();
      Ctx = &E->getParentASTContext();
-     ExprResult result = MemberExpr::Create(*Ctx,
-                                            BaseExpr.get(),
-                                            true,
-                                            SS.getWithLocInContext(*Ctx),
-                                            Loc,
-                                            FD,
-                                            fakeFoundDecl,
-                                            memberNameInfo,
-                                            nullptr,
-                                            FD->getType().getNonReferenceType(),
-                                            VK_LValue,
-                                            OK_Ordinary);
+     ExprResult BaseExpr = GetMulle_paramExpr( S, SS, Loc, (char *) "_param");
+     ExprResult CastExpr = DefaultLvalueConversion( BaseExpr.get());
+/*     ExprResult CastExpr = ImplicitCastExpr::Create(*Ctx, BaseExpr.get()->getType(), CK_LValueToRValue, BaseExpr.get(), nullptr, VK_RValue);
+*/
+     ExprResult Result   = MemberExpr::Create( *Ctx,
+                                              CastExpr.get(),
+                                              true,
+                                              SS.getWithLocInContext(*Ctx),
+                                              SourceLocation(), // invalid template location
+                                              FD,
+                                              fakeFoundDecl,
+                                              memberNameInfo,
+                                              nullptr,
+                                              FD->getType(),
+                                              VK_LValue, // maybe so, maybe not so
+                                              OK_Ordinary);
      
-     return( result); 
+     MarkAnyDeclReferenced(Loc, FD, true);
+     
+     return( Result);
   }
    
   ObjCInterfaceDecl *IFace = nullptr;

@@ -12,13 +12,14 @@
 // http://www.mulle-kybernetik.com/software/mulle-objc-runtime
 //
 // This is a tweaked copy of CGObjCMac.cpp. Because those files are as private
-// as possible for some reason, inheritance is difficult and not very much
-// future proof.
+// as possible for some reason, inheritance would have been difficult and not
+// very future proof.
 //
 // Then stuff got started thrown out and tweaked to taste. OK, this is cargo
 // cult programming :)
 //
-// @mulle-objc@ other code places, that I modified, should be marked with this
+// @mulle-objc@ Memo: code places, that I modified, should be marked with this
+//              followed by a comment, what to see there
 //===----------------------------------------------------------------------===//
 
 #include "CGObjCRuntime.h"

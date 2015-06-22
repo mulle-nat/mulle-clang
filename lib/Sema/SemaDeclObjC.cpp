@@ -317,7 +317,11 @@ void Sema::ActOnStartOfObjCMethodDef(Scope *FnBodyScope, Decl *D) {
 
   PushOnScopeChains(MDecl->getSelfDecl(), FnBodyScope);
   PushOnScopeChains(MDecl->getCmdDecl(), FnBodyScope);
-
+  PushOnScopeChains(MDecl->getParamDecl(), FnBodyScope);
+   
+   // @mulle-nat@ save this for later retrieval in ActonMethod
+  MDecl->setParamScope( (void *) FnBodyScope);
+   
   // The ObjC parser requires parameter names so there's no need to check.
   CheckParmsForFunctionDef(MDecl->param_begin(), MDecl->param_end(),
                            /*CheckParameterNames=*/false);
@@ -330,7 +334,7 @@ void Sema::ActOnStartOfObjCMethodDef(Scope *FnBodyScope, Decl *D) {
       Diag(Param->getLocation(), diag::warn_arc_strong_pointer_objc_pointer) <<
             Param->getType();
     
-     // @mulle-objc@
+     // @mulle-objc@ Remove Parameters from Scope
      // (nat) pushing the param identifier on the scope is done here
      // and wrongly done again in Sema::ActOnMethodDeclaration (I think).
      // Do-Not-Want.
@@ -3182,6 +3186,7 @@ Decl *Sema::ActOnMethodDeclaration(
       Param->setInvalidDecl();
     }
      
+     // @mulle-objc@ Remove Parameters from Scope
      // (nat) This is done before already.... but we don't want it anyway.
      //       Keep regular parameters outside of the scopes.
      //    S->AddDecl(Param);
@@ -3207,7 +3212,7 @@ Decl *Sema::ActOnMethodDeclaration(
 
    ObjCMethod->setMethodParams(Context, Params, SelectorLocs);
 
-  //
+  // @mulle-objc@ Create ParamRecord
   // the params are what is used for syntax checks and all the
   // other good stuff.
   //
@@ -3269,9 +3274,10 @@ Decl *Sema::ActOnMethodDeclaration(
                                                             StartLoc,
                                                             &Context.Idents.get("_param"),
                                                             PtrTy);
-      // not so sure about this...
-      IdResolver.AddDecl(Param);
+      
       ObjCMethod->setParamDecl( Param);
+      // this is implicitly done later in ActOnStartOfObjCMethodDef
+      //      IdResolver.AddDecl(Param);  // this adds it to search scope!
    }
    
    // DONE

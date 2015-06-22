@@ -299,10 +299,19 @@ CodeGenTypes::arrangeObjCMessageSendSignature(const ObjCMethodDecl *MD,
   SmallVector<CanQualType, 16> argTys;
   argTys.push_back(Context.getCanonicalParamType(receiverType));
   argTys.push_back(Context.getCanonicalParamType(Context.getObjCSelType()));
+
+   /* @mulle-objc@ Hack ObjCMessageSendSignature */
+
+   RecordDecl *RD = MD->getParamRecord();
+   
+   QualType RecTy = CGM.getContext().getTagDeclType( RD);
+   QualType PtrTy = CGM.getContext().getPointerType( RecTy);
+   
+  argTys.push_back( Context.getCanonicalParamType( PtrTy));
   // FIXME: Kill copy?
-  for (const auto *I : MD->params()) {
-    argTys.push_back(Context.getCanonicalParamType(I->getType()));
-  }
+   //  for (const auto *I : MD->params()) {
+   //    argTys.push_back(Context.getCanonicalParamType(I->getType()));
+   //  }
 
   FunctionType::ExtInfo einfo;
   bool IsWindows = getContext().getTargetInfo().getTriple().isOSWindows();

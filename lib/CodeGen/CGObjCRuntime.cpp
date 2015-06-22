@@ -382,10 +382,11 @@ CGObjCRuntime::getMessageSendInfo(const ObjCMethodDecl *method,
   return MessageSendInfo(argsInfo, signatureType);
 }
 
-/* @mulle-objc@ 
-   this is done differently in mulle-objc so this little code 
-   snippet is placed into the runtime
-*/
+//
+// @mulle-objc@ Callback to generate LLVM method argument list
+//   this is done differently in mulle-objc so this little code
+//   snippet is placed into the runtime
+//
 void  CGObjCRuntime::GenerateCallArgs( CallArgList &Args,
                                        CodeGenFunction &CGF,
                                        const ObjCMessageExpr *Expr)

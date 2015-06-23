@@ -2301,17 +2301,16 @@ CGObjCMulleRuntime::EmitMethodDescList(Twine Name, const char *Section,
                                          ObjCTypes.MethodDescriptionListPtrTy);
 }
 
-/*
- struct _objc_category {
- char *category_name;
- char *class_name;
- struct _objc_method_list *instance_methods;
- struct _objc_method_list *class_methods;
- struct _objc_protocol_list *protocols;
- uint32_t size; // <rdar://4585769>
- struct _objc_property_list *instance_properties;
- };
- */
+//   struct _mulle_objc_load_category
+//   {
+//      mulle_objc_class_id_t            class_id;
+//      char                             *class_name;         // useful ??
+//      
+//      struct _mulle_objc_method_list   *class_methods;
+//      struct _mulle_objc_method_list   *instance_methods;
+//      
+//      mulle_objc_protocol_id_t         *protocol_unique_ids;
+//   };
 void CGObjCMulleRuntime::GenerateCategory(const ObjCCategoryImplDecl *OCD) {
    unsigned Size = CGM.getDataLayout().getTypeAllocSize(ObjCTypes.CategoryTy);
    
@@ -2336,16 +2335,16 @@ void CGObjCMulleRuntime::GenerateCategory(const ObjCCategoryImplDecl *OCD) {
       // Class methods should always be defined.
       ClassMethods.push_back(GetMethodConstant(I));
    
-   llvm::Constant *Values[7];
-   Values[0] = GetClassName(OCD->getName());
-   Values[1] = GetClassName(Interface->getObjCRuntimeNameAsString());
+   llvm::Constant *Values[5];
+   Values[ 0] = HashConstantForString( Interface->getName());
+   Values[ 1] = GetClassName(Interface->getObjCRuntimeNameAsString());
    LazySymbols.insert(Interface->getIdentifier());
-   Values[2] = EmitMethodList("OBJC_CATEGORY_INSTANCE_METHODS_" + ExtName.str(),
-                              "__DATA,__cat_inst_meth,regular,no_dead_strip",
-                              InstanceMethods);
-   Values[3] = EmitMethodList("OBJC_CATEGORY_CLASS_METHODS_" + ExtName.str(),
+   Values[2] = EmitMethodList("OBJC_CATEGORY_CLASS_METHODS_" + ExtName.str(),
                               "__DATA,__cat_cls_meth,regular,no_dead_strip",
                               ClassMethods);
+   Values[3] = EmitMethodList("OBJC_CATEGORY_INSTANCE_METHODS_" + ExtName.str(),
+                              "__DATA,__cat_inst_meth,regular,no_dead_strip",
+                              InstanceMethods);
    if (Category) {
       Values[4] =
       EmitProtocolIDList("OBJC_CATEGORY_PROTOCOLS_" + ExtName.str(),
@@ -2353,15 +2352,14 @@ void CGObjCMulleRuntime::GenerateCategory(const ObjCCategoryImplDecl *OCD) {
    } else {
       Values[4] = llvm::Constant::getNullValue(ObjCTypes.ProtocolListPtrTy);
    }
-   Values[5] = llvm::ConstantInt::get(ObjCTypes.IntTy, Size);
    
-   // If there is no category @interface then there can be no properties.
-   if (Category) {
-      Values[6] = EmitPropertyList("\01l_OBJC_$_PROP_LIST_" + ExtName.str(),
-                                   OCD, Category, ObjCTypes);
-   } else {
-      Values[6] = llvm::Constant::getNullValue(ObjCTypes.PropertyListPtrTy);
-   }
+//   // If there is no category @interface then there can be no properties.
+//   if (Category) {
+//      Values[6] = EmitPropertyList("\01l_OBJC_$_PROP_LIST_" + ExtName.str(),
+//                                   OCD, Category, ObjCTypes);
+//   } else {
+//      Values[6] = llvm::Constant::getNullValue(ObjCTypes.PropertyListPtrTy);
+//   }
    
    llvm::Constant *Init = llvm::ConstantStruct::get(ObjCTypes.CategoryTy,
                                                     Values);
@@ -3825,11 +3823,18 @@ llvm::Constant *CGObjCCommonMulleRuntime::HashConstantForString( StringRef sref)
    }
 }
 
-
 llvm::Constant *CGObjCMulleRuntime::EmitSelector(CodeGenFunction &CGF, Selector Sel,
                                      bool lvalue)
 {
    llvm::StringRef   sref( Sel.getAsString());
+   
+   return( HashConstantForString( sref));
+}
+
+
+llvm::Constant *CGObjCMulleRuntime::EmitClassID(CodeGenFunction &CGF, const ObjCInterfaceDecl *Class)
+{
+   llvm::StringRef   sref( Class->getNameAsString());
    
    return( HashConstantForString( sref));
 }

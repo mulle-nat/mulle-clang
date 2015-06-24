@@ -317,7 +317,8 @@ void Sema::ActOnStartOfObjCMethodDef(Scope *FnBodyScope, Decl *D) {
 
   PushOnScopeChains(MDecl->getSelfDecl(), FnBodyScope);
   PushOnScopeChains(MDecl->getCmdDecl(), FnBodyScope);
-  PushOnScopeChains(MDecl->getParamDecl(), FnBodyScope);
+  if( MDecl->getParamDecl())
+     PushOnScopeChains(MDecl->getParamDecl(), FnBodyScope);
    
    // @mulle-nat@ save this for later retrieval in ActonMethod
   MDecl->setParamScope( (void *) FnBodyScope);

@@ -1442,32 +1442,36 @@ void  CGObjCCommonMulleRuntime::GenerateCallArgs( CallArgList &Args,
       return;
    
    // Initialize the captured struct.
-   RecordDecl *RD = Expr->getMethodDecl()->getParamRecord();
-   
-   QualType RecTy = CGM.getContext().getTagDeclType( RD);
-   QualType PtrTy = CGM.getContext().getPointerType( RecTy);
-   
-   LValue   Record = CGF.MakeNaturalAlignAddrLValue( CGF.CreateMemTemp( RecTy, "__objc__param.storage"), RecTy);
+   const ObjCMethodDecl *method = Expr->getMethodDecl();
+   RecordDecl *RD = method->getParamRecord();
 
-   //
-   // push values into record
-   // (todo) if only one arg and it is convertible to void *
-   //        then don't alloca
-   //
-   unsigned int i = 0;
-   for( RecordDecl::field_iterator CurField = RD->field_begin(), SentinelField = RD->field_end(); CurField != SentinelField; CurField++)
+   if( RD)
    {
-      Expr::Expr  *arg;
+      QualType RecTy = CGM.getContext().getTagDeclType( RD);
+      QualType PtrTy = CGM.getContext().getPointerType( RecTy);
       
-      arg = const_cast<Expr::Expr *>( Expr->getArg( i));
+      LValue   Record = CGF.MakeNaturalAlignAddrLValue( CGF.CreateMemTemp( RecTy, "__objc__param.storage"), RecTy);
       
-      LValue LV = CGF.EmitLValueForFieldInitialization( Record, *CurField);
-      CGF.EmitInitializerForField( *CurField, LV, arg, None);
-
-      ++i;
+      //
+      // push values into record
+      // (todo) if only one arg and it is convertible to void *
+      //        then don't alloca
+      //
+      unsigned int i = 0;
+      for( RecordDecl::field_iterator CurField = RD->field_begin(), SentinelField = RD->field_end(); CurField != SentinelField; CurField++)
+      {
+         Expr::Expr  *arg;
+         
+         arg = const_cast<Expr::Expr *>( Expr->getArg( i));
+         
+         LValue LV = CGF.EmitLValueForFieldInitialization( Record, *CurField);
+         CGF.EmitInitializerForField( *CurField, LV, arg, None);
+         
+         ++i;
+      }
+      
+      Args.add( RValue::get( Record.getAddress()), PtrTy);
    }
-   
-   Args.add( RValue::get( Record.getAddress()), PtrTy);
 }
 
 #pragma mark -

@@ -303,11 +303,14 @@ CodeGenTypes::arrangeObjCMessageSendSignature(const ObjCMethodDecl *MD,
    /* @mulle-objc@ Hack ObjCMessageSendSignature */
 
    RecordDecl *RD = MD->getParamRecord();
+   if( RD)
+   {
+      QualType RecTy = CGM.getContext().getTagDeclType( RD);
+      QualType PtrTy = CGM.getContext().getPointerType( RecTy);
    
-   QualType RecTy = CGM.getContext().getTagDeclType( RD);
-   QualType PtrTy = CGM.getContext().getPointerType( RecTy);
+      argTys.push_back( Context.getCanonicalParamType( PtrTy));
+   }
    
-  argTys.push_back( Context.getCanonicalParamType( PtrTy));
   // FIXME: Kill copy?
    //  for (const auto *I : MD->params()) {
    //    argTys.push_back(Context.getCanonicalParamType(I->getType()));

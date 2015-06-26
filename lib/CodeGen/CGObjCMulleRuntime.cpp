@@ -70,6 +70,7 @@ namespace {
       /// id mulle_objc_object_inline_call (id, SEL, void *)
       ///
       /// The messenger, used for all message sends, except super calls
+      /// might need another one, when params is null..
       ///
       llvm::Constant *getMessageSendFn() const {
          // Add the non-lazy-bind attribute, since objc_msgSend is likely to
@@ -83,6 +84,49 @@ namespace {
                                                            llvm::AttributeSet::FunctionIndex,
                                                            llvm::Attribute::NonLazyBind));
       }
+
+      llvm::Constant *getMessageSendAllocFn() const {
+         llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy };
+         return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidTy,
+                                                                  params, true),
+                                          "_mulle_objc_class_alloc_object");
+      }
+
+      llvm::Constant *getMessageSendNewFn() const {
+         llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy };
+         return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidTy,
+                                                                  params, true),
+                                          "_mulle_objc_class_new_object");
+      }
+      
+      llvm::Constant *getMessageSendRetainFn() const {
+         llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy };
+         return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidTy,
+                                                                  params, true),
+                                          "_mulle_objc_object_retain");
+      }
+
+      llvm::Constant *getMessageSendReleaseFn() const {
+         llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy };
+         return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidTy,
+                                                                  params, true),
+                                          "_mulle_objc_object_release");
+      }
+      
+      llvm::Constant *getMessageSendAutoreleaseFn() const {
+         llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy };
+         return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidTy,
+                                                                  params, true),
+                                          "_mulle_objc_object_autorelease");
+      }
+
+      // improve legacy code to basically a no-op
+      llvm::Constant *getMessageSendZoneFn() const {
+         llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy };
+         return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidTy,
+                                                                  params, true),
+                                          "_mulle_objc_object_zone");
+      }
       
       /// id mulle_objc_object_call_class_id (id, SEL, void *, CLASSID)
       ///
@@ -92,7 +136,14 @@ namespace {
          llvm::Type *params[] = { ObjectPtrTy, ClassIDTy, SelectorIDTy, ParamsPtrTy  };
          return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidTy,
                                                                   params, true),
-                                          "mulle_objc_object_call_class_id");
+                                          "_mulle_objc_object_call_class_id");
+      }
+
+      llvm::Constant *getMessageSendMetaSuperFn() const {
+         llvm::Type *params[] = { ObjectPtrTy, ClassIDTy, SelectorIDTy, ParamsPtrTy  };
+         return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidTy,
+                                                                  params, true),
+                                          "_mulle_objc_class_call_class_id");
       }
       
       
@@ -147,16 +198,6 @@ namespace {
          
          return ExternalProtocolPtrTy;
       }
-      
-      // SuperCTy - clang type for struct objc_super.
-      QualType SuperCTy;
-      // SuperPtrCTy - clang type for struct objc_super *.
-      QualType SuperPtrCTy;
-      
-      /// SuperTy - LLVM type for struct objc_super.
-      llvm::StructType *SuperTy;
-      /// SuperPtrTy - LLVM type for struct objc_super *.
-      llvm::Type *SuperPtrTy;
       
       /// PropertyTy - LLVM type for struct objc_property (struct _prop_t
       /// in GCC parlance).
@@ -944,7 +985,7 @@ namespace {
       
       /// GetOrEmitProtocol - Get the protocol object for the given
       /// declaration, emitting it if necessary. The return value has type
-      /// ProtocolPtrTy.
+      /// ProtocolxTy.
       llvm::Constant *GetOrEmitProtocol(const ObjCProtocolDecl *PD) override;
       
       /// GetOrEmitProtocolRef - Get a forward reference to the protocol
@@ -1203,17 +1244,6 @@ static llvm::Constant *getConstantGEP(llvm::LLVMContext &VMContext,
    return llvm::ConstantExpr::getGetElementPtr(C, Idxs);
 }
 
-/// hasObjCExceptionAttribute - Return true if this class or any super
-/// class has the __objc_exception__ attribute.
-static bool hasObjCExceptionAttribute(ASTContext &Context,
-                                      const ObjCInterfaceDecl *OID) {
-   if (OID->hasAttr<ObjCExceptionAttr>())
-      return true;
-   if (const ObjCInterfaceDecl *Super = OID->getSuperClass())
-      return hasObjCExceptionAttribute(Context, Super);
-   return false;
-}
-
 /* *** CGObjCMulleRuntime Public Interface *** */
 
 CGObjCMulleRuntime::CGObjCMulleRuntime(CodeGen::CodeGenModule &cgm) : CGObjCCommonMulleRuntime(cgm),
@@ -1302,6 +1332,8 @@ enum {
 };
 
 
+#pragma mark -
+#pragma mark message sending
 
 /// Generate code for a message send expression.
 CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction &CGF,
@@ -1317,13 +1349,70 @@ CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction
    QualType      Arg0Ty;
    CallArgList   ActualArgs;
    llvm::Value   *selID;
+   llvm::Constant *Fn;
+   std::string  selName;
+
+   selName = Sel.getAsString();
+   Fn      = nullptr;
    
-   selID = EmitSelector(CGF, Sel);
+   // figure out where to send the message
+   // layme.. should probably use a map for this
+   switch( CallArgs.size())
+   {
+   case 0 :  //
+      if( selName == "alloc")
+      {
+         Fn = ObjCTypes.getMessageSendAllocFn();
+         if( ! Method)
+            ResultType = CGF.getContext().getObjCInstanceType();
+         break;
+      }
+      if( selName == "new")
+      {
+         Fn = ObjCTypes.getMessageSendNewFn();
+         if( ! Method)
+            ResultType = CGF.getContext().getObjCInstanceType();
+         break;
+      }
+      if( selName == "autorelease")
+      {
+         Fn = ObjCTypes.getMessageSendAutoreleaseFn();
+         if( ! Method)
+            ResultType = CGF.getContext().getObjCInstanceType();
+         break;
+      }
+      if( selName == "release")
+      {
+         Fn = ObjCTypes.getMessageSendReleaseFn();
+         if( ! Method)
+            ResultType = CGF.getContext().VoidTy;
+         break;
+      }
+      if( selName == "retain")
+      {
+         Fn = ObjCTypes.getMessageSendRetainFn();
+         if( ! Method)
+            ResultType = CGF.getContext().getObjCInstanceType();
+         break;
+      }
+      if( selName == "zone")
+      {
+         Fn = ObjCTypes.getMessageSendZoneFn();
+         if( ! Method)
+            ResultType = CGF.getContext().VoidPtrTy;
+         break;
+      }
+   }
    
    Arg0 = CGF.Builder.CreateBitCast(Receiver, ObjCTypes.ObjectPtrTy);
    ActualArgs.add(RValue::get(Arg0), CGF.getContext().getObjCInstanceType());
-   ActualArgs.add(RValue::get( selID), CGF.getContext().getObjCSelType());
-   ActualArgs.addFrom( CallArgs);
+   if( Fn == nullptr)  // regular method send call
+   {
+      selID = EmitSelector(CGF, Sel);
+      ActualArgs.add(RValue::get( selID), CGF.getContext().getObjCSelType());
+      ActualArgs.addFrom( CallArgs);
+   }
+   
    
    if (Method)
       assert(CGM.getContext().getCanonicalType(Method->getReturnType()) ==
@@ -1351,8 +1440,9 @@ CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction
          }
       }
    
-   llvm::Constant *Fn;
-   Fn = llvm::ConstantExpr::getBitCast( ObjCTypes.getMessageSendFn(), MSI.MessengerType);
+   if( ! Fn)
+      Fn = ObjCTypes.getMessageSendFn();
+   Fn = llvm::ConstantExpr::getBitCast( Fn, MSI.MessengerType);
    RValue rvalue = CGF.EmitCall(MSI.CallInfo, Fn, Return, ActualArgs);
    return nullReturn.complete(CGF, rvalue, ResultType, CallArgs,
                               requiresnullCheck ? Method : nullptr);
@@ -1421,7 +1511,11 @@ CGObjCMulleRuntime::GenerateMessageSendSuper(CodeGen::CodeGenFunction &CGF,
       }
    
    llvm::Constant *Fn;
-   Fn = llvm::ConstantExpr::getBitCast( ObjCTypes.getMessageSendSuperFn(), MSI.MessengerType);
+   
+   if( IsClassMessage)
+      Fn = llvm::ConstantExpr::getBitCast( ObjCTypes.getMessageSendMetaSuperFn(), MSI.MessengerType);
+   else
+      Fn = llvm::ConstantExpr::getBitCast( ObjCTypes.getMessageSendSuperFn(), MSI.MessengerType);
    RValue rvalue = CGF.EmitCall(MSI.CallInfo, Fn, Return, ActualArgs);
    return nullReturn.complete(CGF, rvalue, ResultType, CallArgs,
                               requiresnullCheck ? Method : nullptr);
@@ -2090,10 +2184,10 @@ llvm::Value *CGObjCMulleRuntime::GenerateProtocolRef(CodeGenFunction &CGF,
                                             const ObjCProtocolDecl *PD) {
    // FIXME: I don't understand why gcc generates this, or where it is
    // resolved. Investigate. Its also wasteful to look this up over and over.
-   LazySymbols.insert(&CGM.getContext().Idents.get("Protocol"));
+   //LazySymbols.insert(&CGM.getContext().Idents.get("Protocol"));
    
-   return llvm::ConstantExpr::getBitCast(GetProtocolRef(PD),
-                                         ObjCTypes.getExternalProtocolPtrTy());
+   return llvm::ConstantExpr::getBitCast(GetOrEmitProtocol(PD),
+                                         ObjCTypes.ProtocolIDTy);
 }
 
 void CGObjCCommonMulleRuntime::GenerateProtocol(const ObjCProtocolDecl *PD) {
@@ -2161,7 +2255,7 @@ CGObjCMulleRuntime::EmitProtocolIDList(Twine Name,
    
    llvm::Constant       *Init = llvm::ConstantStruct::getAnon(Values);
    llvm::GlobalVariable *GV =
-   CreateMetadataVar(Name, Init, "__DATA,regular,no_dead_strip",
+   CreateMetadataVar(Name, Init, "__DATA,__protocols,regular,no_dead_strip",
                      4, false);
    return llvm::ConstantExpr::getBitCast( GV, ObjCTypes.ProtocolIDPtrTy);
 }
@@ -4398,28 +4492,6 @@ ObjCCommonTypesHelper::ObjCCommonTypesHelper(CodeGen::CodeGenModule &cgm)
    
    // FIXME: This is leaked.
    // FIXME: Merge with rewriter code?
-   
-   // struct _objc_super {
-   //   id self;
-   //   Class cls;
-   // }
-   RecordDecl *RD = RecordDecl::Create(Ctx, TTK_Struct,
-                                       Ctx.getTranslationUnitDecl(),
-                                       SourceLocation(), SourceLocation(),
-                                       &Ctx.Idents.get("_objc_super"));
-   RD->addDecl(FieldDecl::Create(Ctx, RD, SourceLocation(), SourceLocation(),
-                                 nullptr, Ctx.getObjCIdType(), nullptr, nullptr,
-                                 false, ICIS_NoInit));
-   RD->addDecl(FieldDecl::Create(Ctx, RD, SourceLocation(), SourceLocation(),
-                                 nullptr, Ctx.getObjCClassType(), nullptr,
-                                 nullptr, false, ICIS_NoInit));
-   RD->completeDefinition();
-   
-   SuperCTy = Ctx.getTagDeclType(RD);
-   SuperPtrCTy = Ctx.getPointerType(SuperCTy);
-   
-   SuperTy = cast<llvm::StructType>(Types.ConvertType(SuperCTy));
-   SuperPtrTy = llvm::PointerType::getUnqual(SuperTy);
    
    // struct _prop_t {
    //   char *name;

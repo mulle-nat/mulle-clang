@@ -1116,7 +1116,10 @@ ExprResult Sema::ParseObjCProtocolExpression(IdentifierInfo *ProtocolId,
   QualType Ty = Context.getObjCProtoType();
   if (Ty.isNull())
     return true;
-  Ty = Context.getObjCObjectPointerType(Ty);
+  //  @mulle-objc@
+  // fake it up
+   Ty = Context.LongTy;
+   //  Ty = Context.getObjCObjectPointerType(Ty);
   return new (Context) ObjCProtocolExpr(Ty, PDecl, AtLoc, ProtoIdLoc, RParenLoc);
 }
 

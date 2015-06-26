@@ -3942,7 +3942,7 @@ llvm::Constant *CGObjCCommonMulleRuntime::GetClassName(StringRef RuntimeName) {
     llvm::GlobalVariable *&Entry = ClassNames[RuntimeName];
     if (!Entry)
       Entry = CreateMetadataVar(
-          "OBJC_CLASS_NAME_",
+          "OBJC_CLASS_NAME_" + RuntimeName.str(),
           llvm::ConstantDataArray::getString(VMContext, RuntimeName),
           ((ObjCABI == 2) ? "__TEXT,__objc_classname,cstring_literals"
                           : "__TEXT,__cstring,cstring_literals"),
@@ -4493,6 +4493,7 @@ ObjCCommonTypesHelper::ObjCCommonTypesHelper(CodeGen::CodeGenModule &cgm)
    // FIXME: This is leaked.
    // FIXME: Merge with rewriter code?
    
+  
    // struct _prop_t {
    //   char *name;
    //   char *attributes;

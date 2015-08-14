@@ -167,10 +167,12 @@ namespace {
       
       llvm::Type *ClassIDTy;
       llvm::Type *CategoryIDTy;
+      llvm::Type *IvarIDTy;
       llvm::Type *SelectorIDTy;
       llvm::Type *ProtocolIDTy;
       
       llvm::Type *ClassIDPtrTy;
+      llvm::Type *IvarIDPtrTy;
       llvm::Type *CategoryIDTyPtrTy;
       llvm::Type *SelectorIDTyPtrTy;
       llvm::Type *ProtocolIDPtrTy;
@@ -704,6 +706,14 @@ namespace {
       
       /// DefinedCategoryNames - list of category names in form Class_Category.
       llvm::SetVector<std::string> DefinedCategoryNames;
+
+      /// IvarNames - uniqued ivar names. We have to use
+      /// a StringMap here because have no other unique reference.
+      llvm::StringMap<llvm::GlobalVariable*> IvarNames;
+
+      /// IvarTypes - uniqued ivar types. We have to use
+      /// a StringMap here because have no other unique reference.
+      llvm::StringMap<llvm::GlobalVariable*> IvarTypes;
       
       /// MethodVarTypes - uniqued method type signatures. We have to use
       /// a StringMap here because have no other unique reference.
@@ -764,6 +774,9 @@ namespace {
       llvm::Constant *GetMethodVarType(const ObjCMethodDecl *D,
                                        bool Extended = false);
       llvm::Constant *GetMethodVarType(const FieldDecl *D);
+      
+      llvm::Constant *GetIvarType(const ObjCIvarDecl *Ivar);
+      llvm::Constant *GetIvarName(const ObjCIvarDecl *Ivar);
       
       /// GetPropertyName - Return a unique constant for the given
       /// name. The return value has type char *.
@@ -956,7 +969,11 @@ namespace {
       /// interface ivars will be emitted. The return value has type
       /// IvarListPtrTy.
       llvm::Constant *EmitIvarList(const ObjCImplementationDecl *ID,
+                                   ArrayRef<llvm::Constant*> Ivars,
                                    bool ForClass);
+      
+      llvm::Constant *GetIvarConstant( const ObjCInterfaceDecl *OID,
+                                       const ObjCIvarDecl *IVD);
       
       llvm::Constant *GetMethodConstant(const ObjCMethodDecl *MD);
       
@@ -2521,7 +2538,18 @@ void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
    if (ID->getClassInterface()->getVisibility() == HiddenVisibility)
       Flags |= FragileABI_Class_Hidden;
    
-   SmallVector<llvm::Constant *, 16> InstanceMethods, ClassMethods;
+   SmallVector<llvm::Constant *, 16> InstanceMethods, ClassMethods, InstanceVariables;
+
+  const ObjCInterfaceDecl *OID = ID->getClassInterface();
+
+  for (const ObjCIvarDecl *IVD = OID->all_declared_ivar_begin();
+       IVD; IVD = IVD->getNextIvar())
+  {
+    if (!IVD->getDeclName())
+      continue;
+    InstanceVariables.push_back( GetIvarConstant( OID, IVD));
+  }
+
    for (const auto *I : ID->instance_methods())
       // Instance methods should always be defined.
       InstanceMethods.push_back(GetMethodConstant(I));
@@ -2560,7 +2588,7 @@ void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
    //      mulle_objc_protocol_id_t         *protocol_unique_ids;
    //   };
    
-   llvm::Constant *Values[8];
+   llvm::Constant *Values[9];
    
    ObjCInterfaceDecl *Super = Interface->getSuperClass();
 
@@ -2579,12 +2607,14 @@ void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
    }
    
    Values[ 4] = llvm::ConstantInt::get(ObjCTypes.LongTy, Size);
+
+   Values[ 5] = EmitIvarList( ID, InstanceVariables, false);
    
-   Values[ 5] = EmitMethodList("OBJC_CLASS_METHODS_" + ID->getNameAsString(),
-                                 "_DATA,__cls_meth,regular,no_dead_strip", ClassMethods);
    Values[ 6] = EmitMethodList("OBJC_CLASS_METHODS_" + ID->getNameAsString(),
+                                 "_DATA,__cls_meth,regular,no_dead_strip", ClassMethods);
+   Values[ 7] = EmitMethodList("OBJC_CLASS_METHODS_" + ID->getNameAsString(),
                                "_DATA,__inst_meth,regular,no_dead_strip", InstanceMethods);
-   Values[ 7] = Protocols;
+   Values[ 8] = Protocols;
 
    llvm::Constant *Init = llvm::ConstantStruct::get(ObjCTypes.ClassTy,
                                                     Values);
@@ -2615,44 +2645,37 @@ void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
 
 
 /*
- struct objc_ivar {
- char *ivar_name;
- char *ivar_type;
- int ivar_offset;
- };
- 
- struct objc_ivar_list {
- int ivar_count;
- struct objc_ivar list[count];
- };
- */
+struct _mulle_objc_ivar_descriptor
+{
+   mulle_objc_ivar_id_t   ivar_id;
+   char                   *name;
+   char                   *type;
+};
+
+struct _mulle_objc_ivar
+{
+   struct _mulle_objc_ivar_descriptor   descriptor;
+   size_t                               offset;  // if == -1 : hashed access (future)
+};
+
+
+struct _mulle_objc_ivar_list
+{
+   unsigned int ivar_count;
+   struct _mulle_objc_ivar list[count];
+};
+*/
 llvm::Constant *CGObjCMulleRuntime::EmitIvarList(const ObjCImplementationDecl *ID,
-                                        bool ForClass) {
-   std::vector<llvm::Constant*> Ivars;
-   
+                                                 ArrayRef<llvm::Constant*> Ivars,
+                                        bool ForwardClass) {
    // When emitting the root class GCC emits ivar entries for the
    // actual class structure. It is not clear if we need to follow this
    // behavior; for now lets try and get away with not doing it. If so,
    // the cleanest solution would be to make up an ObjCInterfaceDecl
    // for the class.
-   if (ForClass)
+   if (ForwardClass)
       return llvm::Constant::getNullValue(ObjCTypes.IvarListPtrTy);
    
-   const ObjCInterfaceDecl *OID = ID->getClassInterface();
-   
-   for (const ObjCIvarDecl *IVD = OID->all_declared_ivar_begin();
-        IVD; IVD = IVD->getNextIvar()) {
-      // Ignore unnamed bit-fields.
-      if (!IVD->getDeclName())
-         continue;
-      llvm::Constant *Ivar[] = {
-         GetMethodVarName(IVD->getIdentifier()),
-         GetMethodVarType(IVD),
-         llvm::ConstantInt::get(ObjCTypes.IntTy,
-                                ComputeIvarBaseOffset(CGM, OID, IVD))
-      };
-      Ivars.push_back(llvm::ConstantStruct::get(ObjCTypes.IvarTy, Ivar));
-   }
    
    // Return null for empty list.
    if (Ivars.empty())
@@ -2666,15 +2689,29 @@ llvm::Constant *CGObjCMulleRuntime::EmitIvarList(const ObjCImplementationDecl *I
    llvm::Constant *Init = llvm::ConstantStruct::getAnon(Values);
    
    llvm::GlobalVariable *GV;
-   if (ForClass)
-      GV =
-      CreateMetadataVar("OBJC_CLASS_VARIABLES_" + ID->getName(), Init,
-                        "__DATA,__class_vars,regular,no_dead_strip", 4, true);
-   else
-      GV = CreateMetadataVar("OBJC_INSTANCE_VARIABLES_" + ID->getName(), Init,
+
+   GV = CreateMetadataVar("OBJC_INSTANCE_VARIABLES_" + ID->getName(), Init,
                              "__DATA,__instance_vars,regular,no_dead_strip", 4,
                              true);
    return llvm::ConstantExpr::getBitCast(GV, ObjCTypes.IvarListPtrTy);
+}
+
+
+/// GetMethodConstant - Return a struct objc_method constant for the
+/// given method if it has been defined. The result is null if the
+/// method has not been defined. The return value has type MethodPtrTy.
+llvm::Constant *CGObjCMulleRuntime::GetIvarConstant( const ObjCInterfaceDecl *OID,
+                                                     const ObjCIvarDecl *IVD)
+{
+   llvm::Constant *Ivar[] = {
+      llvm::ConstantExpr::getBitCast( HashConstantForString( IVD->getNameAsString()),
+                                       ObjCTypes.SelectorIDTy),
+      GetIvarName( IVD),
+      GetIvarType(IVD),
+      llvm::ConstantInt::get(ObjCTypes.IntTy,
+                             ComputeIvarBaseOffset(CGM, OID, IVD))
+   };
+   return llvm::ConstantStruct::get(ObjCTypes.IvarTy, Ivar);
 }
 
 /*
@@ -2712,6 +2749,7 @@ llvm::Constant *CGObjCMulleRuntime::GetMethodConstant(const ObjCMethodDecl *MD) 
    };
    return llvm::ConstantStruct::get(ObjCTypes.MethodTy, Method);
 }
+
 
 llvm::Constant *CGObjCMulleRuntime::EmitMethodList(Twine Name,
                                           const char *Section,
@@ -3909,6 +3947,17 @@ llvm::Constant *CGObjCCommonMulleRuntime::HashConstantForString( StringRef sref)
       value  |= hash[ i];
    }
    
+   if( value == 0 || value == (uint64_t) -1)
+   {
+      // FAIL! FIX
+      std::string  fail;
+      
+      fail.append("congratulations, your string \"");
+      fail.append( sref.str());
+      fail.append( "\" hashes badly (rare and precious, please tweet it @mulle_nat, then rename it).");
+      llvm_unreachable( fail.c_str());
+   }
+   
    if (WordSizeInBytes == 8)
    {
       const llvm::APInt SelConstant(64, value);
@@ -4409,6 +4458,51 @@ llvm::Constant *CGObjCCommonMulleRuntime::GetMethodVarType(const ObjCMethodDecl 
    return getConstantGEP(VMContext, Entry, 0, 0);
 }
 
+
+llvm::Constant *CGObjCCommonMulleRuntime::GetIvarName(const ObjCIvarDecl *Ivar)
+{
+   llvm::GlobalVariable *&Entry = IvarNames[ Ivar->getNameAsString()];
+   
+   // FIXME: Avoid std::string in "Sel.getAsString()"
+   if (!Entry)
+      Entry = CreateMetadataVar(
+                                "OBJC_IVAR_NAME_",
+                                llvm::ConstantDataArray::getString(VMContext, Ivar->getNameAsString()),
+                                ((ObjCABI == 2) ? "__TEXT,__objc_ivarname,cstring_literals"
+                                 : "__TEXT,__cstring,cstring_literals"),
+                                1, true);
+   
+   return getConstantGEP(VMContext, Entry, 0, 0);
+}
+
+
+llvm::Constant *CGObjCCommonMulleRuntime::GetIvarType(const ObjCIvarDecl *Ivar)
+{
+   std::string TypeStr;
+   QualType PType = Ivar->getType();
+   
+   CGM.getContext().getObjCEncodingForTypeImpl(PType, TypeStr, true, true, nullptr,
+                              true     /*OutermostType*/,
+                              false    /*EncodingProperty*/,
+                              false    /*StructField*/,
+                              false    /*EncodeBlockParameters*/,
+                              false    /*EncodeClassNames*/);
+   
+   // IvarTypes is always empty...
+   llvm::GlobalVariable *&Entry = IvarTypes[TypeStr];
+   
+   if (!Entry)
+      Entry = CreateMetadataVar(
+                                "OBJC_IVAR_TYPE_",
+                                llvm::ConstantDataArray::getString(VMContext, TypeStr),
+                                ((ObjCABI == 2) ? "__TEXT,__objc_methtype,cstring_literals"
+                                 : "__TEXT,__cstring,cstring_literals"),
+                                1, true);
+   
+   return getConstantGEP(VMContext, Entry, 0, 0);
+}
+
+
 // FIXME: Merge into a single cstring creation function.
 llvm::Constant *CGObjCCommonMulleRuntime::GetPropertyName(IdentifierInfo *Ident) {
    llvm::GlobalVariable *&Entry = PropertyNames[Ident];
@@ -4467,11 +4561,13 @@ ObjCCommonTypesHelper::ObjCCommonTypesHelper(CodeGen::CodeGenModule &cgm)
    ClassIDTy    = Types.ConvertType(Ctx.LongTy);
    CategoryIDTy = Types.ConvertType(Ctx.LongTy);
    SelectorIDTy = Types.ConvertType(Ctx.LongTy);
+   IvarIDTy     = Types.ConvertType(Ctx.LongTy);
    ProtocolIDTy = Types.ConvertType(Ctx.LongTy);
    
    ClassIDPtrTy      = llvm::PointerType::getUnqual(ClassIDTy);
    CategoryIDTyPtrTy = llvm::PointerType::getUnqual(CategoryIDTy);
    SelectorIDTyPtrTy = llvm::PointerType::getUnqual(SelectorIDTy);
+   IvarIDPtrTy       = llvm::PointerType::getUnqual(IvarIDTy);
    ProtocolIDPtrTy   = llvm::PointerType::getUnqual(ProtocolIDTy);
 
    // arm64 targets use "int" ivar offset variables. All others,
@@ -4537,6 +4633,8 @@ ObjCCommonTypesHelper::ObjCCommonTypesHelper(CodeGen::CodeGenModule &cgm)
 
 ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
 : ObjCCommonTypesHelper(cgm) {
+
+
    // struct _objc_method_description {
    //   SEL name;
    //   char *types;
@@ -4612,8 +4710,13 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
    //   char *ivar_type;
    //   int  ivar_offset;
    // }
-   IvarTy = llvm::StructType::create("struct._objc_ivar",
-                                     Int8PtrTy, Int8PtrTy, IntTy, nullptr);
+   IvarTy = llvm::StructType::create(VMContext, "struct._objc_ivar");
+   IvarTy->setBody(
+                    IvarIDTy,    // ivar_id
+                    Int8PtrTy,   // name
+                    Int8PtrTy,   // signature
+                    IntTy,       // offset
+                    nullptr);
    
    // struct _objc_ivar_list *
    IvarListTy =
@@ -4659,6 +4762,7 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
                     
                     LongTy,      // instance_size
 
+                    IvarListPtrTy,
                     MethodListPtrTy,   // class_methods
                     MethodListPtrTy,   // instance_methods
                     

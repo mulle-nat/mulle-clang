@@ -1116,8 +1116,7 @@ ExprResult Sema::ParseObjCProtocolExpression(IdentifierInfo *ProtocolId,
   QualType Ty = Context.getObjCProtoType();
   if (Ty.isNull())
     return true;
-  //  @mulle-objc@
-  // fake it up
+  //  @mulle-objc@ protocol: fake up protocol type to be a long
    Ty = Context.LongTy;
    //  Ty = Context.getObjCObjectPointerType(Ty);
   return new (Context) ObjCProtocolExpr(Ty, PDecl, AtLoc, ProtoIdLoc, RParenLoc);
@@ -2872,7 +2871,7 @@ ExprResult Sema::ActOnInstanceMessage(Scope *S,
   if (Sel == RespondsToSelectorSel)
     RemoveSelectorFromWarningCache(*this, Args[0]);
 
-   // @mulle-objc@  Check that mulle_objc_object_inline_call is defined
+   // @mulle-objc@ runtime: Check that mulle_objc_object_inline_call is defined
   // (nat) check now that method dispatcher function is enabled
   // if we do this during code generation, it's too late. We don't have the
   // lookup and error facilities easily available

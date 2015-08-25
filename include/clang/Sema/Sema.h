@@ -3506,6 +3506,7 @@ public:
                       ArrayRef<Expr *> Args = None, TypoExpr **Out = nullptr);
 
   ExprResult   GetMulle_paramExpr( Scope *S, CXXScopeSpec &SS, SourceLocation Loc, char *Name);
+  ExprResult   GetMulle_paramFieldExpr( FieldDecl *FD, SourceLocation Loc, Scope *S, CXXScopeSpec &SS);
 
   ExprResult LookupInObjCMethod(LookupResult &LookUp, Scope *S, CXXScopeSpec &SS,
                                 IdentifierInfo *II,
@@ -7120,6 +7121,10 @@ public:
     DeclaratorChunk::ParamInfo *CParamInfo, unsigned CNumArgs, // c-style args
     AttributeList *AttrList, tok::ObjCKeywordKind MethodImplKind,
     bool isVariadic, bool MethodDefinition);
+
+   // @mulle-objc* addition
+   void SetMulleObjCParam( ObjCMethodDecl *ObjCMethod, Selector Sel, SmallVector<ParmVarDecl*, 16> Params, SourceLocation   MethodLoc,
+   SourceLocation   EndLoc, SourceLocation SelectorLoc);
 
   ObjCMethodDecl *LookupMethodInQualifiedType(Selector Sel,
                                               const ObjCObjectPointerType *OPT,

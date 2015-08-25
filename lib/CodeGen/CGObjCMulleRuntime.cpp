@@ -2427,7 +2427,7 @@ CGObjCMulleRuntime::EmitMethodDescList(Twine Name, const char *Section,
 //      mulle_objc_protocol_id_t         *protocol_unique_ids;
 //   };
 void CGObjCMulleRuntime::GenerateCategory(const ObjCCategoryImplDecl *OCD) {
-   unsigned Size = CGM.getDataLayout().getTypeAllocSize(ObjCTypes.CategoryTy);
+//   unsigned Size = CGM.getDataLayout().getTypeAllocSize(ObjCTypes.CategoryTy);
    
    // FIXME: This is poor design, the OCD should have a pointer to the category
    // decl. Additionally, note that Category can be null for the @implementation

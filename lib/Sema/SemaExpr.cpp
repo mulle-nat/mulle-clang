@@ -2314,12 +2314,12 @@ Sema::BuildQualifiedDeclarationNameExpr(CXXScopeSpec &SS,
 }
 
 
+/* @mulle-objc@ parameters: create an expression to access _param */
 ExprResult   Sema::GetMulle_paramExpr( Scope *S, CXXScopeSpec &SS, SourceLocation Loc, char *Name)
 {
    ASTContext        *Ctx;
    DeclContext       *E;
    DeclarationName   DN;
-   ExprResult        BaseExpr;
    IdentifierInfo    *II;
    
    // hacked together without a clue
@@ -2328,7 +2328,7 @@ ExprResult   Sema::GetMulle_paramExpr( Scope *S, CXXScopeSpec &SS, SourceLocatio
    II  = &Ctx->Idents.get( Name);
    DN  = DeclarationName( II);
    
-   LookupResult R(*this, DN, Loc, LookupOrdinaryName);
+   LookupResult R( *this, DN, Loc, LookupOrdinaryName);
    LookupParsedName( R, S, &SS, false);
    if( ! R.empty())
       return( BuildDeclarationNameExpr( SS, R, false));
@@ -2337,6 +2337,40 @@ ExprResult   Sema::GetMulle_paramExpr( Scope *S, CXXScopeSpec &SS, SourceLocatio
    return ExprError();
 }
 
+
+/* @mulle-objc@ parameters: create an expression to access _param->field */
+ExprResult
+Sema::GetMulle_paramFieldExpr( FieldDecl *FD, SourceLocation Loc, Scope *S, CXXScopeSpec &SS)
+{
+     // this couldn't be any easier... 
+     DeclarationNameInfo   memberNameInfo( FD->getDeclName(), Loc);
+     DeclAccessPair        fakeFoundDecl = DeclAccessPair::make(FD, FD->getAccess());
+     ASTContext            *Ctx;
+     DeclContext           *E;
+
+     E   = S->getEntity();
+     Ctx = &E->getParentASTContext();
+     ExprResult BaseExpr = GetMulle_paramExpr( S, SS, Loc, (char *) "_param");
+     ExprResult CastExpr = DefaultLvalueConversion( BaseExpr.get());
+/*     ExprResult CastExpr = ImplicitCastExpr::Create(*Ctx, BaseExpr.get()->getType(), CK_LValueToRValue, BaseExpr.get(), nullptr, VK_RValue);
+*/
+     ExprResult Result   = MemberExpr::Create( *Ctx,
+                                              CastExpr.get(),
+                                              true,
+                                              SS.getWithLocInContext(*Ctx),
+                                              SourceLocation(), // invalid template location
+                                              FD,
+                                              fakeFoundDecl,
+                                              memberNameInfo,
+                                              nullptr,
+                                              FD->getType(),
+                                              VK_LValue, // maybe so, maybe not so
+                                              OK_Ordinary);
+     
+     MarkAnyDeclReferenced(Loc, FD, true);
+     
+     return( Result);
+}
 
 
 /// LookupInObjCMethod - The parser has read a name in, and Sema has
@@ -2379,43 +2413,12 @@ Sema::LookupInObjCMethod(LookupResult &Lookup, Scope *S, CXXScopeSpec &SS,
                     Lookup.getFoundDecl()->isDefinedOutsideFunctionOrMethod());
    
   //
-  // @mulle-objc@ Create MemberExpr for _param-><name>
+  // @mulle-objc@ parameters: Create MemberExpr for _param-><name>
   // (nat) lookup if this is one of our parameters
   //
-   
   FD = CurMethod->FindParamRecordField( II);
   if( FD)
-  {
-     // this couldn't be any easier... 
-
-     DeclarationNameInfo   memberNameInfo( FD->getDeclName(), Loc);
-     DeclAccessPair        fakeFoundDecl = DeclAccessPair::make(FD, FD->getAccess());
-     ASTContext            *Ctx;
-     DeclContext           *E;
-
-     E   = S->getEntity();
-     Ctx = &E->getParentASTContext();
-     ExprResult BaseExpr = GetMulle_paramExpr( S, SS, Loc, (char *) "_param");
-     ExprResult CastExpr = DefaultLvalueConversion( BaseExpr.get());
-/*     ExprResult CastExpr = ImplicitCastExpr::Create(*Ctx, BaseExpr.get()->getType(), CK_LValueToRValue, BaseExpr.get(), nullptr, VK_RValue);
-*/
-     ExprResult Result   = MemberExpr::Create( *Ctx,
-                                              CastExpr.get(),
-                                              true,
-                                              SS.getWithLocInContext(*Ctx),
-                                              SourceLocation(), // invalid template location
-                                              FD,
-                                              fakeFoundDecl,
-                                              memberNameInfo,
-                                              nullptr,
-                                              FD->getType(),
-                                              VK_LValue, // maybe so, maybe not so
-                                              OK_Ordinary);
-     
-     MarkAnyDeclReferenced(Loc, FD, true);
-     
-     return( Result);
-  }
+    return( GetMulle_paramFieldExpr( FD, Loc, S, SS));
    
   ObjCInterfaceDecl *IFace = nullptr;
   if (LookForIvars) {

@@ -173,9 +173,9 @@ private:
   void *ParamsAndSelLocs;
   unsigned NumParams;
 
-  // @mulle-objc@ New variables for parameter hackage
+  // @mulle-objc@ parameters: New variables for parameter hackage
   RecordDecl    *ParamRecord;
-   void          *ParamScope; // void coz to lazy to include scope
+   void         *ParamScope; // void coz to lazy to include scope
    
   /// List of attributes for this method declaration.
   SourceLocation DeclEndLoc; // the location of the ';' or '{'.

@@ -91,6 +91,13 @@ public:
     llvm_unreachable("bad kind");
   }
 
+  bool hasMulleMetaABI() const {
+    switch (getKind()) {
+    case Mulle: return true;
+    default   : return false;
+    }
+    llvm_unreachable("bad kind");
+  }
   /// The inverse of isNonFragile():  does this runtime follow the set of
   /// implied behaviors for a "fragile" ABI?
   bool isFragile() const { return !isNonFragile(); }

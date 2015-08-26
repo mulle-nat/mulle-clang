@@ -1117,8 +1117,14 @@ ExprResult Sema::ParseObjCProtocolExpression(IdentifierInfo *ProtocolId,
   if (Ty.isNull())
     return true;
   //  @mulle-objc@ protocol: fake up protocol type to be a long
-   Ty = Context.LongTy;
-   //  Ty = Context.getObjCObjectPointerType(Ty);
+   if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+   {
+      Ty = Context.LongTy;
+   }
+   else
+   {
+      Ty = Context.getObjCObjectPointerType(Ty);
+   }
   return new (Context) ObjCProtocolExpr(Ty, PDecl, AtLoc, ProtoIdLoc, RParenLoc);
 }
 
@@ -2875,8 +2881,11 @@ ExprResult Sema::ActOnInstanceMessage(Scope *S,
   // (nat) check now that method dispatcher function is enabled
   // if we do this during code generation, it's too late. We don't have the
   // lookup and error facilities easily available
-  if( ! CheckMulleObjCFunctionDefined( S, LBracLoc, (char *) "mulle_objc_object_inline_call"))
-     return ExprError();
+   if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+   {
+      if( ! CheckMulleObjCFunctionDefined( S, LBracLoc, (char *) "mulle_objc_object_inline_call"))
+         return ExprError();
+   }
   
   return BuildInstanceMessage(Receiver, Receiver->getType(),
                               /*SuperLoc=*/SourceLocation(), Sel,

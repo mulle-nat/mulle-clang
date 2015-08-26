@@ -317,12 +317,14 @@ void Sema::ActOnStartOfObjCMethodDef(Scope *FnBodyScope, Decl *D) {
 
   PushOnScopeChains(MDecl->getSelfDecl(), FnBodyScope);
   PushOnScopeChains(MDecl->getCmdDecl(), FnBodyScope);
-  if( MDecl->getParamDecl())
-     PushOnScopeChains(MDecl->getParamDecl(), FnBodyScope);
-   
    // @mulle-objc@ parameters: save scope for later retrieval in ActonMethod
-  MDecl->setParamScope( (void *) FnBodyScope);
+   if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+   {
+      if( MDecl->getParamDecl())
+         PushOnScopeChains(MDecl->getParamDecl(), FnBodyScope);
    
+      MDecl->setParamScope( (void *) FnBodyScope);
+  }
   // The ObjC parser requires parameter names so there's no need to check.
   CheckParmsForFunctionDef(MDecl->param_begin(), MDecl->param_end(),
                            /*CheckParameterNames=*/false);
@@ -339,8 +341,11 @@ void Sema::ActOnStartOfObjCMethodDef(Scope *FnBodyScope, Decl *D) {
      // (nat) pushing the param identifier on the scope is done here
      // and wrongly done again in Sema::ActOnMethodDeclaration (I think).
      // Do-Not-Want.
-     // if (Param->getIdentifier())
-     // PushOnScopeChains(Param, FnBodyScope);
+     if( ! getLangOpts().ObjCRuntime.hasMulleMetaABI())
+     {
+       if (Param->getIdentifier())
+         PushOnScopeChains(Param, FnBodyScope);
+     }
   }
 
   // In ARC, disallow definition of retain/release/autorelease/retainCount
@@ -3256,9 +3261,12 @@ Decl *Sema::ActOnMethodDeclaration(
      // @mulle-objc@ parameters: Remove Parameters from Scope
      // (nat) This is done before already.... but we don't want it anyway.
      //       Keep regular parameters outside of the scopes.
-     //    S->AddDecl(Param);
-     // Scope, IdResolver ??
-     //    IdResolver.AddDecl(Param);
+      if( ! getLangOpts().ObjCRuntime.hasMulleMetaABI())
+      {
+         S->AddDecl(Param);
+         // Scope, IdResolver ??
+         IdResolver.AddDecl(Param);
+      }
 
     Params.push_back(Param);
   }
@@ -3289,9 +3297,11 @@ Decl *Sema::ActOnMethodDeclaration(
   // The optimization for one parameter fitting into a void *,
   // is done a) during call  and  b) during access of the parameter
   //
-  SourceLocation SelLoc = SelectorLocs[ 0];
-  SetMulleObjCParam( ObjCMethod, Sel, Params, MethodLoc, EndLoc, SelLoc);
-   
+   if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+   {
+      SourceLocation SelLoc = SelectorLocs[ 0];
+      SetMulleObjCParam( ObjCMethod, Sel, Params, MethodLoc, EndLoc, SelLoc);
+   }
    // DONE
    
   ObjCMethod->setObjCDeclQualifier(

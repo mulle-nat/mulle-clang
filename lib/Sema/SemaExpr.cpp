@@ -2416,10 +2416,13 @@ Sema::LookupInObjCMethod(LookupResult &Lookup, Scope *S, CXXScopeSpec &SS,
   // @mulle-objc@ parameters: Create MemberExpr for _param-><name>
   // (nat) lookup if this is one of our parameters
   //
-  FD = CurMethod->FindParamRecordField( II);
-  if( FD)
-    return( GetMulle_paramFieldExpr( FD, Loc, S, SS));
-   
+  if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+  {
+     FD = CurMethod->FindParamRecordField( II);
+     if( FD)
+        return( GetMulle_paramFieldExpr( FD, Loc, S, SS));
+  }
+  
   ObjCInterfaceDecl *IFace = nullptr;
   if (LookForIvars) {
     IFace = CurMethod->getClassInterface();

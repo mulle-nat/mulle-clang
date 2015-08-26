@@ -5215,6 +5215,7 @@ def err_objc_object_catch : Error<
 def err_incomplete_type_objc_at_encode : Error<
   "'@encode' of incomplete type %0">;
 
+// @mulle-objc@ compiler: error message definition
 def err_function_mulle_objc_missing : Error<
 "the mulle-objc runtime function %0 has not been declared yet">;
 

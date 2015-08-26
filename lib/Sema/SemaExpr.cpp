@@ -2078,6 +2078,7 @@ Sema::ActOnIdExpression(Scope *S, CXXScopeSpec &SS,
     // If this reference is in an Objective-C method, then we need to do
     // some special Objective-C lookup, too.
     if (IvarLookupFollowUp) {
+      // @mulle-objc@ added CXXScopeSpec to LookupInObjCMethod arguments
       ExprResult E(LookupInObjCMethod(R, S, SS, II, true));
       if (E.isInvalid())
         return ExprError();
@@ -2160,6 +2161,7 @@ Sema::ActOnIdExpression(Scope *S, CXXScopeSpec &SS,
     // reference the ivar.
     if (ObjCIvarDecl *Ivar = R.getAsSingle<ObjCIvarDecl>()) {
       R.clear();
+      // @mulle-objc@ added CXXScopeSpec to LookupInObjCMethod arguments
       ExprResult E(LookupInObjCMethod(R, S, SS, Ivar->getIdentifier()));
       // In a hopelessly buggy code, Objective-C instance variable
       // lookup fails and no expression will be built to reference it.
@@ -2386,8 +2388,7 @@ Sema::LookupInObjCMethod(LookupResult &Lookup, Scope *S, CXXScopeSpec &SS,
                          IdentifierInfo *II, bool AllowBuiltinCreation) {
   SourceLocation Loc = Lookup.getNameLoc();
   ObjCMethodDecl *CurMethod = getCurMethodDecl();
-  FieldDecl      *FD;
-   
+
   // Check for error condition which is already reported.
   if (!CurMethod)
     return ExprError();
@@ -2418,6 +2419,8 @@ Sema::LookupInObjCMethod(LookupResult &Lookup, Scope *S, CXXScopeSpec &SS,
   //
   if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
   {
+     FieldDecl   *FD;
+     
      FD = CurMethod->FindParamRecordField( II);
      if( FD)
         return( GetMulle_paramFieldExpr( FD, Loc, S, SS));

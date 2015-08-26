@@ -3098,7 +3098,7 @@ void Sema::CheckObjCMethodOverrides(ObjCMethodDecl *ObjCMethod,
 }
 
 //
-// @mulle-objc@ parameters: stuffs a method parameters into a struct
+// @mulle-objc@ parameters: creates a struct from method parameters
 //
 void   Sema::SetMulleObjCParam( ObjCMethodDecl *ObjCMethod,
    Selector Sel,
@@ -3281,11 +3281,11 @@ Decl *Sema::ActOnMethodDeclaration(
       // Perform the default array/function conversions (C99 6.7.5.3p[7,8]).
       ArgType = Context.getAdjustedParameterType(ArgType);
 
-     Param->setDeclContext(ObjCMethod);
-     Params.push_back(Param);
+    Param->setDeclContext(ObjCMethod);
+    Params.push_back(Param);
   }
-
-   ObjCMethod->setMethodParams(Context, Params, SelectorLocs);
+  
+  ObjCMethod->setMethodParams(Context, Params, SelectorLocs);
 
   // @mulle-objc@ parameters: create ParamRecord
   // the params are what is used for syntax checks and all the

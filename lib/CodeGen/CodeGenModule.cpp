@@ -183,6 +183,7 @@ void CodeGenModule::createObjCRuntime() {
     ObjCRuntime = CreateMacObjCRuntime(*this);
     return;
    
+  // @mulle-objc@ compiler: add ObjCRuntime::Mulle to runtimes
   case ObjCRuntime::Mulle:
     ObjCRuntime = CreateMulleObjCRuntime(*this);
     return;

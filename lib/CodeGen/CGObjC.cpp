@@ -366,7 +366,7 @@ RValue CodeGenFunction::EmitObjCMessageExpr(const ObjCMessageExpr *E,
   QualType ResultType = method ? method->getReturnType() : E->getType();
 
   
-  // @mulle-objc@ codegen: Patchpoint for GenerateCallArgs
+  // @mulle-objc@ codegen: added a patchpoint for GenerateCallArgs
   // take arguments, push it into one big struct
   // Emit this argument
   //
@@ -429,9 +429,6 @@ RValue CodeGenFunction::EmitObjCMessageExpr(const ObjCMessageExpr *E,
     Builder.CreateStore(newSelf, selfAddr);
   }
 
-// leak for now
-//  delete Args;
-  
   return AdjustRelatedResultType(*this, E->getType(), method, result);
 }
 
@@ -482,7 +479,7 @@ void CodeGenFunction::StartObjCMethod(const ObjCMethodDecl *OMD,
   args.push_back(OMD->getSelfDecl());
   args.push_back(OMD->getCmdDecl());
 
- // @mulle-objc@ parameters: Push ParamDecl on args Decl, the _param pointer
+ // @mulle-objc@ arguments: Push ParamDecl on args Decl, the _param pointer
  // Ignore others
  
    if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
@@ -499,8 +496,6 @@ void CodeGenFunction::StartObjCMethod(const ObjCMethodDecl *OMD,
   CurGD = OMD;
   CurEHLocation = OMD->getLocEnd();
 
-   // create a FunctionDecl that mimics what we are actually about
-  
   StartFunction(OMD, OMD->getReturnType(), Fn, FI, args,
                 OMD->getLocation(), StartLoc);
 
@@ -1114,7 +1109,6 @@ CodeGenFunction::generateObjCSetterBody(const ObjCImplementationDecl *classImpl,
   const ObjCPropertyDecl *prop = propImpl->getPropertyDecl();
   ObjCIvarDecl *ivar = propImpl->getPropertyIvarDecl();
   ObjCMethodDecl *setterMethod = prop->getSetterMethodDecl();
-  Expr   *expr;
   
   // Just use the setter expression if Sema gave us one and it's
   // non-trivial.
@@ -1251,6 +1245,7 @@ CodeGenFunction::generateObjCSetterBody(const ObjCImplementationDecl *classImpl,
   //
   // this code really should be runtime specific
   //
+  Expr   *expr;
   ParmVarDecl *argDecl = *setterMethod->param_begin();
   QualType argType = argDecl->getType().getNonReferenceType();
   

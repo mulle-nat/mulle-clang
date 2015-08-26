@@ -3505,9 +3505,11 @@ public:
                       TemplateArgumentListInfo *ExplicitTemplateArgs = nullptr,
                       ArrayRef<Expr *> Args = None, TypoExpr **Out = nullptr);
 
+  // @mulle-objc@ parameters: additional methods GetMulle_paramExpr GetMulle_paramFieldExpr
   ExprResult   GetMulle_paramExpr( Scope *S, CXXScopeSpec &SS, SourceLocation Loc, char *Name);
   ExprResult   GetMulle_paramFieldExpr( FieldDecl *FD, SourceLocation Loc, Scope *S, CXXScopeSpec &SS);
 
+  // @mulle-objc@ added CXXScopeSpec to LookupInObjCMethod parameters
   ExprResult LookupInObjCMethod(LookupResult &LookUp, Scope *S, CXXScopeSpec &SS,
                                 IdentifierInfo *II,
                                 bool AllowBuiltinCreation=false);
@@ -7122,7 +7124,7 @@ public:
     AttributeList *AttrList, tok::ObjCKeywordKind MethodImplKind,
     bool isVariadic, bool MethodDefinition);
 
-   // @mulle-objc* addition
+   // @mulle-objc@ parameters: additional method SetMulleObjCParam
    void SetMulleObjCParam( ObjCMethodDecl *ObjCMethod, Selector Sel, SmallVector<ParmVarDecl*, 16> Params, SourceLocation   MethodLoc,
    SourceLocation   EndLoc, SourceLocation SelectorLoc);
 
@@ -7222,6 +7224,7 @@ public:
                                           ObjCMethodDecl *Method,
                                           MultiExprArg Args);
 
+   // @mulle-objc@ additional method CheckMulleObjCFunctionDefined
   bool  CheckMulleObjCFunctionDefined( Scope *S,
                                        SourceLocation Loc,
                                        char *Name);

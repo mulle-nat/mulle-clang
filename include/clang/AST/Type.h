@@ -1605,7 +1605,8 @@ public:
   bool isEventT() const;                        // OpenCL event_t
 
   bool isOpenCLSpecificType() const;            // Any OpenCL specific type
-
+   
+  // @mulle-objc@ arguments: isToVoidPointerCastableType
   bool isToVoidPointerCastableType() const;    // mulle OBJC convenience
   /// Determines if this type, which must satisfy
   /// isObjCLifetimeType(), is implicitly __unsafe_unretained rather
@@ -5159,6 +5160,7 @@ inline bool Type::isIntegerType() const {
   return false;
 }
 
+// @mulle-objc@ arguments: will it fit ? isToVoidPointerCastableType
 inline bool Type::isToVoidPointerCastableType() const /* const */ {
    if (const BuiltinType *BT = dyn_cast<BuiltinType>(CanonicalType))
    {

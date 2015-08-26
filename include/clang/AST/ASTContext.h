@@ -2278,6 +2278,7 @@ public:
 private:
   void InitBuiltinType(CanQualType &R, BuiltinType::Kind K);
 
+// @mulle-objc@ need getObjCEncodingForTypeImpl to be public
 public:
   // Return the Objective-C type encoding for a given type.
   void getObjCEncodingForTypeImpl(QualType t, std::string &S,

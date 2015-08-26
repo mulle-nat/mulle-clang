@@ -1541,7 +1541,7 @@ CGObjCMulleRuntime::GenerateMessageSendSuper(CodeGen::CodeGenFunction &CGF,
 
 /// Creat the CallArgList
 /// Here we stuff all arguments into a alloca struct
-////
+/// @mulle-objc@ stuff values into alloca
 void  CGObjCCommonMulleRuntime::GenerateCallArgs( CallArgList &Args,
                                                   CodeGenFunction &CGF,
                                                   const ObjCMessageExpr *Expr)

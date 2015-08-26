@@ -716,6 +716,7 @@ Sema::ClassifyName(Scope *S, CXXScopeSpec &SS, IdentifierInfo *&Name,
   // FIXME: This lookup really, really needs to be folded in to the normal
   // unqualified lookup mechanism.
   if (!SS.isSet() && CurMethod && !isResultTypeOrTemplate(Result, NextToken)) {
+   // @mulle-objc@ added CXXScopeSpec to LookupInObjCMethod arguments
     ExprResult E = LookupInObjCMethod(Result, S, SS, Name, true);
     if (E.get() || E.isInvalid())
       return E;
@@ -819,6 +820,7 @@ Corrected:
         // FIXME: This is a gross hack.
         if (ObjCIvarDecl *Ivar = Result.getAsSingle<ObjCIvarDecl>()) {
           Result.clear();
+          // @mulle-objc@ added CXXScopeSpec to LookupInObjCMethod arguments
           ExprResult E(LookupInObjCMethod(Result, S, SS, Ivar->getIdentifier()));
           return E;
         }

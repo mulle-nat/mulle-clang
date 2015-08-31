@@ -899,7 +899,7 @@ namespace {
       llvm::Function *GenerateMethod(const ObjCMethodDecl *OMD,
                                      const ObjCContainerDecl *CD=nullptr) override;
 
-      virtual void  GenerateCallArgs( CallArgList &Args,
+      virtual LValue  *GenerateCallArgs( CallArgList &Args,
                                       CodeGenFunction &CGF,
                                       const ObjCMessageExpr *Expr) override;
       
@@ -1250,16 +1250,17 @@ struct NullReturnState {
 /* *** Helper Functions *** */
 
 /// getConstantGEP() - Help routine to construct simple GEPs.
+/// TODO: (nat) why not inherit ?
 static llvm::Constant *getConstantGEP(llvm::LLVMContext &VMContext,
-                                      llvm::Constant *C,
-                                      unsigned idx0,
+                                      llvm::GlobalVariable *C, unsigned idx0,
                                       unsigned idx1) {
-   llvm::Value *Idxs[] = {
-      llvm::ConstantInt::get(llvm::Type::getInt32Ty(VMContext), idx0),
-      llvm::ConstantInt::get(llvm::Type::getInt32Ty(VMContext), idx1)
-   };
-   return llvm::ConstantExpr::getGetElementPtr(C, Idxs);
+  llvm::Value *Idxs[] = {
+    llvm::ConstantInt::get(llvm::Type::getInt32Ty(VMContext), idx0),
+    llvm::ConstantInt::get(llvm::Type::getInt32Ty(VMContext), idx1)
+  };
+  return llvm::ConstantExpr::getGetElementPtr(C->getValueType(), C, Idxs);
 }
+
 
 /* *** CGObjCMulleRuntime Public Interface *** */
 
@@ -1542,47 +1543,57 @@ CGObjCMulleRuntime::GenerateMessageSendSuper(CodeGen::CodeGenFunction &CGF,
 /// Creat the CallArgList
 /// Here we stuff all arguments into a alloca struct
 /// @mulle-objc@ stuff values into alloca
-void  CGObjCCommonMulleRuntime::GenerateCallArgs( CallArgList &Args,
-                                                  CodeGenFunction &CGF,
-                                                  const ObjCMessageExpr *Expr)
+LValue  *CGObjCCommonMulleRuntime::GenerateCallArgs( CallArgList &Args,
+                                                     CodeGenFunction &CGF,
+                                                     const ObjCMessageExpr *Expr)
 {
    unsigned  nArgs;
    
    nArgs = Expr->getNumArgs();
    if( ! nArgs)
-      return;
+      return( nullptr);
    
    // Initialize the captured struct.
    const ObjCMethodDecl *method = Expr->getMethodDecl();
    RecordDecl *RD = method->getParamRecord();
-
-   if( RD)
+   
+   if( ! RD)
+      return( nullptr);
+   
+   QualType RecTy = CGM.getContext().getTagDeclType( RD);
+   QualType PtrTy = CGM.getContext().getPointerType( RecTy);
+   
+   LValue   Record = CGF.MakeNaturalAlignAddrLValue( CGF.CreateMemTemp( RecTy, "__objc__param.storage"), RecTy);
+   
+   //
+   // push values into record
+   // (todo) if only one arg and it is convertible to void *
+   //        then don't alloca
+   //
+   unsigned int i = 0;
+   for( RecordDecl::field_iterator CurField = RD->field_begin(), SentinelField = RD->field_end(); CurField != SentinelField; CurField++)
    {
-      QualType RecTy = CGM.getContext().getTagDeclType( RD);
-      QualType PtrTy = CGM.getContext().getPointerType( RecTy);
+      Expr::Expr  *arg;
       
-      LValue   Record = CGF.MakeNaturalAlignAddrLValue( CGF.CreateMemTemp( RecTy, "__objc__param.storage"), RecTy);
+      arg = const_cast<Expr::Expr *>( Expr->getArg( i));
       
-      //
-      // push values into record
-      // (todo) if only one arg and it is convertible to void *
-      //        then don't alloca
-      //
-      unsigned int i = 0;
-      for( RecordDecl::field_iterator CurField = RD->field_begin(), SentinelField = RD->field_end(); CurField != SentinelField; CurField++)
-      {
-         Expr::Expr  *arg;
-         
-         arg = const_cast<Expr::Expr *>( Expr->getArg( i));
-         
-         LValue LV = CGF.EmitLValueForFieldInitialization( Record, *CurField);
-         CGF.EmitInitializerForField( *CurField, LV, arg, None);
-         
-         ++i;
-      }
+      LValue LV = CGF.EmitLValueForFieldInitialization( Record, *CurField);
+      CGF.EmitInitializerForField( *CurField, LV, arg, None);
       
-      Args.add( RValue::get( Record.getAddress()), PtrTy);
+      ++i;
    }
+   
+   Args.add( RValue::get( Record.getAddress()), PtrTy);
+   
+   //
+   // specify beginning of life for this alloca
+   //
+   llvm::Type  *type = CGF.ConvertTypeForMem( RecTy);
+   unsigned size = CGM.getDataLayout().getTypeAllocSize( type);
+   
+   if( ! CGF.EmitLifetimeStart( size, Record.getAddress()))
+      return( nullptr);
+   return( new LValue( Record));
 }
 
 #pragma mark -

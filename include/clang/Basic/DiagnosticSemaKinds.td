@@ -7179,11 +7179,6 @@ def err_builtin_longjmp_unsupported : Error<
 def err_builtin_setjmp_unsupported : Error<
   "__builtin_setjmp is not supported for the current target">;
 
-def err_builtin_longjmp_unsupported : Error<
-  "__builtin_longjmp is not supported for the current target">;
-def err_builtin_setjmp_unsupported : Error<
-  "__builtin_setjmp is not supported for the current target">;
-
 def err_builtin_longjmp_invalid_val : Error<
   "argument to __builtin_longjmp must be a constant 1">;
 def err_builtin_requires_language : Error<"'%0' is only available in %1">;

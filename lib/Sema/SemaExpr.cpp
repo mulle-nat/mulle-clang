@@ -2423,6 +2423,7 @@ Sema::GetMulle_paramFieldExpr( FieldDecl *FD, SourceLocation Loc, Scope *S, CXXS
      ExprResult Result   = MemberExpr::Create( *Ctx,
                                               CastExpr.get(),
                                               true,
+                                              SourceLocation(),   // (nat) blind add
                                               SS.getWithLocInContext(*Ctx),
                                               SourceLocation(), // invalid template location
                                               FD,
@@ -2448,7 +2449,7 @@ Sema::GetMulle_paramFieldExpr( FieldDecl *FD, SourceLocation Loc, Scope *S, CXXS
 ///
 /// Returns a null sentinel to indicate trivial success.
 ExprResult
-Sema::LookupInObjCMethod(LookupResult &Lookup, Scope *S,
+Sema::LookupInObjCMethod(LookupResult &Lookup, Scope *S, CXXScopeSpec &SS,
                          IdentifierInfo *II, bool AllowBuiltinCreation) {
   SourceLocation Loc = Lookup.getNameLoc();
   ObjCMethodDecl *CurMethod = getCurMethodDecl();

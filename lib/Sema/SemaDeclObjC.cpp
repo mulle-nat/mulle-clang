@@ -320,7 +320,14 @@ void Sema::ActOnStartOfObjCMethodDef(Scope *FnBodyScope, Decl *D) {
 
   PushOnScopeChains(MDecl->getSelfDecl(), FnBodyScope);
   PushOnScopeChains(MDecl->getCmdDecl(), FnBodyScope);
-
+   // @mulle-objc@ parameters: save scope for later retrieval in ActonMethod
+   if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+   {
+      if( MDecl->getParamDecl())
+         PushOnScopeChains(MDecl->getParamDecl(), FnBodyScope);
+   
+      MDecl->setParamScope( (void *) FnBodyScope);
+  }
   // The ObjC parser requires parameter names so there's no need to check.
   CheckParmsForFunctionDef(MDecl->param_begin(), MDecl->param_end(),
                            /*CheckParameterNames=*/false);
@@ -333,8 +340,15 @@ void Sema::ActOnStartOfObjCMethodDef(Scope *FnBodyScope, Decl *D) {
       Diag(Param->getLocation(), diag::warn_arc_strong_pointer_objc_pointer) <<
             Param->getType();
     
-    if (Param->getIdentifier())
-      PushOnScopeChains(Param, FnBodyScope);
+     // @mulle-objc@ parameters: Remove Parameters from Scope
+     // (nat) pushing the param identifier on the scope is done here
+     // and wrongly done again in Sema::ActOnMethodDeclaration (I think).
+     // Do-Not-Want.
+     if( ! getLangOpts().ObjCRuntime.hasMulleMetaABI())
+     {
+       if (Param->getIdentifier())
+         PushOnScopeChains(Param, FnBodyScope);
+     }
   }
 
   // In ARC, disallow definition of retain/release/autorelease/retainCount
@@ -4079,6 +4093,72 @@ static void mergeInterfaceMethodToImpl(Sema &S,
   }
 }
 
+//
+// @mulle-objc@ parameters: creates a struct from method parameters
+//
+void   Sema::SetMulleObjCParam( ObjCMethodDecl *ObjCMethod,
+   Selector Sel,
+   SmallVector<ParmVarDecl*, 16> Params,
+   SourceLocation   MethodLoc,
+   SourceLocation   EndLoc,
+   SourceLocation   SelectorLoc)
+{
+   if( Params.size())
+   {
+      StringRef  RecordName;
+      
+      //
+      // this could be trouble, if someone has declared the same method
+      // already ? check this
+      //
+      RecordName = "__objc_param__" + Sel.getAsString();
+      IdentifierInfo  *RecordID = &Context.Idents.get( RecordName);
+      
+      RecordDecl  *RD = RecordDecl::Create( Context, TTK_Struct, CurContext, MethodLoc, EndLoc, RecordID);
+      
+      for (unsigned i = 0, e = Params.size(); i != e; ++i)
+      {
+         ParmVarDecl *Param = Params[ i];
+         FieldDecl   *FD;
+         
+         FD = FieldDecl::Create( Context, RD,
+                                Param->getLocation(), Param->getLocEnd(),
+                                Param->getIdentifier(),
+                                Param->getType(),
+                                Param->getTypeSourceInfo(),
+                                Param->getDefaultArg(),
+                                false,  // Mutable... only for C++
+                                ICIS_NoInit);
+         RD->addDecl( FD);
+      }
+      RD->completeDefinition();
+
+      // some voodoo, blindly copied
+      AddAlignmentAttributesForRecord(RD);
+      AddMsStructLayoutForRecord(RD);
+      
+      ObjCMethod->setParamRecord( RD);
+
+   // (nat) fake it up, so that ever method looks exactly alike
+   //       add our _param implicit decl now.
+   //
+      // convert record to a QualType
+      QualType RecTy = Context.getTagDeclType(RD);
+      QualType PtrTy = Context.getPointerType( RecTy);
+
+      ImplicitParamDecl  *Param = ImplicitParamDecl::Create(Context,
+                                                            ObjCMethod,
+                                                            SelectorLoc,
+                                                            &Context.Idents.get("_param"),
+                                                            PtrTy);
+      
+      ObjCMethod->setParamDecl( Param);
+      // this is implicitly done later in ActOnStartOfObjCMethodDef
+      //      IdResolver.AddDecl(Param);  // this adds it to search scope!
+   }
+}
+
+
 Decl *Sema::ActOnMethodDeclaration(
     Scope *S,
     SourceLocation MethodLoc, SourceLocation EndLoc,
@@ -4175,14 +4255,23 @@ Decl *Sema::ActOnMethodDeclaration(
       Diag(Param->getLocation(), diag::err_block_on_nonlocal);
       Param->setInvalidDecl();
     }
-    S->AddDecl(Param);
-    IdResolver.AddDecl(Param);
+     
+     // @mulle-objc@ parameters: Remove Parameters from Scope
+     // (nat) This is done before already.... but we don't want it anyway.
+     //       Keep regular parameters outside of the scopes.
+      if( ! getLangOpts().ObjCRuntime.hasMulleMetaABI())
+      {
+         S->AddDecl(Param);
+         // Scope, IdResolver ??
+         IdResolver.AddDecl(Param);
+      }
 
     Params.push_back(Param);
   }
   
   for (unsigned i = 0, e = CNumArgs; i != e; ++i) {
     ParmVarDecl *Param = cast<ParmVarDecl>(CParamInfo[i].Param);
+     // this ArgType code appears to be completely superflous
     QualType ArgType = Param->getType();
     if (ArgType.isNull())
       ArgType = Context.getObjCIdType();
@@ -4195,6 +4284,24 @@ Decl *Sema::ActOnMethodDeclaration(
   }
   
   ObjCMethod->setMethodParams(Context, Params, SelectorLocs);
+
+  // @mulle-objc@ parameters: create ParamRecord
+  // the params are what is used for syntax checks and all the
+  // other good stuff.
+  //
+  // The actual ParameterBlock that is used for code generation
+  // is kept separately. For now we assume that there
+  // is alwas a _param block, except if there are not arguments.
+  // The optimization for one parameter fitting into a void *,
+  // is done a) during call  and  b) during access of the parameter
+  //
+   if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+   {
+      SourceLocation SelLoc = SelectorLocs[ 0];
+      SetMulleObjCParam( ObjCMethod, Sel, Params, MethodLoc, EndLoc, SelLoc);
+   }
+   // DONE
+   
   ObjCMethod->setObjCDeclQualifier(
     CvtQTToAstBitMask(ReturnQT.getObjCDeclQualifier()));
 

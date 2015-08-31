@@ -2394,6 +2394,8 @@ public:
 private:
   void InitBuiltinType(CanQualType &R, BuiltinType::Kind K);
 
+// @mulle-objc@ need getObjCEncodingForTypeImpl to be public
+public:
   // Return the Objective-C type encoding for a given type.
   void getObjCEncodingForTypeImpl(QualType t, std::string &S,
                                   bool ExpandPointedToStructures,
@@ -2407,6 +2409,7 @@ private:
                                   bool EncodePointerToObjCTypedef = false,
                                   QualType *NotEncodedT=nullptr) const;
 
+private:
   // Adds the encoding of the structure's members.
   void getObjCEncodingForStructureImpl(RecordDecl *RD, std::string &S,
                                        const FieldDecl *Field,

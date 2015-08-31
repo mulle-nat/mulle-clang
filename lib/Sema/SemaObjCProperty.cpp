@@ -2123,6 +2123,17 @@ void Sema::ProcessPropertyDecl(ObjCPropertyDecl *property,
                                                   nullptr);
       SetterMethod->setMethodParams(Context, Argument, None);
 
+      // @mulle-objc@ property: fix up setter description for mulle-objc calling convention
+      //
+      if( Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+      {
+         SmallVector<ParmVarDecl*, 16> Params;
+         Params.push_back(Argument);
+      
+      
+         SetMulleObjCParam( SetterMethod, property->getSetterName(), Params, Loc, Loc, Loc);
+      }
+
       AddPropertyAttrs(*this, SetterMethod, property);
 
       CD->addDecl(SetterMethod);

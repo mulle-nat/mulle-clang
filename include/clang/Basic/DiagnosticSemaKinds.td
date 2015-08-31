@@ -2314,7 +2314,7 @@ def warn_attribute_wrong_decl_type : Warning<
   "%0 attribute only applies to %select{functions|unions|"
   "variables and functions|functions and methods|parameters|"
   "functions, methods and blocks|functions, methods, and classes|"
-  "functions, methods, and parameters|classes|enums|variables|methods|"
+  "functions, methods, and parameters|classes|variables|methods|"
   "variables, functions and labels|fields and global variables|structs|"
   "variables and typedefs|thread-local variables|"
   "variables and fields|variables, data members and tag types|"
@@ -4148,9 +4148,6 @@ def ext_enum_too_large : ExtWarn<
 def ext_enumerator_increment_too_large : ExtWarn<
   "incremented enumerator value %0 is not representable in the "
   "largest integer type">, InGroup<EnumTooLarge>;
-def warn_flag_enum_constant_out_of_range : Warning<
-  "enumeration value %0 is out of range of flags in enumeration type %1">,
-  InGroup<FlagEnum>;
   
 def warn_illegal_constant_array_size : Extension<
   "size of static array must be an integer constant expression">;
@@ -5361,6 +5358,10 @@ def warn_objc_circular_container : Warning<
   "adding '%0' to '%1' might cause circular dependency in container">,
   InGroup<DiagGroup<"objc-circular-container">>;
 def note_objc_circular_container_declared_here : Note<"'%0' declared here">;
+
+// @mulle-objc@ compiler: error message definition
+def err_function_mulle_objc_missing : Error<
+"the mulle-objc runtime function %0 has not been declared yet">;
 
 def warn_setter_getter_impl_required : Warning<
   "property %0 requires method %1 to be defined - "
@@ -7172,6 +7173,11 @@ def err_64_bit_builtin_32_bit_tgt : Error<
   "this builtin is only available on 64-bit targets">;
 def err_ppc_builtin_only_on_pwr7 : Error<
   "this builtin is only valid on POWER7 or later CPUs">;
+
+def err_builtin_longjmp_unsupported : Error<
+  "__builtin_longjmp is not supported for the current target">;
+def err_builtin_setjmp_unsupported : Error<
+  "__builtin_setjmp is not supported for the current target">;
 
 def err_builtin_longjmp_unsupported : Error<
   "__builtin_longjmp is not supported for the current target">;

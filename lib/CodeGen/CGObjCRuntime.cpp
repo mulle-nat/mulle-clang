@@ -381,3 +381,15 @@ CGObjCRuntime::getMessageSendInfo(const ObjCMethodDecl *method,
     CGM.getTypes().GetFunctionType(argsInfo)->getPointerTo();
   return MessageSendInfo(argsInfo, signatureType);
 }
+
+//
+// @mulle-objc@ codegen: to generate LLVM method argument list
+//   this is done differently in mulle-objc so this little code
+//   snippet is placed into the runtime
+//
+void  CGObjCRuntime::GenerateCallArgs( CallArgList &Args,
+                                       CodeGenFunction &CGF,
+                                       const ObjCMessageExpr *Expr)
+{
+  CGF.EmitCallArgs( Args, Expr->getMethodDecl(), Expr->arg_begin(), Expr->arg_end());
+}

@@ -188,6 +188,11 @@ void CodeGenModule::createObjCRuntime() {
   case ObjCRuntime::iOS:
     ObjCRuntime = CreateMacObjCRuntime(*this);
     return;
+   
+  // @mulle-objc@ compiler: add ObjCRuntime::Mulle to runtimes
+  case ObjCRuntime::Mulle:
+    ObjCRuntime = CreateMulleObjCRuntime(*this);
+    return;
   }
   llvm_unreachable("bad runtime kind");
 }

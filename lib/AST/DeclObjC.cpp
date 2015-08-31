@@ -945,6 +945,25 @@ ObjCMethodFamily ObjCMethodDecl::getMethodFamily() const {
   return family;
 }
 
+// @mulle-objc@ parameters: Lookup a _param FieldDecl by Identifier
+FieldDecl  *ObjCMethodDecl::FindParamRecordField( IdentifierInfo *II)
+{
+   IdentifierInfo   *FII;
+   
+   if( ! ParamRecord)
+      return( nullptr);
+   
+   for (RecordDecl::field_iterator Field = ParamRecord->field_begin(),
+        FieldEnd = ParamRecord->field_end(); Field != FieldEnd; ++Field)
+   {
+      FII = Field->getIdentifier();
+      if( FII == II)
+         return( Field->getCanonicalDecl());
+   }
+   return( nullptr);
+}
+
+
 QualType ObjCMethodDecl::getSelfType(ASTContext &Context,
                                      const ObjCInterfaceDecl *OID,
                                      bool &selfIsPseudoStrong,

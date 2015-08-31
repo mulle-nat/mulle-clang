@@ -3632,7 +3632,12 @@ public:
                       TemplateArgumentListInfo *ExplicitTemplateArgs = nullptr,
                       ArrayRef<Expr *> Args = None, TypoExpr **Out = nullptr);
 
-  ExprResult LookupInObjCMethod(LookupResult &LookUp, Scope *S,
+  // @mulle-objc@ parameters: additional methods GetMulle_paramExpr GetMulle_paramFieldExpr
+  ExprResult   GetMulle_paramExpr( Scope *S, CXXScopeSpec &SS, SourceLocation Loc, char *Name);
+  ExprResult   GetMulle_paramFieldExpr( FieldDecl *FD, SourceLocation Loc, Scope *S, CXXScopeSpec &SS);
+
+  // @mulle-objc@ added CXXScopeSpec to LookupInObjCMethod parameters
+  ExprResult LookupInObjCMethod(LookupResult &LookUp, Scope *S, CXXScopeSpec &SS,
                                 IdentifierInfo *II,
                                 bool AllowBuiltinCreation=false);
 
@@ -7317,6 +7322,10 @@ public:
     AttributeList *AttrList, tok::ObjCKeywordKind MethodImplKind,
     bool isVariadic, bool MethodDefinition);
 
+   // @mulle-objc@ parameters: additional method SetMulleObjCParam
+   void SetMulleObjCParam( ObjCMethodDecl *ObjCMethod, Selector Sel, SmallVector<ParmVarDecl*, 16> Params, SourceLocation   MethodLoc,
+   SourceLocation   EndLoc, SourceLocation SelectorLoc);
+
   ObjCMethodDecl *LookupMethodInQualifiedType(Selector Sel,
                                               const ObjCObjectPointerType *OPT,
                                               bool IsInstance);
@@ -7412,6 +7421,11 @@ public:
                                           Selector Sel,
                                           ObjCMethodDecl *Method,
                                           MultiExprArg Args);
+
+   // @mulle-objc@ additional method CheckMulleObjCFunctionDefined
+  bool  CheckMulleObjCFunctionDefined( Scope *S,
+                                       SourceLocation Loc,
+                                       char *Name);
 
   ExprResult ActOnInstanceMessage(Scope *S,
                                   Expr *Receiver,
@@ -8212,12 +8226,6 @@ public:
                                 QualType DstType, QualType SrcType,
                                 Expr *SrcExpr, AssignmentAction Action,
                                 bool *Complained = nullptr);
-
-  /// IsValueInFlagEnum - Determine if a value is allowed as part of a flag
-  /// enum. If AllowMask is true, then we also allow the complement of a valid
-  /// value, to be used as a mask.
-  bool IsValueInFlagEnum(const EnumDecl *ED, const llvm::APInt &Val,
-                         bool AllowMask) const;
 
   /// DiagnoseAssignmentEnum - Warn if assignment to enum is a constant
   /// integer not in the range of enum values.

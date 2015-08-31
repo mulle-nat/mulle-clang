@@ -297,10 +297,26 @@ CodeGenTypes::arrangeObjCMessageSendSignature(const ObjCMethodDecl *MD,
   SmallVector<CanQualType, 16> argTys;
   argTys.push_back(Context.getCanonicalParamType(receiverType));
   argTys.push_back(Context.getCanonicalParamType(Context.getObjCSelType()));
+
+   // @mulle-objc@ runtime: Hack ObjCMessageSendSignature 
+   if( Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+   {
+      RecordDecl *RD = MD->getParamRecord();
+      if( RD)
+      {
+      QualType RecTy = CGM.getContext().getTagDeclType( RD);
+      QualType PtrTy = CGM.getContext().getPointerType( RecTy);
+   
+      argTys.push_back( Context.getCanonicalParamType( PtrTy));
+      }
+   }
+   else
+   {
   // FIXME: Kill copy?
-  for (const auto *I : MD->params()) {
-    argTys.push_back(Context.getCanonicalParamType(I->getType()));
-  }
+      for (const auto *I : MD->params()) {
+         argTys.push_back(Context.getCanonicalParamType(I->getType()));
+      }
+   }
 
   FunctionType::ExtInfo einfo;
   bool IsWindows = getContext().getTargetInfo().getTriple().isOSWindows();

@@ -159,6 +159,12 @@ public:
                       const ObjCInterfaceDecl *Class = nullptr,
                       const ObjCMethodDecl *Method = nullptr) = 0;
 
+   // @mulle-objc@ header: Callback to generate LLVM method argument list 
+   virtual void   GenerateCallArgs( CallArgList &Args,
+                                    CodeGenFunction &CGF,
+                                    const ObjCMessageExpr *Expr);
+
+  
   /// Generate an Objective-C message send operation to the super
   /// class initiated in a method for Class and with the given Self
   /// object.
@@ -295,6 +301,7 @@ public:
 //TODO: This should include some way of selecting which runtime to target.
 CGObjCRuntime *CreateGNUObjCRuntime(CodeGenModule &CGM);
 CGObjCRuntime *CreateMacObjCRuntime(CodeGenModule &CGM);
+CGObjCRuntime *CreateMulleObjCRuntime(CodeGenModule &CGM);
 }
 }
 #endif

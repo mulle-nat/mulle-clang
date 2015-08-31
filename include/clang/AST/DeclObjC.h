@@ -173,9 +173,9 @@ private:
   void *ParamsAndSelLocs;
   unsigned NumParams;
 
-  // @mulle-objc@ New variables for parameter hackage
+  // @mulle-objc@ parameters: ivars ParamRecord, ParamScope
   RecordDecl    *ParamRecord;
-   void          *ParamScope; // void coz to lazy to include scope
+   void         *ParamScope; // void coz to lazy to include scope
    
   /// List of attributes for this method declaration.
   SourceLocation DeclEndLoc; // the location of the ';' or '{'.
@@ -189,6 +189,7 @@ private:
   /// CmdDecl - Decl for the implicit _cmd parameter. This is lazily
   /// constructed by createImplicitParams.
   ImplicitParamDecl *CmdDecl;
+   /// @mulle-objc@ parameters: ParamDecl storage of declaration
    /// Para,Decl - Decl for the implicit _param parameter. This is lazily
    /// constructed by ActOnMethodDeclaration.
   ImplicitParamDecl *ParamDecl;
@@ -246,14 +247,13 @@ private:
         RelatedResultType(HasRelatedResultType),
         SelLocsKind(SelLoc_StandardNoSpace), IsOverriding(0), HasSkippedBody(0),
         MethodDeclType(T), ReturnTInfo(ReturnTInfo), ParamsAndSelLocs(nullptr),
-        NumParams(0),
-        DeclEndLoc(endLoc), Body(), SelfDecl(nullptr),
+        NumParams(0), DeclEndLoc(endLoc), Body(), SelfDecl(nullptr),
         CmdDecl(nullptr),
-        ParamDecl( nullptr)
-   {
-      ParamRecord = nullptr;
-      ParamScope  = nullptr;
-      setImplicit(isImplicitlyDeclared);
+/// @mulle-objc@ parameters: initialize storage of parameter ivars
+        ParamDecl( nullptr) {
+    ParamRecord = nullptr;
+    ParamScope  = nullptr;
+    setImplicit(isImplicitlyDeclared);
    }
 
   /// \brief A definition will return its interface declaration.
@@ -279,19 +279,11 @@ public:
   }
 
   ObjCDeclQualifier getObjCDeclQualifier() const {
-      return ObjCDeclQualifier(objcDeclQualifier);
+    return ObjCDeclQualifier(objcDeclQualifier);
   }
   void setObjCDeclQualifier(ObjCDeclQualifier QV) { objcDeclQualifier = QV; }
    
-  RecordDecl   *getParamRecord() const {
-     return ParamRecord;
-  }
-  void setParamRecord( RecordDecl  *RD)
-  {
-    ParamRecord = RD;
-  }
-
-   /// \brief Determine whether this method has a result type that is related
+  /// \brief Determine whether this method has a result type that is related
   /// to the message receiver's type.
   bool hasRelatedResultType() const { return RelatedResultType; }
 
@@ -417,11 +409,17 @@ public:
     return llvm::map_iterator(param_end(), deref_fun(&ParmVarDecl::getType));
   }
 
-   void * getParamScope() const { return ParamScope; }
-   void setParamScope(void *Scope) { ParamScope = Scope; }
-   
-   
-   
+  // @mulle-objc@ parameters: paramRecord, paramScope, paramDecl accessors
+  RecordDecl   *getParamRecord() const { return ParamRecord; }
+  void setParamRecord( RecordDecl  *RD) { ParamRecord = RD; }
+
+  void * getParamScope() const { return ParamScope; }
+  void setParamScope(void *Scope) { ParamScope = Scope; }
+
+  ImplicitParamDecl * getParamDecl() const { return ParamDecl; }
+  void setParamDecl(ImplicitParamDecl *PD) { ParamDecl = PD; }
+
+  // @mulle-objc@ parameters:  method FindParamRecordField for parameters
   FieldDecl  *FindParamRecordField( IdentifierInfo *II);
    
   /// createImplicitParams - Used to lazily create the self and cmd
@@ -439,8 +437,6 @@ public:
   void setSelfDecl(ImplicitParamDecl *SD) { SelfDecl = SD; }
   ImplicitParamDecl * getCmdDecl() const { return CmdDecl; }
   void setCmdDecl(ImplicitParamDecl *CD) { CmdDecl = CD; }
-  ImplicitParamDecl * getParamDecl() const { return ParamDecl; }
-  void setParamDecl(ImplicitParamDecl *PD) { ParamDecl = PD; }
 
   /// Determines the family of this method.
   ObjCMethodFamily getMethodFamily() const;

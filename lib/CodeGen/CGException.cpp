@@ -107,6 +107,7 @@ namespace {
     static const EHPersonality GNU_CPlusPlus;
     static const EHPersonality GNU_CPlusPlus_SJLJ;
     static const EHPersonality GNU_CPlusPlus_SEH;
+   // @mulle-objc@ compiler: exception personality
     static const EHPersonality Mulle_ObjC;
     static const EHPersonality MSVC_except_handler;
     static const EHPersonality MSVC_C_specific_handler;
@@ -133,6 +134,7 @@ const EHPersonality
 EHPersonality::GNU_ObjCXX = { "__gnustep_objcxx_personality_v0", nullptr };
 const EHPersonality
 EHPersonality::GNUstep_ObjC = { "__gnustep_objc_personality_v0", nullptr };
+// @mulle-objc@ compiler: exception personality
 const EHPersonality
 EHPersonality::Mulle_ObjC = { "__mulle_objc_personality_v0", nullptr };
 const EHPersonality
@@ -172,6 +174,7 @@ static const EHPersonality &getObjCPersonality(const llvm::Triple &T,
   case ObjCRuntime::GCC:
   case ObjCRuntime::ObjFW:
     return EHPersonality::GNU_ObjC;
+   // @mulle-objc@ compiler: exception personality
   case ObjCRuntime::Mulle:
     return EHPersonality::Mulle_ObjC;
   }
@@ -211,6 +214,7 @@ static const EHPersonality &getObjCXXPersonality(const llvm::Triple &T,
     return EHPersonality::GNU_ObjC;
   case ObjCRuntime::GNUstep:
     return EHPersonality::GNU_ObjCXX;
+   // @mulle-objc@ compiler: exception personality
   case ObjCRuntime::Mulle:
     return EHPersonality::Mulle_ObjC;
   }

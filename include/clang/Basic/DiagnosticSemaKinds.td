@@ -5359,6 +5359,7 @@ def warn_objc_circular_container : Warning<
   InGroup<DiagGroup<"objc-circular-container">>;
 def note_objc_circular_container_declared_here : Note<"'%0' declared here">;
 
+// @mulle-objc@ compiler: error message definition
 def err_function_mulle_objc_missing : Error<
 "the mulle-objc runtime function %0 has not been declared yet">;
 

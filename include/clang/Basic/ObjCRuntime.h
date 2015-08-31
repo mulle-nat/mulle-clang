@@ -51,7 +51,7 @@ public:
     /// 'objfw' is the Objective-C runtime included in ObjFW
     ObjFW,
    
-    /// @mulle-objc@  Add "Mulle" runtime
+    /// @mulle-objc@ compiler: Add "Mulle" runtime
     /// 'mulle' is the runtime from Mulle kybernetiK. It's fragile and
     /// hopefully very fast
     Mulle
@@ -86,11 +86,20 @@ public:
     case GNUstep: return true;
     case ObjFW: return true;
     case iOS: return true;
+    // @mulle-objc@ runtime feature check
     case Mulle: return false;
     }
     llvm_unreachable("bad kind");
   }
 
+  // @mulle-objc@ runtime: additional method hasMulleMetaABI to check if compiling with mulle
+  bool hasMulleMetaABI() const {
+    switch (getKind()) {
+    case Mulle: return true;
+    default   : return false;
+    }
+    llvm_unreachable("bad kind");
+  }
   /// The inverse of isNonFragile():  does this runtime follow the set of
   /// implied behaviors for a "fragile" ABI?
   bool isFragile() const { return !isNonFragile(); }
@@ -111,6 +120,7 @@ public:
         return Arch != llvm::Triple::x86_64;
     // Except for deployment target of 10.5 or less,
     // Mac runtimes use legacy dispatch everywhere now.
+    // @mulle-objc@ runtime feature check
     if( getKind() == Mulle)
       return false; // Mulle dispatches differently I guess
     return true;
@@ -122,6 +132,7 @@ public:
     case FragileMacOSX:
     case MacOSX:
     case iOS:
+    // @mulle-objc@ runtime feature check
     case Mulle:
       return false;
     case GCC:
@@ -148,6 +159,7 @@ public:
     case GCC: return false;
     case GNUstep: return true;
     case ObjFW: return true;
+    // @mulle-objc@ runtime feature check
     case Mulle : return false; // 4 now
     }
     llvm_unreachable("bad kind");
@@ -167,6 +179,7 @@ public:
     case GCC: return false;
     case GNUstep: return getVersion() >= VersionTuple(1, 6);
     case ObjFW: return true;
+    // @mulle-objc@ runtime feature check
     case Mulle: return false;
     }
     llvm_unreachable("bad kind");
@@ -233,6 +246,7 @@ public:
     switch (getKind()) {
     case FragileMacOSX:
     case GCC:
+    // @mulle-objc@ runtime feature check
     case Mulle:
       return true;
     case MacOSX:
@@ -261,6 +275,7 @@ public:
     case GCC: return false;
     case GNUstep: return false;
     case ObjFW: return false;
+    // @mulle-objc@ runtime feature check
     case Mulle: return false;
     }
     llvm_unreachable("bad kind");
@@ -275,6 +290,7 @@ public:
     case GCC: return true;
     case GNUstep: return true;
     case ObjFW: return true;
+    // @mulle-objc@ runtime feature check
     case Mulle: return false;   // maybe so, maybe not so
     }
     llvm_unreachable("bad kind");
@@ -289,6 +305,7 @@ public:
     case GCC: return true;
     case GNUstep: return true;
     case ObjFW: return true;
+    // @mulle-objc@ runtime feature check
     case Mulle: return false;
     }
     llvm_unreachable("bad kind");

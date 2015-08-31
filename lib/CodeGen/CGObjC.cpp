@@ -391,7 +391,7 @@ RValue CodeGenFunction::EmitObjCMessageExpr(const ObjCMessageExpr *E,
   QualType ResultType = method ? method->getReturnType() : E->getType();
 
   
-  // @mulle-objc@ Patchpoint for GenerateCallArgs
+  // @mulle-objc@ codegen: added a patchpoint for GenerateCallArgs
   // take arguments, push it into one big struct
   // Emit this argument
   //
@@ -503,6 +503,7 @@ void CodeGenFunction::StartObjCMethod(const ObjCMethodDecl *OMD,
 
   args.push_back(OMD->getSelfDecl());
   args.push_back(OMD->getCmdDecl());
+<<<<<<< HEAD
  // @mulle-objc@ Push ParmamDecl on args Decl
  // Ignore others
   if( OMD->getParamDecl())
@@ -514,12 +515,26 @@ void CodeGenFunction::StartObjCMethod(const ObjCMethodDecl *OMD,
 =======
   args.append(OMD->param_begin(), OMD->param_end());
 >>>>>>> 7ab883b8e23498801e0038289a8ddfeb62e995c8
+=======
+>>>>>>> mulle_objclang_36
 
+ // @mulle-objc@ arguments: Push ParamDecl on args Decl, the _param pointer
+ // Ignore others
+ 
+   if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+   {
+      if( OMD->getParamDecl())
+         args.push_back(OMD->getParamDecl());
+   }
+   else
+   {
+      for (const auto *PI : OMD->params())
+         args.push_back(PI);
+   }
+   
   CurGD = OMD;
   CurEHLocation = OMD->getLocEnd();
 
-   // create a FunctionDecl that mimics what we are actually about
-  
   StartFunction(OMD, OMD->getReturnType(), Fn, FI, args,
                 OMD->getLocation(), StartLoc);
 
@@ -1262,12 +1277,41 @@ CodeGenFunction::generateObjCSetterBody(const ObjCImplementationDecl *classImpl,
                           SourceLocation(), SourceLocation(),
                           &selfLoad, true, true);
 
+  
+  //
+  // @mulle-objc@ property: gotta make this access our paramDecl instead
+  //
+  // this code really should be runtime specific
+  //
+  Expr   *expr;
   ParmVarDecl *argDecl = *setterMethod->param_begin();
   QualType argType = argDecl->getType().getNonReferenceType();
-  DeclRefExpr arg(argDecl, false, argType, VK_LValue, SourceLocation());
+  
+   if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+   {
+      ValueDecl *paramDecl = setterMethod->getParamDecl();
+      DeclRefExpr param(paramDecl, false, paramDecl->getType(),
+                        VK_LValue, SourceLocation());
+      FieldDecl *FD = setterMethod->FindParamRecordField( argDecl->getIdentifier());
+      argType = FD->getType().getNonReferenceType();
+      DeclarationNameInfo   memberNameInfo( FD->getDeclName(), SourceLocation());
+      
+      MemberExpr   memberExpr( &param, true, FD,
+                              memberNameInfo, argType,
+                              VK_LValue, OK_Ordinary);
+      expr = &memberExpr;
+   }
+   else
+   {
+      ParmVarDecl *argDecl = *setterMethod->param_begin();
+      QualType argType = argDecl->getType().getNonReferenceType();
+      DeclRefExpr arg(argDecl, false, argType, VK_LValue, SourceLocation());
+      expr = &arg;
+   }
+   
   ImplicitCastExpr argLoad(ImplicitCastExpr::OnStack,
                            argType.getUnqualifiedType(), CK_LValueToRValue,
-                           &arg, VK_RValue);
+                           expr, VK_RValue);
     
   // The property type can differ from the ivar type in some situations with
   // Objective-C pointer types, we can always bit cast the RHS in these cases.

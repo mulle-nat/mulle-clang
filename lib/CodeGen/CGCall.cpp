@@ -285,30 +285,41 @@ CodeGenTypes::arrangeObjCMethodDeclaration(const ObjCMethodDecl *MD) {
   return arrangeObjCMessageSendSignature(MD, MD->getSelfDecl()->getType());
 }
 
+///
 /// Arrange the argument and result information for the function type
 /// through which to perform a send to the given Objective-C method,
 /// using the given receiver type.  The receiver type is not always
 /// the 'self' type of the method or even an Objective-C pointer type.
 /// This is *not* the right method for actually performing such a
 /// message send, due to the possibility of optional arguments.
+///
 const CGFunctionInfo &
 CodeGenTypes::arrangeObjCMessageSendSignature(const ObjCMethodDecl *MD,
                                               QualType receiverType) {
   SmallVector<CanQualType, 16> argTys;
+  CallingConv                  callConv;
+  
+  bool IsWindows = getContext().getTargetInfo().getTriple().isOSWindows();
+  
   argTys.push_back(Context.getCanonicalParamType(receiverType));
   argTys.push_back(Context.getCanonicalParamType(Context.getObjCSelType()));
 
-   // @mulle-objc@ runtime: Hack ObjCMessageSendSignature 
+   // @mulle-objc@ call: Hack ObjCMessageSendSignature 
    if( Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
    {
       RecordDecl *RD = MD->getParamRecord();
       if( RD)
       {
-      QualType RecTy = CGM.getContext().getTagDeclType( RD);
-      QualType PtrTy = CGM.getContext().getPointerType( RecTy);
+         QualType RecTy = Context.getTagDeclType( RD);
+         QualType PtrTy = Context.getPointerType( RecTy);
    
-      argTys.push_back( Context.getCanonicalParamType( PtrTy));
+         argTys.push_back( Context.getCanonicalParamType( PtrTy));
       }
+      
+      // fix up calling convention for MD, to be like mulle_objc_object_inline_call
+      // it would be nice to not just use the default, but use the actual one
+      // with which mulle_objc_object_inline_call
+      callConv = Context.getDefaultCallingConvention( false, false);
    }
    else
    {
@@ -316,12 +327,16 @@ CodeGenTypes::arrangeObjCMessageSendSignature(const ObjCMethodDecl *MD,
       for (const auto *I : MD->params()) {
          argTys.push_back(Context.getCanonicalParamType(I->getType()));
       }
+      callConv = getCallingConventionForDecl( MD, IsWindows);
+
    }
 
   FunctionType::ExtInfo einfo;
-  bool IsWindows = getContext().getTargetInfo().getTriple().isOSWindows();
-  einfo = einfo.withCallingConv(getCallingConventionForDecl(MD, IsWindows));
+  
+  // @mulle-objc@ fix call convention
+  einfo = einfo.withCallingConv( callConv);
 
+  // @mulle-objc@ probably need to fix or skip this
   if (getContext().getLangOpts().ObjCAutoRefCount &&
       MD->hasAttr<NSReturnsRetainedAttr>())
     einfo = einfo.withProducesResult(true);

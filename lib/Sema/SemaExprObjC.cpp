@@ -3012,7 +3012,7 @@ static void RemoveSelectorFromWarningCache(Sema &S, Expr* Arg) {
 }
 
 
-bool Sema::CheckMulleObjCFunctionDefined( Scope *S, SourceLocation Loc, char *Name)
+bool Sema::CheckMulleObjCFunctionDefined( Scope *S, SourceLocation Loc, StringRef Name)
 {
    DeclContext               *E;
    DeclarationName           DN;

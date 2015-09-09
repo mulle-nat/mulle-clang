@@ -2380,7 +2380,7 @@ Sema::BuildQualifiedDeclarationNameExpr(CXXScopeSpec &SS,
 }
 
 
-/* @mulle-objc@ parameters: create an expression to access _param */
+/* @mulle-objc@ parameters: create an expression to access _param by name */
 ExprResult   Sema::GetMulle_paramExpr( Scope *S, CXXScopeSpec &SS, SourceLocation Loc, char *Name)
 {
    ASTContext        *Ctx;

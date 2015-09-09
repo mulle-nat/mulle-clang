@@ -7425,7 +7425,7 @@ public:
    // @mulle-objc@ additional method CheckMulleObjCFunctionDefined
   bool  CheckMulleObjCFunctionDefined( Scope *S,
                                        SourceLocation Loc,
-                                       char *Name);
+                                       StringRef Name);
 
   ExprResult ActOnInstanceMessage(Scope *S,
                                   Expr *Receiver,

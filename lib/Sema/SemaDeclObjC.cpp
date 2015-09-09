@@ -4111,7 +4111,7 @@ void   Sema::SetMulleObjCParam( ObjCMethodDecl *ObjCMethod,
       // this could be trouble, if someone has declared the same method
       // already ? check this
       //
-      RecordName = "__objc_param__" + Sel.getAsString();
+      RecordName = "p." + Sel.getAsString();
       IdentifierInfo  *RecordID = &Context.Idents.get( RecordName);
       
       RecordDecl  *RD = RecordDecl::Create( Context, TTK_Struct, CurContext, MethodLoc, EndLoc, RecordID);

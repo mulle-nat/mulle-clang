@@ -2383,15 +2383,11 @@ Sema::BuildQualifiedDeclarationNameExpr(CXXScopeSpec &SS,
 /* @mulle-objc@ parameters: create an expression to access _param by name */
 ExprResult   Sema::GetMulle_paramExpr( Scope *S, CXXScopeSpec &SS, SourceLocation Loc, char *Name)
 {
-   ASTContext        *Ctx;
-   DeclContext       *E;
    DeclarationName   DN;
    IdentifierInfo    *II;
    
    // hacked together without a clue
-   E   = S->getEntity();
-   Ctx = &E->getParentASTContext();
-   II  = &Ctx->Idents.get( Name);
+   II  = &Context.Idents.get( Name);
    DN  = DeclarationName( II);
    
    LookupResult R( *this, DN, Loc, LookupOrdinaryName);
@@ -2411,20 +2407,15 @@ Sema::GetMulle_paramFieldExpr( FieldDecl *FD, SourceLocation Loc, Scope *S, CXXS
      // this couldn't be any easier... 
      DeclarationNameInfo   memberNameInfo( FD->getDeclName(), Loc);
      DeclAccessPair        fakeFoundDecl = DeclAccessPair::make(FD, FD->getAccess());
-     ASTContext            *Ctx;
-     DeclContext           *E;
-
-     E   = S->getEntity();
-     Ctx = &E->getParentASTContext();
      ExprResult BaseExpr = GetMulle_paramExpr( S, SS, Loc, (char *) "_param");
      ExprResult CastExpr = DefaultLvalueConversion( BaseExpr.get());
 /*     ExprResult CastExpr = ImplicitCastExpr::Create(*Ctx, BaseExpr.get()->getType(), CK_LValueToRValue, BaseExpr.get(), nullptr, VK_RValue);
 */
-     ExprResult Result   = MemberExpr::Create( *Ctx,
+     ExprResult Result   = MemberExpr::Create( Context,
                                               CastExpr.get(),
                                               true,
                                               SourceLocation(),   // (nat) blind add
-                                              SS.getWithLocInContext(*Ctx),
+                                              SS.getWithLocInContext(Context),
                                               SourceLocation(), // invalid template location
                                               FD,
                                               fakeFoundDecl,

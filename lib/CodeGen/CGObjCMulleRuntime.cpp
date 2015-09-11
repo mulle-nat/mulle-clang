@@ -32,8 +32,10 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
+#include "clang/AST/ParentMap.h"
 #include "clang/AST/RecordLayout.h"
 #include "clang/AST/StmtObjC.h"
+#include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/Basic/LangOptions.h"
 #include "clang/CodeGen/CGFunctionInfo.h"
 #include "clang/Frontend/CodeGenOptions.h"
@@ -92,35 +94,35 @@ namespace {
       llvm::Constant *getMessageSendAllocFn() const {
          llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy };
          return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidTy,
-                                                                  params, true),
+                                                                  params, false),
                                           "_mulle_objc_class_alloc_object");
       }
 
       llvm::Constant *getMessageSendNewFn() const {
          llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy };
          return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidTy,
-                                                                  params, true),
+                                                                  params, false),
                                           "_mulle_objc_class_new_object");
       }
       
       llvm::Constant *getMessageSendRetainFn() const {
          llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy };
          return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidTy,
-                                                                  params, true),
+                                                                  params, false),
                                           "_mulle_objc_object_retain");
       }
 
       llvm::Constant *getMessageSendReleaseFn() const {
          llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy };
          return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidTy,
-                                                                  params, true),
+                                                                  params, false),
                                           "_mulle_objc_object_release");
       }
       
       llvm::Constant *getMessageSendAutoreleaseFn() const {
          llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy };
          return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidTy,
-                                                                  params, true),
+                                                                  params, false),
                                           "_mulle_objc_object_autorelease");
       }
 
@@ -128,7 +130,7 @@ namespace {
       llvm::Constant *getMessageSendZoneFn() const {
          llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy };
          return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidTy,
-                                                                  params, true),
+                                                                  params, false),
                                           "_mulle_objc_object_zone");
       }
       
@@ -139,14 +141,14 @@ namespace {
       llvm::Constant *getMessageSendSuperFn() const {
          llvm::Type *params[] = { ObjectPtrTy, ClassIDTy, SelectorIDTy, ParamsPtrTy  };
          return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidTy,
-                                                                  params, true),
+                                                                  params, false),
                                           "_mulle_objc_object_call_class_id");
       }
 
       llvm::Constant *getMessageSendMetaSuperFn() const {
          llvm::Type *params[] = { ObjectPtrTy, ClassIDTy, SelectorIDTy, ParamsPtrTy  };
          return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidTy,
-                                                                  params, true),
+                                                                  params, false),
                                           "_mulle_objc_class_call_class_id");
       }
       
@@ -1552,6 +1554,275 @@ CGObjCMulleRuntime::GenerateMessageSendSuper(CodeGen::CodeGenFunction &CGF,
                               requiresnullCheck ? Method : nullptr);
 }
 
+/* 
+ * Analyze AST for parameter usage. 
+ */
+
+static   Expr  *unparenthesizedAndUncastedExpr( Expr *expr)
+{
+   CastExpr  *cast;
+   ParenExpr  *parenExpr;
+   
+   for(;;)
+   {
+      if( (parenExpr = dyn_cast< ParenExpr>( expr)))
+      {
+         expr = parenExpr->getSubExpr();
+         continue;
+      }
+      
+      if( (cast = dyn_cast< CastExpr>( expr)))
+      {
+         expr = cast->getSubExpr();
+         continue;
+      }
+      return( expr);
+   }
+}
+
+
+struct find_info
+{
+   Stmt   *next;
+   bool   insideLoop;
+};
+
+
+struct find_info   findNextStatementInBody( Stmt *s, Stmt *body)
+{
+   Stmt        *parent;
+   Stmt        *next;
+   bool        found;
+   ParentMap   ParentMap( body);
+   struct find_info  info;
+   
+   info.insideLoop = false;
+   info.next       = nullptr;
+   
+   assert( ParentMap.getParent( s));
+   
+   for(;;)
+   {
+      parent = ParentMap.getParent( s);
+      if( ! parent)
+         break;
+      
+      if( dyn_cast< DoStmt>( parent) ||
+          dyn_cast< WhileStmt>( parent) ||
+          dyn_cast< ForStmt>( parent))
+      {
+         info.insideLoop = true;
+      }
+         
+      for (Stmt::child_iterator
+           I = parent->child_begin(), E = parent->child_end(); I != E; ++I)
+      {
+         Stmt *child = *I;
+         
+         if( found)
+         {
+            if( ! info.next)
+            {
+               info.next = child;
+               continue;  // keep going to collect insideLoop info
+            }
+         }
+         
+         if( child == s)
+            found = true;
+      }
+      
+      s = parent;
+   }
+   
+   return( info);
+}
+
+
+
+class MulleStatementVisitor : public RecursiveASTVisitor<MulleStatementVisitor>
+{
+  std::set<Decl *>   taintedLoves;
+
+  ObjCMethodDecl     *Method;
+  ObjCMessageExpr    *Call;
+  Stmt               *NextStatement;
+  bool               returnFalseIfTainted;
+  bool               stopCollectingTaints;
+  
+public:
+  MulleStatementVisitor( ObjCMethodDecl *M, ObjCMessageExpr *C)
+  {
+     Method = M;
+     Call   = C;
+     taintedLoves.insert( Method->getParamDecl());
+  }
+
+  void   getTaintedLoves( std::set<Decl *> *result)
+  {
+     result->insert( taintedLoves.begin(), taintedLoves.end());
+  }
+  
+protected:
+  MulleStatementVisitor( ObjCMethodDecl *M, std::set<Decl *> *taints)
+  {
+     Method       = M;
+     taintedLoves.insert( taints->begin(), taints->end());
+     returnFalseIfTainted = true;
+  }
+
+public:
+   bool VisitStmt(Stmt *s)
+   {
+      if( NextStatement == s)
+      {
+         returnFalseIfTainted = true;
+         stopCollectingTaints = true;
+      }
+      return( true);
+   }
+
+  bool VisitLabelStmt( LabelStmt *s)
+  {
+     //
+     // we bail if we find a label before before the [call]
+     // we could collect labels before the call and check
+     // that the goto doesn't hit any known label
+     //
+     if( ! NextStatement)
+     {
+        taintedLoves.clear();
+        return( false);
+     }
+     return( true);
+  }
+
+   //
+   // check if left side is a pointer, check if right side
+   // contains a taint, if yes, assume left side is tainted
+   // downside:
+   //   s = &tmp[ _param->width]
+   // gets tainted, but its fairly complicated to parse this
+   // correctly
+   //
+   bool VisitBinaryOperator( BinaryOperator *op)
+   {
+      Expr         *lhs;
+      Expr         *rhs;
+      DeclRefExpr  *ref;
+      
+      if( stopCollectingTaints)
+         return( true);
+      
+      switch( op->getOpcode())
+      {
+      case BO_Assign    :
+      case BO_MulAssign :
+      case BO_DivAssign :
+      case BO_RemAssign :
+      case BO_AddAssign :
+      case BO_SubAssign :
+      case BO_ShlAssign :
+      case BO_ShrAssign :
+      case BO_AndAssign :
+      case BO_XorAssign :
+      case BO_OrAssign  :
+         break;
+      default           :
+         return( true);
+      }
+      
+      // ok check if leftside is a pointer
+      lhs = op->getLHS();
+      lhs = unparenthesizedAndUncastedExpr( lhs);
+      if( (ref = dyn_cast< DeclRefExpr>( lhs)))
+      {
+         ValueDecl   *value;
+      
+         value = ref->getDecl();
+         if( value->getType()->isPointerType())
+         {
+            // check if rhs is tainted, we don't check deeply, if any
+            // taint is mentioned, we assume this pointer is also now tainted
+            // its not too bad though, taints don't necessarily mean, that
+            // the optimization can't happen
+            
+            rhs = op->getRHS();
+            if( isStatementTainted( rhs))
+               taintedLoves.insert( value);
+         }
+      }
+      return( true);
+   }
+
+   bool  isStatementTainted( Stmt *s)
+   {
+      MulleStatementVisitor   SubVisitor( Method, &taintedLoves);
+
+      return( ! SubVisitor.TraverseStmt( s));
+   }
+
+   bool VisitObjCMessageExpr(ObjCMessageExpr *d)
+   {
+      if( d == Call)
+      {
+         struct find_info  info;
+         
+         info = findNextStatementInBody( d, Method->getBody());
+         if( info.insideLoop)
+            return( false);
+         NextStatement = info.next;
+      }
+      return( true);
+   }
+   
+   bool VisitDeclRefExpr(DeclRefExpr *d)
+   {
+      ValueDecl   *value;
+      
+      value = d->getDecl();
+      // lol @ c++ sets
+      if( taintedLoves.find( value) != taintedLoves.end())
+      {
+         if( returnFalseIfTainted)
+            return( false);
+      }
+      return( true);
+   }
+};
+
+
+
+/* 
+ * Analyze AST for parameter usage. 
+ */
+// some general thoughts:
+// 1. we know that the contents of _param reside on the stack and are created
+//    by the compiler
+// 2. we can therefore rule out that anything in _param intentionally points
+//    into param
+// 3. Run through the whole function until we encounter the MesssageExpr,
+//    collect  variables that may alias our _param in the meantime. If we hit a
+//    label we return false (currently)
+// 4. Find the next statement after MesssageExpr
+// 5. Continue with the regular callbacks until this statement hits
+// 6. Now continue the flow of the statements including this one.
+//    If we hit a loop statement going up the parents
+//    we return false. If we find a DeclVarExpr hitting the taints we return false.
+// 6. We reach the end, we return true
+//
+
+static bool  param_unused_after_expr( ObjCMethodDecl *Method, ObjCMessageExpr *Expr)
+{
+   // cache this later
+   ASTContext             *Context;
+   MulleStatementVisitor   Visitor( Method, Expr);
+   
+   Context    = &Method->getASTContext();
+   Stmt *Body = Method->getBody();
+   return( Visitor.TraverseStmt( Body));
+}
+
 
 /*
  * Argument construction
@@ -1590,12 +1861,6 @@ static void  fill_struct_info( struct struct_info *info, CodeGenModule *CGM, Tag
    info->ptrTy    = CGM->getContext().getPointerType( info->recTy);
    info->llvmType = CGM->getTypes().ConvertTypeForMem( info->recTy);
    info->size     = CGM->getDataLayout().getTypeAllocSize( info->llvmType);
-}
-
-
-static bool  param_will_be_used_after_expr( const ObjCMessageExpr *Expr)
-{
-   return( false);
 }
 
 
@@ -1661,7 +1926,10 @@ LValue  *CGObjCMulleRuntime::GenerateCallArgs( CallArgList &Args,
       // if there is no method declaration, we default to
       // - (id) method:(id):(id):  ... number of arguments
       // but we can't do it yet
-      llvm_unreachable( "you forgot to declare a method");
+      std::string  error;
+      
+      error = "you forgot to declare method: " + method->getNameAsString();
+      llvm_unreachable( error.c_str());
       return( nullptr);
    }
    
@@ -1721,6 +1989,7 @@ LValue  *CGObjCMulleRuntime::GenerateCallArgs( CallArgList &Args,
    // push values into record
    //
    unsigned int i = 0;
+   
    for( RecordDecl::field_iterator CurField = RD->field_begin(), SentinelField = RD->field_end(); CurField != SentinelField; CurField++)
    {
       Expr::Expr  *arg;
@@ -1736,7 +2005,11 @@ LValue  *CGObjCMulleRuntime::GenerateCallArgs( CallArgList &Args,
    //
    // ok lets see if we can't use _params as an argument
    // basically. First see if we even have that (we could be in a C function)
+   // only do this when optimizing
    //
+   if (CGM.getCodeGenOpts().OptimizationLevel == 0)
+      goto skip;
+
    if (const ObjCMethodDecl *parent = dyn_cast<ObjCMethodDecl>(CGF.CurFuncDecl))
    {
       RecordDecl *PRD = parent->getParamRecord();
@@ -1748,6 +2021,7 @@ LValue  *CGObjCMulleRuntime::GenerateCallArgs( CallArgList &Args,
 
          size_t sizeRecord       = rounded_type_length( &CGM.getContext(), record_info.recTy, Void5PtrTy);
          size_t sizeParentRecord = rounded_type_length( &CGM.getContext(), parent_info.recTy, Void5PtrTy);
+
          if( sizeParentRecord >= sizeRecord)
          {
             //
@@ -1758,7 +2032,7 @@ LValue  *CGObjCMulleRuntime::GenerateCallArgs( CallArgList &Args,
             // _param but not necessarily _rval (which is in a union with _param)
             //
             
-            if( ! param_will_be_used_after_expr( Expr))
+            if( param_unused_after_expr( (ObjCMethodDecl *) parent, (ObjCMessageExpr *) Expr))
             {
                //
                // nice we can substitute _param, so what we do is
@@ -1779,7 +2053,7 @@ LValue  *CGObjCMulleRuntime::GenerateCallArgs( CallArgList &Args,
                                                     VK_LValue);
 
                LValue ParentRecord = CGF.EmitLValue( E);
-               // this next emit sis needed, weird llvmism i dont understand
+               // this next emit is needed, weird llvmism i dont understand
                RValue loaded       = CGF.EmitLoadOfLValue(ParentRecord, SourceLocation());
                
                
@@ -1800,7 +2074,7 @@ LValue  *CGObjCMulleRuntime::GenerateCallArgs( CallArgList &Args,
       }
    }
    
-   
+skip:
    // we are always pushing a void through mulle_objc_calls
    Args.add( RValue::get( Record.getAddress()), CGM.getContext().VoidPtrTy);
    return( emitEnd ? new LValue( Record) : nullptr);

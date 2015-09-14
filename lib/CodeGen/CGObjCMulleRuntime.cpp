@@ -90,7 +90,7 @@ namespace {
          //   F->setCallingConv( llvm::CallingConv::Fast);
            return( C);
       }
-
+      
       llvm::Constant *getMessageSendAllocFn() const {
          llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy };
          return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidTy,
@@ -1376,13 +1376,18 @@ CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction
                                                const ObjCMethodDecl *Method)
 {
    llvm::Value   *Arg0;
+   llvm::Value   *Arg2;
    CallArgList   ActualArgs;
    llvm::Value   *selID;
    llvm::Constant *Fn;
    std::string  selName;
    int          nArgs;
+   QualType     TmpResultType;
+   
    selName = Sel.getAsString();
    Fn      = nullptr;
+   
+   TmpResultType = CGF.getContext().VoidPtrTy;
    
    // figure out where to send the message
    // layme.. should probably use a map for this
@@ -1425,6 +1430,8 @@ CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction
             ResultType = CGF.getContext().getObjCInstanceType();
          break;
       }
+         
+      /* could just make this a nullptr */
       if( selName == "zone")
       {
          Fn = ObjCTypes.getMessageSendZoneFn();
@@ -1441,8 +1448,15 @@ CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction
       selID = EmitSelector(CGF, Sel);
       ActualArgs.add(RValue::get( selID), CGF.getContext().getObjCSelType());
       ActualArgs.addFrom( CallArgs);
+      if( ! nArgs)
+      {
+         // pushing a bogus Arg0 again is probably cheaper than nulling
+         // but then maybe not
+         // we need this for _params 
+         Arg2 = CGF.Builder.CreateBitCast(Receiver, ObjCTypes.ParamsPtrTy);
+         ActualArgs.add( RValue::get(Arg2), CGF.getContext().VoidPtrTy);
+      }
    }
-   
    
    if (Method)
       assert(CGM.getContext().getCanonicalType(Method->getReturnType()) ==
@@ -1473,14 +1487,25 @@ CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction
       }
    
    if( ! Fn)
-      Fn = ObjCTypes.getMessageSendFn();
+      Fn = ObjCTypes.getMessageSendFn(); // : ObjCTypes.getMessageSendFn0();
+      
    // Fn = llvm::ConstantExpr::getBitCast( Fn, MSI.MessengerType);
    
    const CGFunctionInfo &argsInfo =
-   CGM.getTypes().arrangeFreeFunctionCall( ResultType, ActualArgs,
+   CGM.getTypes().arrangeFreeFunctionCall( TmpResultType, ActualArgs,
                                            FunctionType::ExtInfo(),
                                            RequiredArgs::All);
    RValue rvalue = CGF.EmitCall( argsInfo, Fn, Return, ActualArgs);
+
+   // now cast this to actual return value
+   llvm::Value *V = rvalue.getScalarVal();
+   
+   if (V->getType() != CGF.getTypes().ConvertTypeForMem( ResultType))
+   {
+      V = CGF.Builder.CreateBitOrPointerCast(V, CGF.getTypes().ConvertTypeForMem( ResultType));
+      rvalue = RValue::get(V);
+   }
+   
    return nullReturn.complete(CGF, rvalue, ResultType, CallArgs,
                               requiresnullCheck ? Method : nullptr);
 }

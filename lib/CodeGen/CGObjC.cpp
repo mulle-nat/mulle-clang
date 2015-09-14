@@ -456,7 +456,7 @@ RValue CodeGenFunction::EmitObjCMessageExpr(const ObjCMessageExpr *E,
   }
 
   //
-  // @mulle-obj@ call: tell optimizer the lifetime is done for this alloca
+  // @mulle-objc@ call: tell optimizer the lifetime is done for this alloca
   // non-mulle runtimes will NULL here
   if( alloca)
   {

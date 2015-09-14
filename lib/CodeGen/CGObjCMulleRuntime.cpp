@@ -68,7 +68,7 @@ namespace {
       
    public:
       // The types of these functions don't really matter because we
-      // should always bitcast before calling them.
+      // should always bitcast before calling them. (??)
       
       /// id mulle_objc_object_inline_call (id, SEL, void *)
       ///
@@ -231,7 +231,7 @@ namespace {
       llvm::Constant *getClassFn() const {
          llvm::Type *params[] = { ObjectPtrTy };
          return CGM.CreateRuntimeFunction(llvm::FunctionType::get(ObjectPtrTy,
-                                                                  params, true),
+                                                                  params, false),
                                           "_mulle_objc_object_get_class");
       }
       
@@ -240,7 +240,7 @@ namespace {
          llvm::Type *params[] = { ClassIDTy };
          
          return CGM.CreateRuntimeFunction(llvm::FunctionType::get(ObjectPtrTy,
-                                                                  params, true),
+                                                                  params, false),
                                           "mulle_objc_unfailing_get_class");
       }
       
@@ -1613,24 +1613,22 @@ struct find_info   findNextStatementInBody( Stmt *s, Stmt *body)
       {
          info.insideLoop = true;
       }
-         
-      for (Stmt::child_iterator
-           I = parent->child_begin(), E = parent->child_end(); I != E; ++I)
-      {
-         Stmt *child = *I;
-         
-         if( found)
+      
+      if( ! info.next)
+         for (Stmt::child_iterator
+              I = parent->child_begin(), E = parent->child_end(); I != E; ++I)
          {
-            if( ! info.next)
+            Stmt *child = *I;
+            
+            if( found)
             {
                info.next = child;
-               continue;  // keep going to collect insideLoop info
+               break;
             }
+            
+            if( child == s)
+               found = true;
          }
-         
-         if( child == s)
-            found = true;
-      }
       
       s = parent;
    }
@@ -1855,12 +1853,18 @@ struct struct_info
 };
 
 
-static void  fill_struct_info( struct struct_info *info, CodeGenModule *CGM, TagDecl *Decl)
+static void  fill_struct_info_from_recTy( struct struct_info *info, CodeGenModule *CGM)
 {
-   info->recTy    = CGM->getContext().getTagDeclType( Decl);
    info->ptrTy    = CGM->getContext().getPointerType( info->recTy);
    info->llvmType = CGM->getTypes().ConvertTypeForMem( info->recTy);
    info->size     = CGM->getDataLayout().getTypeAllocSize( info->llvmType);
+}
+
+
+static void  fill_struct_info( struct struct_info *info, CodeGenModule *CGM, TagDecl *Decl)
+{
+   info->recTy    = CGM->getContext().getTagDeclType( Decl);
+   fill_struct_info_from_recTy( info, CGM);
 }
 
 
@@ -1912,6 +1916,7 @@ LValue  *CGObjCMulleRuntime::GenerateCallArgs( CallArgList &Args,
 {
    unsigned             nArgs;
    struct struct_info   record_info;
+   struct struct_info   void_info;
    bool                 emitEnd;
    
    nArgs = Expr->getNumArgs();
@@ -1934,14 +1939,21 @@ LValue  *CGObjCMulleRuntime::GenerateCallArgs( CallArgList &Args,
    }
    
    RecordDecl *RD = method->getParamRecord();
-   if( ! RD)
-      return( nullptr);
-   
-   // (todo) if only one arg and it is convertible to void *
-   //        then don't alloca
 
-   fill_struct_info( &record_info, &CGM, RD);
+   // special case, argument is void * compatible, there is no paramRecord.
+   // yet one argument will have been passed
+   if( ! RD)
+   {
+      Expr::Expr  *arg = const_cast<Expr::Expr *>( Expr->getArg( 0));
+      LValue lval = CGF.EmitLValue( arg);
+      assert( nArgs == 1);
+      
+      Args.add( RValue::get( lval.getAddress()), CGM.getContext().VoidPtrTy);
+      return( nullptr);
+   }
    
+   fill_struct_info( &record_info, &CGM, RD);
+
    //
    // at this point, we alloca something and copy all the values
    // into the alloca, at a later time, we check
@@ -2013,6 +2025,7 @@ LValue  *CGObjCMulleRuntime::GenerateCallArgs( CallArgList &Args,
    if (const ObjCMethodDecl *parent = dyn_cast<ObjCMethodDecl>(CGF.CurFuncDecl))
    {
       RecordDecl *PRD = parent->getParamRecord();
+
       if( PRD)
       {
          struct struct_info   parent_info;

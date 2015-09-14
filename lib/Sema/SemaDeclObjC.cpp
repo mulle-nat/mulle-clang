@@ -4159,6 +4159,12 @@ void   Sema::SetMulleObjCParam( ObjCMethodDecl *ObjCMethod,
 }
 
 
+bool  Sema::isVoidPointerParameterCompatible( ParmVarDecl  *Param)
+{
+   return( Param->getType()->isPointerType());
+}
+
+
 Decl *Sema::ActOnMethodDeclaration(
     Scope *S,
     SourceLocation MethodLoc, SourceLocation EndLoc,
@@ -4297,8 +4303,30 @@ Decl *Sema::ActOnMethodDeclaration(
   //
    if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
    {
-      SourceLocation SelLoc = SelectorLocs[ 0];
-      SetMulleObjCParam( ObjCMethod, Sel, Params, MethodLoc, EndLoc, SelLoc);
+      bool   skip;
+      
+      skip = false;
+      if( Params.size() == 1 && Sel.getNumArgs() == 1)
+      {
+         //
+         // get the type, if it is compatible with void *
+         // (i.e. will be passed in same register), then
+         //
+         ParmVarDecl *Param = Params[ 0];
+         if( isVoidPointerParameterCompatible( Param))
+         {
+            // reinstitute as regular parameter
+            S->AddDecl(Param);
+            IdResolver.AddDecl(Param);
+            skip = true;
+         }
+      }
+      
+      if( ! skip)
+      {
+         SourceLocation SelLoc = SelectorLocs[ 0];
+         SetMulleObjCParam( ObjCMethod, Sel, Params, MethodLoc, EndLoc, SelLoc);
+      }
    }
    // DONE
    

@@ -93,45 +93,52 @@ namespace {
       
       llvm::Constant *getMessageSendAllocFn() const {
          llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy };
-         return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidTy,
+         return CGM.CreateRuntimeFunction(llvm::FunctionType::get( ObjectPtrTy,
                                                                   params, false),
-                                          "_mulle_objc_class_alloc_object");
+                                          "mulle_objc_class_alloc_instance");
+      }
+
+      llvm::Constant *getClassLookupFn() const {
+         llvm::Type *params[] = { ClassIDTy };
+         return CGM.CreateRuntimeFunction(llvm::FunctionType::get( ObjectPtrTy,
+                                                                  params, false),
+                                          "mulle_objc_runtime_unfailing_get_class");
       }
 
       llvm::Constant *getMessageSendNewFn() const {
-         llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy };
-         return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidTy,
+         llvm::Type *params[] = { ObjectPtrTy };
+         return CGM.CreateRuntimeFunction(llvm::FunctionType::get( ObjectPtrTy,
                                                                   params, false),
-                                          "_mulle_objc_class_new_object");
+                                          "mulle_objc_class_new_instance");
       }
       
       llvm::Constant *getMessageSendRetainFn() const {
          llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy };
-         return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidTy,
+         return CGM.CreateRuntimeFunction(llvm::FunctionType::get( ObjectPtrTy,
                                                                   params, false),
-                                          "_mulle_objc_object_retain");
+                                          "mulle_objc_object_retain");
       }
 
       llvm::Constant *getMessageSendReleaseFn() const {
          llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy };
          return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidTy,
                                                                   params, false),
-                                          "_mulle_objc_object_release");
+                                          "mulle_objc_object_release");
       }
       
       llvm::Constant *getMessageSendAutoreleaseFn() const {
          llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy };
-         return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidTy,
+         return CGM.CreateRuntimeFunction(llvm::FunctionType::get( ObjectPtrTy,
                                                                   params, false),
-                                          "_mulle_objc_object_autorelease");
+                                          "mulle_objc_object_autorelease");
       }
 
       // improve legacy code to basically a no-op
       llvm::Constant *getMessageSendZoneFn() const {
          llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy };
-         return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidTy,
+         return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidPtrTy,
                                                                   params, false),
-                                          "_mulle_objc_object_zone");
+                                          "mulle_objc_object_zone");
       }
       
       /// id mulle_objc_object_call_class_id (id, SEL, void *, CLASSID)
@@ -140,16 +147,16 @@ namespace {
       ///
       llvm::Constant *getMessageSendSuperFn() const {
          llvm::Type *params[] = { ObjectPtrTy, ClassIDTy, SelectorIDTy, ParamsPtrTy  };
-         return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidTy,
+         return CGM.CreateRuntimeFunction(llvm::FunctionType::get(ObjectPtrTy,
                                                                   params, false),
-                                          "_mulle_objc_object_call_class_id");
+                                          "mulle_objc_object_call_class_id");
       }
 
       llvm::Constant *getMessageSendMetaSuperFn() const {
          llvm::Type *params[] = { ObjectPtrTy, ClassIDTy, SelectorIDTy, ParamsPtrTy  };
-         return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidTy,
+         return CGM.CreateRuntimeFunction(llvm::FunctionType::get(ObjectPtrTy,
                                                                   params, false),
-                                          "_mulle_objc_class_call_class_id");
+                                          "mulle_objc_class_call_class_id");
       }
       
       
@@ -239,7 +246,7 @@ namespace {
       llvm::Constant *getGetRuntimeClassFn() {
          llvm::Type *params[] = { ClassIDTy };
          
-         return CGM.CreateRuntimeFunction(llvm::FunctionType::get(ObjectPtrTy,
+         return CGM.CreateRuntimeFunction(llvm::FunctionType::get( ObjectPtrTy,
                                                                   params, false),
                                           "mulle_objc_unfailing_get_class");
       }
@@ -1050,6 +1057,17 @@ namespace {
       
       llvm::Function *ModuleInitFunction() override;
       
+      CodeGen::RValue CommonMessageSend(CodeGen::CodeGenFunction &CGF,
+                                        llvm::Constant *Fn,
+                                        ReturnValueSlot Return,
+                                        QualType ResultType,
+                                        llvm::Value *Receiver,
+                                        const CallArgList &CallArgs,
+                                        CallArgList &ActualArgs,
+                                        llvm::Value   *Arg0,
+                                        const ObjCMethodDecl *Method,
+                                        bool isDispatchFn);
+      
       CodeGen::RValue GenerateMessageSend(CodeGen::CodeGenFunction &CGF,
                                           ReturnValueSlot Return,
                                           QualType ResultType,
@@ -1365,6 +1383,85 @@ enum {
 #pragma mark -
 #pragma mark message sending
 
+CodeGen::RValue CGObjCMulleRuntime::CommonMessageSend(CodeGen::CodeGenFunction &CGF,
+                                                      llvm::Constant *Fn,
+                                                      ReturnValueSlot Return,
+                                                      QualType ResultType,
+                                                      llvm::Value *Receiver,
+                                                      const CallArgList &CallArgs,
+                                                      CallArgList   &ActualArgs,
+                                                      llvm::Value   *Arg0,
+                                                      const ObjCMethodDecl *Method,
+                                                      bool isDispatchFn)
+{
+   /* now common code with super follows */
+   
+   if (Method)
+      assert(CGM.getContext().getCanonicalType(Method->getReturnType()) ==
+             CGM.getContext().getCanonicalType(ResultType) &&
+             "Result type mismatch!");
+   
+   
+   //
+   // this runs through patched code, to produce what we need
+   //
+   if( ! Fn)
+   {
+      Fn = ObjCTypes.getMessageSendFn(); // : ObjCTypes.getMessageSendFn0();
+      isDispatchFn = true;
+   }
+   
+   if( isDispatchFn && ! CallArgs.size())
+   {
+      llvm::Value   *Arg2;
+      // pushing a bogus Arg0 again is probably cheaper than nulling
+      // but then maybe not
+      // we need this for _params
+      Arg2 = CGF.Builder.CreateBitCast( Receiver, ObjCTypes.ParamsPtrTy);
+      ActualArgs.add( RValue::get( Arg2), CGF.getContext().VoidPtrTy);
+   }
+   
+   MessageSendInfo MSI = getMessageSendInfo( Method, ResultType, ActualArgs);
+   NullReturnState nullReturn;
+   
+   if (CGM.ReturnSlotInterferesWithArgs(MSI.CallInfo))
+      nullReturn.init(CGF, Arg0);
+   
+   bool requiresnullCheck = false;
+   
+   if (CGM.getLangOpts().ObjCAutoRefCount && Method)
+      for (const auto *ParamDecl : Method->params())
+      {
+         if (ParamDecl->hasAttr<NSConsumedAttr>())
+         {
+            if (!nullReturn.NullBB)
+               nullReturn.init(CGF, Arg0);
+            requiresnullCheck = true;
+            break;
+         }
+      }
+   
+   const CGFunctionInfo &argsInfo =
+   CGM.getTypes().arrangeFreeFunctionCall( CGF.getContext().VoidPtrTy, ActualArgs,
+                                          FunctionType::ExtInfo(),
+                                          RequiredArgs::All);
+   RValue rvalue = CGF.EmitCall( argsInfo, Fn, Return, ActualArgs);
+   
+   // now cast this to actual return value
+   llvm::Value *V = rvalue.getScalarVal();
+   
+   if (V->getType() != CGF.getTypes().ConvertTypeForMem( ResultType))
+   {
+      V = CGF.Builder.CreateBitOrPointerCast(V, CGF.getTypes().ConvertTypeForMem( ResultType));
+      rvalue = RValue::get(V);
+   }
+   
+   return nullReturn.complete(CGF, rvalue, ResultType, CallArgs,
+                              requiresnullCheck ? Method : nullptr);
+}
+
+
+
 /// Generate code for a message send expression.
 CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction &CGF,
                                                ReturnValueSlot Return,
@@ -1376,7 +1473,6 @@ CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction
                                                const ObjCMethodDecl *Method)
 {
    llvm::Value   *Arg0;
-   llvm::Value   *Arg2;
    CallArgList   ActualArgs;
    llvm::Value   *selID;
    llvm::Constant *Fn;
@@ -1386,8 +1482,6 @@ CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction
    
    selName = Sel.getAsString();
    Fn      = nullptr;
-   
-   TmpResultType = CGF.getContext().VoidPtrTy;
    
    // figure out where to send the message
    // layme.. should probably use a map for this
@@ -1448,67 +1542,12 @@ CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction
       selID = EmitSelector(CGF, Sel);
       ActualArgs.add(RValue::get( selID), CGF.getContext().getObjCSelType());
       ActualArgs.addFrom( CallArgs);
-      if( ! nArgs)
-      {
-         // pushing a bogus Arg0 again is probably cheaper than nulling
-         // but then maybe not
-         // we need this for _params 
-         Arg2 = CGF.Builder.CreateBitCast(Receiver, ObjCTypes.ParamsPtrTy);
-         ActualArgs.add( RValue::get(Arg2), CGF.getContext().VoidPtrTy);
-      }
    }
    
-   if (Method)
-      assert(CGM.getContext().getCanonicalType(Method->getReturnType()) ==
-             CGM.getContext().getCanonicalType(ResultType) &&
-             "Result type mismatch!");
-   
-   //
-   // this runs through patched code, to produce what we need
-   //
-   MessageSendInfo MSI = getMessageSendInfo( Method, ResultType, ActualArgs);
-   NullReturnState nullReturn;
-   
-   if (CGM.ReturnSlotInterferesWithArgs(MSI.CallInfo))
-      nullReturn.init(CGF, Arg0);
-
-   bool requiresnullCheck = false;
-   
-   if (CGM.getLangOpts().ObjCAutoRefCount && Method)
-      for (const auto *ParamDecl : Method->params())
-      {
-         if (ParamDecl->hasAttr<NSConsumedAttr>())
-         {
-            if (!nullReturn.NullBB)
-               nullReturn.init(CGF, Arg0);
-            requiresnullCheck = true;
-            break;
-         }
-      }
-   
-   if( ! Fn)
-      Fn = ObjCTypes.getMessageSendFn(); // : ObjCTypes.getMessageSendFn0();
-      
-   // Fn = llvm::ConstantExpr::getBitCast( Fn, MSI.MessengerType);
-   
-   const CGFunctionInfo &argsInfo =
-   CGM.getTypes().arrangeFreeFunctionCall( TmpResultType, ActualArgs,
-                                           FunctionType::ExtInfo(),
-                                           RequiredArgs::All);
-   RValue rvalue = CGF.EmitCall( argsInfo, Fn, Return, ActualArgs);
-
-   // now cast this to actual return value
-   llvm::Value *V = rvalue.getScalarVal();
-   
-   if (V->getType() != CGF.getTypes().ConvertTypeForMem( ResultType))
-   {
-      V = CGF.Builder.CreateBitOrPointerCast(V, CGF.getTypes().ConvertTypeForMem( ResultType));
-      rvalue = RValue::get(V);
-   }
-   
-   return nullReturn.complete(CGF, rvalue, ResultType, CallArgs,
-                              requiresnullCheck ? Method : nullptr);
+   return( CommonMessageSend( CGF, Fn, Return, ResultType, Receiver, CallArgs, ActualArgs, Arg0, Method, Fn == nullptr));
 }
+
+
 
 /// Generates a message send where the super is the receiver.  This is
 /// a message send to self with special delivery semantics indicating
@@ -1529,54 +1568,29 @@ CGObjCMulleRuntime::GenerateMessageSendSuper(CodeGen::CodeGenFunction &CGF,
    CallArgList   ActualArgs;
    llvm::Value   *selID;
    llvm::Value   *classID;
-   
-   selID   = EmitSelector(CGF, Sel);
-   classID = EmitClassID( CGF, Class->getSuperClass());
-   
+
+
    Arg0 = CGF.Builder.CreateBitCast(Receiver, ObjCTypes.ObjectPtrTy);
    ActualArgs.add(RValue::get( Arg0), CGF.getContext().getObjCInstanceType());
-   ActualArgs.add(RValue::get( classID), CGF.getContext().getObjCSelType());
+
+   classID = EmitClassID( CGF, Class->getSuperClass());
+   ActualArgs.add(RValue::get( classID), CGF.getContext().LongTy);
+
+   selID   = EmitSelector(CGF, Sel);
    ActualArgs.add(RValue::get( selID), CGF.getContext().getObjCSelType());
+
    ActualArgs.addFrom( CallArgs);
    
    // add classID
    // a class is not really an ObjCSelType but soo similiar, good enough
    
    // TODO add parameter for Class to call
-//   ActualArgs.add(RValue::get(  selID), CGF.getContext().getObjCSelType());
-   
-   if (Method)
-      assert(CGM.getContext().getCanonicalType(Method->getReturnType()) ==
-             CGM.getContext().getCanonicalType(ResultType) &&
-             "Result type mismatch!");
-   
-   MessageSendInfo MSI = getMessageSendInfo( Method, ResultType, ActualArgs);
-   NullReturnState nullReturn;
-   
-   if (CGM.ReturnSlotInterferesWithArgs(MSI.CallInfo))
-      nullReturn.init(CGF, Arg0);
-
-   bool requiresnullCheck = false;
-   
-   if (CGM.getLangOpts().ObjCAutoRefCount && Method)
-      for (const auto *ParamDecl : Method->params())
-      {
-         if (ParamDecl->hasAttr<NSConsumedAttr>())
-         {
-            if (!nullReturn.NullBB)
-               nullReturn.init(CGF, Arg0);
-            requiresnullCheck = true;
-            break;
-         }
-      }
+   //   ActualArgs.add(RValue::get(  selID), CGF.getContext().getObjCSelType());
    
    llvm::Constant *Fn;
    
    Fn = IsClassMessage ? ObjCTypes.getMessageSendMetaSuperFn() : ObjCTypes.getMessageSendSuperFn();
-   Fn = llvm::ConstantExpr::getBitCast( Fn, MSI.MessengerType);
-   RValue rvalue = CGF.EmitCall(MSI.CallInfo, Fn, Return, ActualArgs);
-   return nullReturn.complete(CGF, rvalue, ResultType, CallArgs,
-                              requiresnullCheck ? Method : nullptr);
+   return( CommonMessageSend( CGF, Fn, Return, ResultType, Receiver, CallArgs, ActualArgs, Arg0, Method, true));
 }
 
 /* 
@@ -1616,7 +1630,6 @@ struct find_info
 struct find_info   findNextStatementInBody( Stmt *s, Stmt *body)
 {
    Stmt        *parent;
-   Stmt        *next;
    bool        found;
    ParentMap   ParentMap( body);
    struct find_info  info;
@@ -1958,7 +1971,7 @@ LValue  *CGObjCMulleRuntime::GenerateCallArgs( CallArgList &Args,
       // but we can't do it yet
       std::string  error;
       
-      error = "you forgot to declare method: " + method->getNameAsString();
+      error = "you forgot to declare method: " + Expr->getSelector().getAsString();
       llvm_unreachable( error.c_str());
       return( nullptr);
    }
@@ -4440,11 +4453,34 @@ llvm::Constant *CGObjCMulleRuntime::EmitModuleSymbols() {
    return llvm::ConstantExpr::getBitCast(GV, ObjCTypes.SymtabPtrTy);
 }
 
+
 llvm::Constant *CGObjCMulleRuntime::EmitClassRefFromId(CodeGenFunction &CGF,
                                            IdentifierInfo *II) {
+   CallArgList  ActualArgs;
+   llvm::Constant  *Fn;
+   llvm::Constant  *Hash;
+   llvm::Value   *Arg0;
+   ReturnValueSlot Return;
+
    LazySymbols.insert(II);
    
-   return( HashConstantForString( II->getName()));
+   Hash = HashConstantForString( II->getName());
+   return( Hash);
+#if 0
+   Arg0 = CGF.Builder.CreateBitCast( Hash, ObjCTypes.ClassIDTy);
+   ActualArgs.add( RValue::get( Arg0), CGF.getContext().LongTy);
+   
+   Fn =  ObjCTypes.getClassLookupFn();
+
+   const CGFunctionInfo &argsInfo =
+   CGM.getTypes().arrangeFreeFunctionCall( CGF.getContext().VoidPtrTy,
+                                           ActualArgs,
+                                           FunctionType::ExtInfo(),
+                                           RequiredArgs::All);
+   RValue rvalue = CGF.EmitCall( argsInfo, Fn, Return, ActualArgs);
+   llvm::Value *V = rvalue.getScalarVal();
+   return( dyn_cast< llvm::Constant>( V));
+#endif   
 }
 
 llvm::Constant *CGObjCMulleRuntime::EmitClassRef(CodeGenFunction &CGF,

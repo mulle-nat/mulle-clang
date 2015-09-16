@@ -75,13 +75,23 @@ namespace {
       /// The messenger, used for all message sends, except super calls
       /// might need another one, when params is null..
       ///
-      llvm::Constant *getMessageSendFn() const {
+      llvm::Constant *getMessageSendFn( int optLevel) const {
+         StringRef    name;
          // Add the non-lazy-bind attribute, since objc_msgSend is likely to
          // be called a lot.
+         switch( optLevel)
+         {
+         default : name = "mulle_objc_object_inline_call"; break;
+         case  1 : name = "mulle_objc_object_call"; break;
+         case -1 :
+         case 0  : name = "mulle_objc_object_no_inline_call"; break;
+         }
+         
+               
          llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy, ParamsPtrTy };
          llvm::Constant *C =  CGM.CreateRuntimeFunction(llvm::FunctionType::get(ObjectPtrTy,
                                                            params, false),
-                                   "mulle_objc_object_inline_call",
+                                   name,
                                    llvm::AttributeSet::get(CGM.getLLVMContext(),
                                                            llvm::AttributeSet::FunctionIndex,
                                                            llvm::Attribute::NonLazyBind));
@@ -96,13 +106,6 @@ namespace {
          return CGM.CreateRuntimeFunction(llvm::FunctionType::get( ObjectPtrTy,
                                                                   params, false),
                                           "mulle_objc_class_alloc_instance");
-      }
-
-      llvm::Constant *getClassLookupFn() const {
-         llvm::Type *params[] = { ClassIDTy };
-         return CGM.CreateRuntimeFunction(llvm::FunctionType::get( ObjectPtrTy,
-                                                                  params, false),
-                                          "mulle_objc_runtime_unfailing_get_class");
       }
 
       llvm::Constant *getMessageSendNewFn() const {
@@ -235,14 +238,6 @@ namespace {
       llvm::Type *CachePtrTy;
       
       
-      llvm::Constant *getClassFn() const {
-         llvm::Type *params[] = { ObjectPtrTy };
-         return CGM.CreateRuntimeFunction(llvm::FunctionType::get(ObjectPtrTy,
-                                                                  params, false),
-                                          "_mulle_objc_object_get_class");
-      }
-      
-      // TODO: this is too slow use inlinable method
       llvm::Constant *getGetRuntimeClassFn() {
          llvm::Type *params[] = { ClassIDTy };
          
@@ -883,8 +878,27 @@ namespace {
       llvm::Constant *GetProtocolRef(const ObjCProtocolDecl *PD);
       
       // common helper function, turning names into abbreviated MD5 hashes
-      llvm::Constant *HashConstantForString( StringRef sref);
-      
+      llvm::Constant *_HashConstantForString( StringRef sref, uint64_t first_valid);
+      llvm::Constant *HashClassConstantForString( StringRef sref)
+      {
+         return( _HashConstantForString( sref, 0x20));
+      }
+      llvm::Constant *HashProtocolConstantForString( StringRef sref)
+      {
+         return( HashClassConstantForString( sref));
+      }
+      llvm::Constant *HashCategoryConstantForString( StringRef sref)
+      {
+         return( _HashConstantForString( sref, 0x0));
+      }
+      llvm::Constant *HashSelConstantForString( StringRef sref)
+      {
+         return( _HashConstantForString( sref, 0x0));
+      }
+      llvm::Constant *HashIvarConstantForString( StringRef sref)
+      {
+         return( HashSelConstantForString( sref));
+      }
       
       /// CreateMetadataVar - Create a global variable with internal
       /// linkage for use by the Objective-C runtime.
@@ -1310,7 +1324,7 @@ llvm::Value *CGObjCMulleRuntime::GetClass(CodeGenFunction &CGF,
    llvm::Value *rval;
    llvm::Value *classPtr;
    
-   classID  = HashConstantForString( ID->getName());
+   classID  = HashClassConstantForString( ID->getName());
    classPtr = CGF.EmitNounwindRuntimeCall(ObjCTypes.getGetRuntimeClassFn(),
                                classID, "mulle_objc_unfailing_get_class"); // string what for ??
    rval     = CGF.Builder.CreateBitCast( classPtr, ObjCTypes.ObjectPtrTy);
@@ -1407,7 +1421,8 @@ CodeGen::RValue CGObjCMulleRuntime::CommonMessageSend(CodeGen::CodeGenFunction &
    //
    if( ! Fn)
    {
-      Fn = ObjCTypes.getMessageSendFn(); // : ObjCTypes.getMessageSendFn0();
+      int optLevel = CGM.getLangOpts().OptimizeSize ? -1 : CGM.getLangOpts().Optimize;
+      Fn = ObjCTypes.getMessageSendFn( optLevel); // : ObjCTypes.getMessageSendFn0();
       isDispatchFn = true;
    }
    
@@ -2778,7 +2793,7 @@ llvm::Constant *CGObjCMulleRuntime::GetOrEmitProtocol(const ObjCProtocolDecl *PD
 {
    StringRef    sref( PD->getIdentifier()->getName());
    
-   return( HashConstantForString( sref));
+   return( HashProtocolConstantForString( sref));
 }
 
 
@@ -2786,7 +2801,7 @@ llvm::Constant *CGObjCMulleRuntime::GetOrEmitProtocolRef(const ObjCProtocolDecl 
 {
    StringRef    sref( PD->getIdentifier()->getName());
    
-   return( HashConstantForString( sref));
+   return( HashProtocolConstantForString( sref));
 }
 
 
@@ -2997,7 +3012,7 @@ void CGObjCMulleRuntime::GenerateCategory(const ObjCCategoryImplDecl *OCD) {
       ClassMethods.push_back(GetMethodConstant(I));
    
    llvm::Constant *Values[5];
-   Values[ 0] = HashConstantForString( Interface->getName());
+   Values[ 0] = HashClassConstantForString( Interface->getName());
    Values[ 1] = GetClassName(Interface->getObjCRuntimeNameAsString());
    LazySymbols.insert(Interface->getIdentifier());
    Values[2] = EmitMethodList("OBJC_CATEGORY_CLASS_METHODS_" + ExtName.str(),
@@ -3138,12 +3153,12 @@ void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
    
    ObjCInterfaceDecl *Super = Interface->getSuperClass();
 
-   Values[ 0] =  llvm::ConstantExpr::getBitCast( HashConstantForString( ID->getObjCRuntimeNameAsString()), ObjCTypes.ClassIDTy);
+   Values[ 0] =  llvm::ConstantExpr::getBitCast( HashClassConstantForString( ID->getObjCRuntimeNameAsString()), ObjCTypes.ClassIDTy);
    Values[ 1] = GetClassName(ID->getObjCRuntimeNameAsString());
 
    if( Super)
    {
-      Values[ 2] = llvm::ConstantExpr::getBitCast( HashConstantForString( Super->getObjCRuntimeNameAsString()), ObjCTypes.ClassIDTy);
+      Values[ 2] = llvm::ConstantExpr::getBitCast( HashClassConstantForString( Super->getObjCRuntimeNameAsString()), ObjCTypes.ClassIDTy);
       Values[ 3] = GetClassName( Super->getObjCRuntimeNameAsString());
    }
    else
@@ -3250,7 +3265,7 @@ llvm::Constant *CGObjCMulleRuntime::GetIvarConstant( const ObjCInterfaceDecl *OI
                                                      const ObjCIvarDecl *IVD)
 {
    llvm::Constant *Ivar[] = {
-      llvm::ConstantExpr::getBitCast( HashConstantForString( IVD->getNameAsString()),
+      llvm::ConstantExpr::getBitCast( HashIvarConstantForString( IVD->getNameAsString()),
                                        ObjCTypes.SelectorIDTy),
       GetIvarName( IVD),
       GetIvarType(IVD),
@@ -3285,7 +3300,7 @@ llvm::Constant *CGObjCMulleRuntime::GetMethodConstant(const ObjCMethodDecl *MD) 
       return nullptr;
    
    llvm::Constant *Method[] = {
-      llvm::ConstantExpr::getBitCast( HashConstantForString( MD->getSelector().getAsString()),
+      llvm::ConstantExpr::getBitCast( HashSelConstantForString( MD->getSelector().getAsString()),
                                        ObjCTypes.SelectorIDTy),
       llvm::ConstantExpr::getBitCast(GetMethodVarName(MD->getSelector()),
                                      ObjCTypes.Int8PtrTy),
@@ -4457,30 +4472,13 @@ llvm::Constant *CGObjCMulleRuntime::EmitModuleSymbols() {
 llvm::Constant *CGObjCMulleRuntime::EmitClassRefFromId(CodeGenFunction &CGF,
                                            IdentifierInfo *II) {
    CallArgList  ActualArgs;
-   llvm::Constant  *Fn;
    llvm::Constant  *Hash;
-   llvm::Value   *Arg0;
    ReturnValueSlot Return;
 
    LazySymbols.insert(II);
    
-   Hash = HashConstantForString( II->getName());
+   Hash = HashClassConstantForString( II->getName());
    return( Hash);
-#if 0
-   Arg0 = CGF.Builder.CreateBitCast( Hash, ObjCTypes.ClassIDTy);
-   ActualArgs.add( RValue::get( Arg0), CGF.getContext().LongTy);
-   
-   Fn =  ObjCTypes.getClassLookupFn();
-
-   const CGFunctionInfo &argsInfo =
-   CGM.getTypes().arrangeFreeFunctionCall( CGF.getContext().VoidPtrTy,
-                                           ActualArgs,
-                                           FunctionType::ExtInfo(),
-                                           RequiredArgs::All);
-   RValue rvalue = CGF.EmitCall( argsInfo, Fn, Return, ActualArgs);
-   llvm::Value *V = rvalue.getScalarVal();
-   return( dyn_cast< llvm::Constant>( V));
-#endif   
 }
 
 llvm::Constant *CGObjCMulleRuntime::EmitClassRef(CodeGenFunction &CGF,
@@ -4493,8 +4491,7 @@ llvm::Constant *CGObjCMulleRuntime::EmitNSAutoreleasePoolClassRef(CodeGenFunctio
    return EmitClassRefFromId(CGF, II);
 }
 
-
-llvm::Constant *CGObjCCommonMulleRuntime::HashConstantForString( StringRef sref)
+llvm::Constant *CGObjCCommonMulleRuntime::_HashConstantForString( StringRef sref, uint64_t first_valid)
 {
    unsigned WordSizeInBits = CGM.getTarget().getPointerWidth(0);
    unsigned ByteSizeInBits = CGM.getTarget().getCharWidth();
@@ -4516,7 +4513,7 @@ llvm::Constant *CGObjCCommonMulleRuntime::HashConstantForString( StringRef sref)
       value  |= hash[ i];
    }
    
-   if( value == 0 || value == (uint64_t) -1)
+   if( value < first_valid || value == (uint64_t) -1)
    {
       // FAIL! FIX
       std::string  fail;
@@ -4544,7 +4541,7 @@ llvm::Constant *CGObjCMulleRuntime::EmitSelector(CodeGenFunction &CGF, Selector 
 {
    llvm::StringRef   sref( Sel.getAsString());
    
-   return( HashConstantForString( sref));
+   return( HashSelConstantForString( sref));
 }
 
 
@@ -4552,7 +4549,7 @@ llvm::Constant *CGObjCMulleRuntime::EmitClassID(CodeGenFunction &CGF, const ObjC
 {
    llvm::StringRef   sref( Class->getNameAsString());
    
-   return( HashConstantForString( sref));
+   return( HashClassConstantForString( sref));
 }
 
 
@@ -5050,6 +5047,11 @@ llvm::Constant *CGObjCCommonMulleRuntime::GetIvarType(const ObjCIvarDecl *Ivar)
    std::string TypeStr;
    QualType PType = Ivar->getType();
    
+   //
+   // find property of same name (how?), if yes, encode
+   // '@' differently as '@', '=' or '~' depending
+   // on assignment
+   //
    CGM.getContext().getObjCEncodingForTypeImpl(PType, TypeStr, true, true, nullptr,
                               true     /*OutermostType*/,
                               false    /*EncodingProperty*/,
@@ -5057,7 +5059,7 @@ llvm::Constant *CGObjCCommonMulleRuntime::GetIvarType(const ObjCIvarDecl *Ivar)
                               false    /*EncodeBlockParameters*/,
                               false    /*EncodeClassNames*/);
    
-   // IvarTypes is always empty...
+   // remember these crazy containers, insert on what looks like a read
    llvm::GlobalVariable *&Entry = IvarTypes[TypeStr];
    
    if (!Entry)

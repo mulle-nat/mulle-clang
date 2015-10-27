@@ -1927,6 +1927,14 @@ void CodeGenFunction::EmitFunctionProlog(const CGFunctionInfo &FI,
         auto AI = FnArgs[FirstIRArg];
         llvm::Value *V = AI;
 
+        // @mulle-objc@ make self nullable in llvm if so desired 
+        if (const ImplicitParamDecl *IPD = dyn_cast<ImplicitParamDecl>(Arg)) {
+          if (IPD->getAttr<NonNullAttr>())
+            AI->addAttr(llvm::AttributeSet::get(getLLVMContext(),
+                                                AI->getArgNo() + 1,
+                                                llvm::Attribute::NonNull));
+       }
+       
         if (const ParmVarDecl *PVD = dyn_cast<ParmVarDecl>(Arg)) {
           if (getNonNullAttr(CurCodeDecl, PVD, PVD->getType(),
                              PVD->getFunctionScopeIndex()))

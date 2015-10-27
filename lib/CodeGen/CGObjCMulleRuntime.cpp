@@ -1491,7 +1491,7 @@ CodeGen::RValue CGObjCMulleRuntime::CommonMessageSend(CodeGen::CodeGenFunction &
    //
    if( ! Fn)
    {
-      int optLevel = CGM.getLangOpts().OptimizeSize ? -1 : CGM.getLangOpts().Optimize;
+      int optLevel = CGM.getLangOpts().OptimizeSize ? -1 : CGM.getCodeGenOpts().OptimizationLevel;
       Fn = ObjCTypes.getMessageSendFn( optLevel); // : ObjCTypes.getMessageSendFn0();
       isDispatchFn = true;
    }
@@ -3605,7 +3605,7 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
   llvm::FunctionType *FT =
     llvm::FunctionType::get(Builder.getVoidTy(),
                             llvm::PointerType::getUnqual(ObjCTypes.LoadInfoTy), true);
-  llvm::Value *Register = CGM.CreateRuntimeFunction( FT, "mulle_objc_load_info_unfailing_enqueue");
+  llvm::Value *Register = CGM.CreateRuntimeFunction( FT, "mulle_objc_load_info_locked_unfailing_enqueue");
   Builder.CreateCall( Register, LoadInfo);
   Builder.CreateRetVoid();
 

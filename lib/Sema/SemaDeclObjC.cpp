@@ -4306,7 +4306,7 @@ Decl *Sema::ActOnMethodDeclaration(
       bool   skip;
       
       skip = false;
-      if( Params.size() == 1 && Sel.getNumArgs() == 1)
+      if( Params.size() == 1 && Sel.getNumArgs() == 1 && ! isVariadic)
       {
          //
          // get the type, if it is compatible with void *

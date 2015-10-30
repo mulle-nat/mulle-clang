@@ -1135,6 +1135,7 @@ namespace {
       void RegisterAlias(const ObjCCompatibleAliasDecl *OAD) override {}
       
       RecordDecl  *CreateOnTheFlyRecordDecl( CodeGenFunction &CGF, const ObjCMessageExpr *Expr);
+      RecordDecl  *CreateVariadicOnTheFlyRecordDecl( CodeGenFunction &CGF, const ObjCMessageExpr *Expr, RecordDecl *RD);
       
       virtual LValue  *GenerateCallArgs( CallArgList &Args,
                                         CodeGenFunction &CGF,
@@ -2021,6 +2022,7 @@ static RecordDecl   *create_union_type( ASTContext *context, QualType paramType,
 }
 
 
+
 RecordDecl  *CGObjCMulleRuntime::CreateOnTheFlyRecordDecl( CodeGenFunction &CGF, const ObjCMessageExpr *Expr)
 {
    ASTContext   *Context;
@@ -2076,6 +2078,101 @@ RecordDecl  *CGObjCMulleRuntime::CreateOnTheFlyRecordDecl( CodeGenFunction &CGF,
    return( RD);
 }
 
+
+RecordDecl  *CGObjCMulleRuntime::CreateVariadicOnTheFlyRecordDecl( CodeGenFunction &CGF,
+                                                                   const ObjCMessageExpr *Expr,
+                                                                   RecordDecl *RD)
+{
+   ASTContext   *Context;
+   StringRef    FieldName;
+   StringRef    RecordName;
+   char         buf[ 32];
+   
+   Context = &CGM.getContext();
+
+   // try to reuse identifier for all, as we are in codegen I don't think
+   // it matters
+   
+   IdentifierInfo  *RecordID = &Context->Idents.get( "variadic_expr");
+   
+   ObjCMethodDecl *OnTheFlyDeclContext;
+   
+   TypeSourceInfo *ReturnTInfo = nullptr;
+   OnTheFlyDeclContext =
+      ObjCMethodDecl::Create( *Context,
+                              SourceLocation(), SourceLocation(),
+                              Expr->getSelector(),
+                              QualType(),
+                              ReturnTInfo,
+                              Context->getTranslationUnitDecl(),
+                          /*isInstance=*/false, /*isVariadic=*/false,
+                          /*isPropertyAccessor=*/false,
+                          /*isImplicitlyDeclared=*/true,
+                          /*isDefined=*/false, ObjCMethodDecl::Required,
+                          /*HasRelatedResultType=*/false);
+   
+   // (DeclContext *) CGF.CurFuncDecl is a hack
+   RecordDecl  *RD2 = RecordDecl::Create( *Context, TTK_Struct, OnTheFlyDeclContext, SourceLocation(), SourceLocation(), RecordID);
+
+
+   /* copy over parameters from Record decl first */
+   unsigned int FieldNo;
+   
+   FieldNo = 0;
+   for (RecordDecl::field_iterator Field = RD->field_begin(),
+       FieldEnd = RD->field_end(); Field != FieldEnd; ++Field, ++FieldNo)
+   {
+      FieldDecl   *FD;
+      
+      sprintf( buf, "param_%d", FieldNo);
+      FieldName = buf;
+
+      IdentifierInfo  *FieldID = &Context->Idents.get( FieldName);
+      FD = FieldDecl::Create(  *Context, RD2,
+                               SourceLocation(), SourceLocation(),
+                               FieldID,
+                               Field->getType(),
+                               Field->getTypeSourceInfo(),
+                               NULL,
+                               false,  // Mutable... only for C++
+                               ICIS_NoInit);
+      RD2->addDecl( FD);
+   }
+
+   /* 
+    * Now copy over remaining variadic arguments. Arguments have been
+    * already promoted (bummer)
+    */
+   for (unsigned i = FieldNo, e = Expr->getNumArgs(); i != e; ++i)
+   {
+      FieldDecl   *FD;
+      Expr::Expr  *arg;
+      QualType    type;
+      
+      sprintf( buf, "param_%d", i);
+      FieldName = buf;
+
+      arg = const_cast<Expr::Expr *>( Expr->getArg( i));
+      type = arg->getType();
+      
+      IdentifierInfo  *FieldID = &Context->Idents.get( FieldName);
+      FD = FieldDecl::Create(  *Context, RD2,
+                               SourceLocation(), SourceLocation(),
+                               FieldID,
+                               type,
+                               Context->CreateTypeSourceInfo( type, 0),
+                               NULL,
+                               false,  // Mutable... only for C++
+                               ICIS_NoInit);
+      RD2->addDecl( FD);
+   }
+   
+   
+   RD2->completeDefinition();
+   
+   return( RD2);
+}
+
 /// Creat the CallArgList
 /// Here we stuff all arguments into a alloca struct
 /// @mulle-objc@ call: stuff values into alloca
@@ -2103,7 +2200,12 @@ LValue  *CGObjCMulleRuntime::GenerateCallArgs( CallArgList &Args,
          RD = CreateOnTheFlyRecordDecl( CGF, Expr);
    }
    else
+   {
       RD = method->getParamRecord();
+      if( method->isVariadic())
+         RD = CreateVariadicOnTheFlyRecordDecl( CGF, Expr, RD);
+   }
+   
 
    // special case, argument is void * compatible, there is no paramRecord.
    // yet one argument will have been passed

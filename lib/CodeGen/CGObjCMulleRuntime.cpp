@@ -90,15 +90,16 @@ namespace {
          case -1 :
          case 0  : name = "mulle_objc_object_no_inline_call"; break;
          }
-         
-               
+
          llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy, ParamsPtrTy };
-         llvm::Constant *C =  CGM.CreateRuntimeFunction(llvm::FunctionType::get(ObjectPtrTy,
-                                                           params, false),
-                                   name,
-                                   llvm::AttributeSet::get(CGM.getLLVMContext(),
-                                                           llvm::AttributeSet::FunctionIndex,
-                                                           llvm::Attribute::NonLazyBind));
+         llvm::Constant *C;
+         
+         C  =  CGM.CreateRuntimeFunction(llvm::FunctionType::get(ObjectPtrTy,
+                                                              params, false),
+                                         name,
+                                         llvm::AttributeSet::get(CGM.getLLVMContext(),
+                                                                 llvm::AttributeSet::FunctionIndex,
+                                                                 llvm::Attribute::NonLazyBind));
          // HACK
          //if (auto *F = dyn_cast<llvm::Function>(C))
          //   F->setCallingConv( llvm::CallingConv::Fast);
@@ -810,6 +811,14 @@ namespace {
       
       llvm::Function *GetMethodDefinition(const ObjCMethodDecl *MD);
       
+      // dup from COdeGenModule, but easier here
+      llvm::StructType *NSConstantStringType;
+      llvm::StringMap<llvm::GlobalVariable *> NSConstantStringMap;
+
+      llvm::StringMapEntry<llvm::GlobalVariable *> &GetNSConstantStringMapEntry( const StringLiteral *Literal, unsigned &StringLength);
+   
+      llvm::Constant *GenerateConstantString(const StringLiteral *SL) override;
+      
       /// BuildIvarLayout - Builds ivar layout bitmap for the class
       /// implementation for the __strong or __weak case.
       ///
@@ -930,7 +939,9 @@ namespace {
       CGObjCCommonMulleRuntime(CodeGen::CodeGenModule &cgm) :
       CGObjCRuntime(cgm), VMContext(cgm.getLLVMContext()) { }
       
-      llvm::Constant *GenerateConstantString(const StringLiteral *SL) override;
+      virtual llvm::ConstantStruct *CreateNSConstantStringStruct( StringRef S, unsigned StringLength) = 0;
+      llvm::StructType *GetOrCreateNSConstantStringType( void);
+      llvm::StructType *CreateNSConstantStringType( void);
       
       llvm::Function *GenerateMethod(const ObjCMethodDecl *OMD,
                                      const ObjCContainerDecl *CD=nullptr) override;
@@ -1184,7 +1195,9 @@ namespace {
       llvm::Value *EmitIvarOffset(CodeGen::CodeGenFunction &CGF,
                                   const ObjCInterfaceDecl *Interface,
                                   const ObjCIvarDecl *Ivar) override;
+
       
+      llvm::ConstantStruct *CreateNSConstantStringStruct( StringRef S, unsigned StringLength) override;
       /// GetClassGlobal - Return the global variable for the Objective-C
       /// class of the given name.
       llvm::GlobalVariable *GetClassGlobal(const std::string &Name,
@@ -1378,40 +1391,177 @@ llvm::Constant *CGObjCMulleRuntime::GetEHType(QualType T) {
    llvm_unreachable("asking for catch type for ObjC type in fragile runtime");
 }
 
-/// Generate a constant CFString object.
-/*
- struct __builtin_CFString {
- const int *isa; // point to __CFConstantStringClassReference
- int flags;
- const char *str;
- long length;
- };
- */
-
-/// or Generate a constant NSString object.
-/*
- struct __builtin_NSString {
- const int *isa; // point to __NSConstantStringClassReference
- const char *str;
- unsigned int length;
- };
- */
-
+///  Generate a constant NSString object.
 //
-// { LONG_MAX, MULLE_OBJC_METHOD_ID( 0x423aeba60e4eb3be), "VfL Bochum 1848" };
-// 0x423aeba60e4eb3be == NXConstantString
-//
-
-llvm::Constant *CGObjCCommonMulleRuntime::GenerateConstantString(
-                                                        const StringLiteral *SL) {
-   return (CGM.getLangOpts().NoConstantCFStrings == 0 ?
-           CGM.GetAddrOfConstantCFString(SL) :
-           CGM.GetAddrOfConstantString(SL));
+// { LONG_MAX, <isa>, "VfL Bochum 1848", 15 };
+//               ^--magic needed
+llvm::StructType *CGObjCCommonMulleRuntime::CreateNSConstantStringType( void)
+{
+   ASTContext   &Context = CGM.getContext();
+   
+   // Construct the type for a constant NSString.
+   RecordDecl *D = Context.buildImplicitRecord("__builtin_NSString");
+   D->startDefinition();
+   
+   QualType FieldTypes[4];
+   
+   // const unsigned long  retainCount;
+   FieldTypes[0] = Context.UnsignedLongTy;
+   // const void *isa;
+   FieldTypes[1] = Context.VoidPtrTy;
+   
+   // unsigned char *str;
+   FieldTypes[2] = Context.getPointerType(Context.CharTy.withConst());
+   // unsigned int length;
+   FieldTypes[3] = Context.UnsignedIntTy;
+   
+   // Create fields
+   for (unsigned i = 0; i < 4; ++i) {
+      FieldDecl *Field = FieldDecl::Create(Context, D,
+                                           SourceLocation(),
+                                           SourceLocation(), nullptr,
+                                           FieldTypes[i], /*TInfo=*/nullptr,
+                                           /*BitWidth=*/nullptr,
+                                           /*Mutable=*/false,
+                                           ICIS_NoInit);
+      Field->setAccess(AS_public);
+      D->addDecl(Field);
+   }
+   
+   D->completeDefinition();
+   
+   QualType NSTy = Context.getTagDeclType(D);
+   return( cast<llvm::StructType>( CGM.getTypes().ConvertType(NSTy)));
 }
 
-enum {
-   kCFTaggedObjectID_Integer = (1 << 1) + 1
-};
+
+/// \brief The LLVM type corresponding to NSConstantString.
+llvm::StructType *CGObjCCommonMulleRuntime::GetOrCreateNSConstantStringType( void)
+{
+   if( ! NSConstantStringType)
+      NSConstantStringType = CreateNSConstantStringType();
+   return( NSConstantStringType);
+}
+
+
+//
+// this is basically CodeGenModule::GetAddrOfConstantString copy/pasted
+// and slighlty tweaked. Why this code is in CodeGenModule beats me..
+//
+
+llvm::ConstantStruct *CGObjCMulleRuntime::CreateNSConstantStringStruct( StringRef S, unsigned StringLength)
+{
+   llvm::Constant *Fields[4];
+   ASTContext   *Context;
+   
+   Context = &CGM.getContext();
+   
+   // drop LONG_MAX
+   llvm::Type *Ty = CGM.getTypes().ConvertType(CGM.getContext().LongTy);
+   Fields[0] = llvm::ConstantInt::get(Ty, LONG_MAX);
+   
+   std::string SymbolName = "NSConstantString";
+   llvm::GlobalVariable *Symbol = CGM.getModule().getGlobalVariable(SymbolName);
+   
+   //
+   // this is a pointer to a struct _mulle_objc_class, but we don't have this
+   // struct here, so we fake it with a "load" class type, and noone would
+   // notice, except because I am writing it here and because someone probably
+   // implements typesafe linking in the future, just to be a pain in the ass
+   //
+   if (! Symbol)
+      Symbol = new llvm::GlobalVariable( CGM.getModule(), ObjCTypes.ClassTy, false,
+                                        llvm::GlobalValue::ExternalLinkage,
+                                        nullptr, SymbolName);
+   Fields[1] = llvm::ConstantExpr::getBitCast( Symbol,
+                                               CGM.VoidPtrTy);
+   //MakeAddrLValue( Symbol, CGM.VoidPtrTy);
+   // String pointer.
+   llvm::Constant *C =
+   llvm::ConstantDataArray::getString(VMContext, S);
+   
+   llvm::GlobalValue::LinkageTypes Linkage;
+   bool isConstant;
+   Linkage = llvm::GlobalValue::PrivateLinkage;
+   isConstant = ! CGM.getLangOpts().WritableStrings;
+   
+   auto *GV = new llvm::GlobalVariable( CGM.getModule(), C->getType(), isConstant,
+                                       Linkage, C, ".str");
+   GV->setUnnamedAddr(true);
+   
+   // Don't enforce the target's minimum global alignment, since the only use
+   // of the string is via this class initializer.
+   CharUnits Align = CGM.getContext().getTypeAlignInChars(CGM.getContext().CharTy);
+   GV->setAlignment(Align.getQuantity());
+   Fields[2] = getConstantGEP( VMContext, GV, 0, 0);
+   
+   // String length.
+   Ty = CGM.getTypes().ConvertType(CGM.getContext().UnsignedIntTy);
+   Fields[3] = llvm::ConstantInt::get(Ty, StringLength);
+   
+   llvm::StructType *StructType;
+   
+   StructType = GetOrCreateNSConstantStringType();
+   // The struct.
+   
+   return( (llvm::ConstantStruct *) llvm::ConstantStruct::get( StructType, Fields));
+}
+
+
+static llvm::StringMapEntry<llvm::GlobalVariable *> &
+GetConstantStringEntry(llvm::StringMap<llvm::GlobalVariable *> &Map,
+                       const StringLiteral *Literal, unsigned &StringLength)
+{
+  StringRef String = Literal->getString();
+  StringLength = String.size();
+  return *Map.insert(std::make_pair(String, nullptr)).first;
+}
+
+
+llvm::StringMapEntry<llvm::GlobalVariable *> &
+CGObjCCommonMulleRuntime::GetNSConstantStringMapEntry( const StringLiteral *Literal, unsigned &StringLength) {
+   return( GetConstantStringEntry( NSConstantStringMap, Literal, StringLength));
+}
+
+
+llvm::Constant *CGObjCCommonMulleRuntime::GenerateConstantString( const StringLiteral *SL)
+{
+   unsigned StringLength = 0;
+   llvm::StringMapEntry<llvm::GlobalVariable *> &Entry =
+   GetNSConstantStringMapEntry( SL, StringLength);
+   
+   if (auto *C = Entry.second)
+      return C;
+   
+   llvm::GlobalVariable   *GV;
+   llvm::ConstantStruct   *NSStringHeader = CreateNSConstantStringStruct( Entry.first(), StringLength);
+   
+   GV = new llvm::GlobalVariable(CGM.getModule(), NSStringHeader->getType(), true,
+                                 llvm::GlobalVariable::PrivateLinkage, NSStringHeader,
+                                 "_unnamed_nsstring_header");
+   // FIXME. Fix section.
+   GV->setSection( "__DATA,__objc_stringobj,regular,no_dead_strip");
+   Entry.second = GV;
+   
+   // skip header, index "object"
+   //   C = NSStringHeader->getAggregateElement(2);
+
+   llvm::Constant *C;
+   
+   // The vtable address point is 2.
+   //   C = NSStringHeader->getAggregateElement( 1);
+   C = getConstantGEP( VMContext, GV, 0, 2);
+   C = llvm::ConstantExpr::getBitCast( C, CGM.VoidPtrTy);
+   
+   llvm::GlobalAlias  *GA;
+   GA = llvm::GlobalAlias::create( CGM.VoidPtrTy,
+                                  llvm::GlobalVariable::WeakAnyLinkage,
+                                  Twine( "_unnamed_nsstring_"),
+                                  C,
+                                  &CGM.getModule());
+   // FIXME. Fix section.
+   return( GA);
+}
 
 
 #pragma mark -

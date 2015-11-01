@@ -320,13 +320,14 @@ void Sema::ActOnStartOfObjCMethodDef(Scope *FnBodyScope, Decl *D) {
 
   PushOnScopeChains(MDecl->getSelfDecl(), FnBodyScope);
   PushOnScopeChains(MDecl->getCmdDecl(), FnBodyScope);
-   // @mulle-objc@ parameters: save scope for later retrieval in ActonMethod
+   // @mulle-objc@ MetaABI parameters: save scope for later retrieval in ActonMethod
    if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
    {
       if( MDecl->getParamDecl())
          PushOnScopeChains(MDecl->getParamDecl(), FnBodyScope);
-   
-      MDecl->setParamScope( (void *) FnBodyScope);
+      else
+         if( MDecl->isOneVoidPointerParam())
+            PushOnScopeChains( MDecl->parameters()[ 0], FnBodyScope);
   }
   // The ObjC parser requires parameter names so there's no need to check.
   CheckParmsForFunctionDef(MDecl->param_begin(), MDecl->param_end(),
@@ -342,8 +343,7 @@ void Sema::ActOnStartOfObjCMethodDef(Scope *FnBodyScope, Decl *D) {
     
      // @mulle-objc@ parameters: Remove Parameters from Scope
      // (nat) pushing the param identifier on the scope is done here
-     // and wrongly done again in Sema::ActOnMethodDeclaration (I think).
-     // Do-Not-Want.
+     //
      if( ! getLangOpts().ObjCRuntime.hasMulleMetaABI())
      {
        if (Param->getIdentifier())
@@ -4103,59 +4103,59 @@ void   Sema::SetMulleObjCParam( ObjCMethodDecl *ObjCMethod,
    SourceLocation   EndLoc,
    SourceLocation   SelectorLoc)
 {
-   if( Params.size())
+   StringRef  RecordName;
+   
+   if( ! Params.size())
+      return;
+   
+   //
+   // this could be trouble, if someone has declared the same method
+   // already ? check this
+   //
+   RecordName = "p." + Sel.getAsString();
+   IdentifierInfo  *RecordID = &Context.Idents.get( RecordName);
+   
+   RecordDecl  *RD = RecordDecl::Create( Context, TTK_Struct, CurContext, MethodLoc, EndLoc, RecordID);
+   
+   for (unsigned i = 0, e = Params.size(); i != e; ++i)
    {
-      StringRef  RecordName;
+      ParmVarDecl *Param = Params[ i];
+      FieldDecl   *FD;
       
-      //
-      // this could be trouble, if someone has declared the same method
-      // already ? check this
-      //
-      RecordName = "p." + Sel.getAsString();
-      IdentifierInfo  *RecordID = &Context.Idents.get( RecordName);
-      
-      RecordDecl  *RD = RecordDecl::Create( Context, TTK_Struct, CurContext, MethodLoc, EndLoc, RecordID);
-      
-      for (unsigned i = 0, e = Params.size(); i != e; ++i)
-      {
-         ParmVarDecl *Param = Params[ i];
-         FieldDecl   *FD;
-         
-         FD = FieldDecl::Create( Context, RD,
-                                Param->getLocation(), Param->getLocEnd(),
-                                Param->getIdentifier(),
-                                Param->getType(),
-                                Param->getTypeSourceInfo(),
-                                Param->getDefaultArg(),
-                                false,  // Mutable... only for C++
-                                ICIS_NoInit);
-         RD->addDecl( FD);
-      }
-      RD->completeDefinition();
-
-      // some voodoo, blindly copied
-      AddAlignmentAttributesForRecord(RD);
-      AddMsStructLayoutForRecord(RD);
-      
-      ObjCMethod->setParamRecord( RD);
-
+      FD = FieldDecl::Create( Context, RD,
+                             Param->getLocation(), Param->getLocEnd(),
+                             Param->getIdentifier(),
+                             Param->getType(),
+                             Param->getTypeSourceInfo(),
+                             Param->getDefaultArg(),
+                             false,  // Mutable... only for C++
+                             ICIS_NoInit);
+      RD->addDecl( FD);
+   }
+   RD->completeDefinition();
+   
+   // some voodoo, blindly copied
+   AddAlignmentAttributesForRecord(RD);
+   AddMsStructLayoutForRecord(RD);
+   
+   ObjCMethod->setParamRecord( RD);
+   
    // (nat) fake it up, so that ever method looks exactly alike
    //       add our _param implicit decl now.
    //
-      // convert record to a QualType
-      QualType RecTy = Context.getTagDeclType(RD);
-      QualType PtrTy = Context.getPointerType( RecTy);
-
-      ImplicitParamDecl  *Param = ImplicitParamDecl::Create(Context,
-                                                            ObjCMethod,
-                                                            SelectorLoc,
-                                                            &Context.Idents.get("_param"),
-                                                            PtrTy);
-      
-      ObjCMethod->setParamDecl( Param);
-      // this is implicitly done later in ActOnStartOfObjCMethodDef
-      //      IdResolver.AddDecl(Param);  // this adds it to search scope!
-   }
+   // convert record to a QualType
+   QualType RecTy = Context.getTagDeclType(RD);
+   QualType PtrTy = Context.getPointerType( RecTy);
+   
+   ImplicitParamDecl  *Param = ImplicitParamDecl::Create(Context,
+                                                         ObjCMethod,
+                                                         SelectorLoc,
+                                                         &Context.Idents.get("_param"),
+                                                         PtrTy);
+   
+   ObjCMethod->setParamDecl( Param);
+   // this is implicitly done later in ActOnStartOfObjCMethodDef
+   //      IdResolver.AddDecl(Param);  // this adds it to search scope!
 }
 
 
@@ -4291,7 +4291,7 @@ Decl *Sema::ActOnMethodDeclaration(
   
   ObjCMethod->setMethodParams(Context, Params, SelectorLocs);
 
-  // @mulle-objc@ parameters: create ParamRecord
+  // @mulle-objc@ MetaABI parameters: create ParamRecord
   // the params are what is used for syntax checks and all the
   // other good stuff.
   //
@@ -4318,6 +4318,7 @@ Decl *Sema::ActOnMethodDeclaration(
             // reinstitute as regular parameter
             S->AddDecl(Param);
             IdResolver.AddDecl(Param);
+            ObjCMethod->setIsOneVoidPointerParam( true);
             skip = true;
          }
       }

@@ -518,13 +518,16 @@ void CodeGenFunction::StartObjCMethod(const ObjCMethodDecl *OMD,
   args.push_back(OMD->getSelfDecl());
   args.push_back(OMD->getCmdDecl());
 
- // @mulle-objc@ arguments: Push ParamDecl on args Decl, the _param pointer
+ // @mulle-objc@ MetaABI arguments: Push ParamDecl on args Decl, the _param pointer
  // Ignore others
  
    if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
    {
       if( OMD->getParamDecl())
          args.push_back(OMD->getParamDecl());
+      else
+         if( OMD->isOneVoidPointerParam())
+            args.push_back( OMD->parameters()[ 0]);
    }
    else
    {
@@ -1278,7 +1281,7 @@ CodeGenFunction::generateObjCSetterBody(const ObjCImplementationDecl *classImpl,
 
   
   //
-  // @mulle-objc@ property: gotta make this access our paramDecl instead
+  // @mulle-objc@ MetaAPI property: gotta make this access our paramDecl instead
   //
   // this code really should be runtime specific
   //

@@ -173,9 +173,8 @@ private:
   void *ParamsAndSelLocs;
   unsigned NumParams;
 
-  // @mulle-objc@ parameters: ivars ParamRecord, ParamScope
+  // @mulle-objc@ parameters: ivars ParamRecord
   RecordDecl    *ParamRecord;
-   void         *ParamScope; // void coz to lazy to include scope
    
   /// List of attributes for this method declaration.
   SourceLocation DeclEndLoc; // the location of the ';' or '{'.
@@ -193,7 +192,7 @@ private:
    /// Para,Decl - Decl for the implicit _param parameter. This is lazily
    /// constructed by ActOnMethodDeclaration.
   ImplicitParamDecl *ParamDecl;
-
+  bool              IsOneVoidPointerParam;
   SelectorLocationsKind getSelLocsKind() const {
     return (SelectorLocationsKind)SelLocsKind;
   }
@@ -252,7 +251,7 @@ private:
 /// @mulle-objc@ parameters: initialize storage of parameter ivars
         ParamDecl( nullptr) {
     ParamRecord = nullptr;
-    ParamScope  = nullptr;
+    IsOneVoidPointerParam = false;
     setImplicit(isImplicitlyDeclared);
    }
 
@@ -409,15 +408,15 @@ public:
     return llvm::map_iterator(param_end(), deref_fun(&ParmVarDecl::getType));
   }
 
-  // @mulle-objc@ parameters: paramRecord, paramScope, paramDecl accessors
+  // @mulle-objc@ parameters: paramRecord, paramDecl accessors
   RecordDecl   *getParamRecord() const { return ParamRecord; }
   void setParamRecord( RecordDecl  *RD) { ParamRecord = RD; }
 
-  void * getParamScope() const { return ParamScope; }
-  void setParamScope(void *Scope) { ParamScope = Scope; }
-
   ImplicitParamDecl * getParamDecl() const { return ParamDecl; }
   void setParamDecl(ImplicitParamDecl *PD) { ParamDecl = PD; }
+
+  bool isOneVoidPointerParam() const { return IsOneVoidPointerParam; }
+  void setIsOneVoidPointerParam(bool Flag) { IsOneVoidPointerParam = Flag; }
 
   // @mulle-objc@ parameters:  method FindParamRecordField for parameters
   FieldDecl  *FindParamRecordField( IdentifierInfo *II);

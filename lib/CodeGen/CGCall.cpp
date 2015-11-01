@@ -304,7 +304,7 @@ CodeGenTypes::arrangeObjCMessageSendSignature(const ObjCMethodDecl *MD,
   argTys.push_back(Context.getCanonicalParamType(receiverType));
   argTys.push_back(Context.getCanonicalParamType(Context.getObjCSelType()));
 
-   // @mulle-objc@ call: Hack ObjCMessageSendSignature 
+   // @mulle-objc@ MetaABI call: Hack ObjCMessageSendSignature 
    if( Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
    {
       RecordDecl *RD = MD->getParamRecord();
@@ -315,6 +315,9 @@ CodeGenTypes::arrangeObjCMessageSendSignature(const ObjCMethodDecl *MD,
    
          argTys.push_back( Context.getCanonicalParamType( PtrTy));
       }
+      else
+         if( MD->isOneVoidPointerParam())
+            argTys.push_back( Context.getCanonicalParamType( Context.VoidPtrTy));
       
       // fix up calling convention for MD, to be like mulle_objc_object_inline_call
       // it would be nice to not just use the default, but use the actual one

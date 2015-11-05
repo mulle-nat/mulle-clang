@@ -3857,7 +3857,7 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
   llvm::FunctionType *FT =
     llvm::FunctionType::get(Builder.getVoidTy(),
                             llvm::PointerType::getUnqual(ObjCTypes.LoadInfoTy), true);
-  llvm::Value *Register = CGM.CreateRuntimeFunction( FT, "mulle_objc_load_info_locked_unfailing_enqueue");
+  llvm::Value *Register = CGM.CreateRuntimeFunction( FT, "mulle_objc_loadinfo_locked_unfailing_enqueue");
   Builder.CreateCall( Register, LoadInfo);
   Builder.CreateRetVoid();
 

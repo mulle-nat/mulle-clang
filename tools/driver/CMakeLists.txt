@@ -45,11 +45,6 @@ else()
   set_target_properties(clang PROPERTIES VERSION ${CLANG_EXECUTABLE_VERSION})
 endif()
 
-# Support plugins.
-if(CLANG_PLUGIN_SUPPORT)
-  export_executable_symbols(clang)
-endif()
-
 add_dependencies(clang clang-headers)
 
 if(UNIX)

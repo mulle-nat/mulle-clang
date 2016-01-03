@@ -69,7 +69,7 @@ ObjCRuntime Darwin::getDefaultObjCRuntime(bool isNonFragile) const {
     return ObjCRuntime(ObjCRuntime::iOS, TargetVersion);
   if (isNonFragile)
     return ObjCRuntime(ObjCRuntime::MacOSX, TargetVersion);
-  // @mulle-objc@ :: use Mulle as default
+  // @mulle-objc@ :: use Mulle runtime as default
   return ObjCRuntime(ObjCRuntime::Mulle, TargetVersion);
 }
 

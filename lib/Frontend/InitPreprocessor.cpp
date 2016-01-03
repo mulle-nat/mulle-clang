@@ -528,7 +528,7 @@ static void InitializePredefinedMacros(const TargetInfo &TI,
     if (LangOpts.ObjCRuntime.isNeXTFamily())
       Builder.defineMacro("__NEXT_RUNTIME__");
 
-    /* @mulle-objc@ announce that we are running */
+    // @mulle-objc@ announce that we are running 
     if (LangOpts.ObjCRuntime.hasMulleMetaABI())
         Builder.defineMacro("__MULLE_RUNTIME__");
 

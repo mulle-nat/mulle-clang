@@ -160,9 +160,9 @@ public:
                       const ObjCMethodDecl *Method = nullptr) = 0;
 
    // @mulle-objc@ header: Callback to generate LLVM method argument list 
-   virtual void   GenerateCallArgs( CallArgList &Args,
-                                    CodeGenFunction &CGF,
-                                    const ObjCMessageExpr *Expr);
+   virtual LValue   *GenerateCallArgs( CallArgList &Args,
+                                       CodeGenFunction &CGF,
+                                       const ObjCMessageExpr *Expr);
 
   
   /// Generate an Objective-C message send operation to the super

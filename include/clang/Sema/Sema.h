@@ -3633,8 +3633,9 @@ public:
                       ArrayRef<Expr *> Args = None, TypoExpr **Out = nullptr);
 
   // @mulle-objc@ parameters: additional methods GetMulle_paramExpr GetMulle_paramFieldExpr
-  ExprResult   GetMulle_paramExpr( Scope *S, CXXScopeSpec &SS, SourceLocation Loc, char *Name);
-  ExprResult   GetMulle_paramFieldExpr( FieldDecl *FD, SourceLocation Loc, Scope *S, CXXScopeSpec &SS);
+  ExprResult   GetMulle_paramExpr( Scope *S, CXXScopeSpec &SS, SourceLocation Loc, StringRef Name);
+  ExprResult   GetMulle_paramFieldExpr( FieldDecl *FD, Scope *S, CXXScopeSpec &SS, SourceLocation Loc);
+  ExprResult   GetMulle_paramExprAsType( QualType type, Scope *S, CXXScopeSpec &SS, SourceLocation Loc, StringRef Name);
 
   // @mulle-objc@ added CXXScopeSpec to LookupInObjCMethod parameters
   ExprResult LookupInObjCMethod(LookupResult &LookUp, Scope *S, CXXScopeSpec &SS,
@@ -7323,7 +7324,8 @@ public:
     bool isVariadic, bool MethodDefinition);
 
    // @mulle-objc@ parameters: additional method SetMulleObjCParam
-   void SetMulleObjCParam( ObjCMethodDecl *ObjCMethod, Selector Sel, SmallVector<ParmVarDecl*, 16> Params, SourceLocation   MethodLoc,
+   // Why do I have to specify the size of the vector when passing ??
+   void SetMulleObjCParam( ObjCMethodDecl *ObjCMethod, Selector Sel, SmallVector<ParmVarDecl*, 16> *Params, QualType resultType, SourceLocation   MethodLoc,
    SourceLocation   EndLoc, SourceLocation SelectorLoc);
 
   ObjCMethodDecl *LookupMethodInQualifiedType(Selector Sel,
@@ -7334,6 +7336,7 @@ public:
 
   bool CheckARCMethodDecl(ObjCMethodDecl *method);
   bool inferObjCARCLifetime(ValueDecl *decl);
+  bool isVoidPointerCompatible( QualType type);
 
   ExprResult
   HandleExprPropertyRefExpr(const ObjCObjectPointerType *OPT,
@@ -7425,7 +7428,7 @@ public:
    // @mulle-objc@ additional method CheckMulleObjCFunctionDefined
   bool  CheckMulleObjCFunctionDefined( Scope *S,
                                        SourceLocation Loc,
-                                       char *Name);
+                                       StringRef Name);
 
   ExprResult ActOnInstanceMessage(Scope *S,
                                   Expr *Receiver,

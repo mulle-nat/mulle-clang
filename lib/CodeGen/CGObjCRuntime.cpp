@@ -387,9 +387,10 @@ CGObjCRuntime::getMessageSendInfo(const ObjCMethodDecl *method,
 //   this is done differently in mulle-objc so this little code
 //   snippet is placed into the runtime
 //
-void  CGObjCRuntime::GenerateCallArgs( CallArgList &Args,
+LValue  *CGObjCRuntime::GenerateCallArgs( CallArgList &Args,
                                        CodeGenFunction &CGF,
                                        const ObjCMessageExpr *Expr)
 {
   CGF.EmitCallArgs( Args, Expr->getMethodDecl(), Expr->arg_begin(), Expr->arg_end());
+  return( nullptr);
 }

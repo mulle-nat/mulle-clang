@@ -1231,7 +1231,8 @@ ExprResult Sema::ParseObjCProtocolExpression(IdentifierInfo *ProtocolId,
   QualType Ty = Context.getObjCProtoType();
   if (Ty.isNull())
     return true;
-  //  @mulle-objc@ protocol: fake up protocol type to be a long
+  // @mulle-objc@ protocol: fake up protocol type to be a long
+  // should ask runtime to return it
    if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
    {
       Ty = Context.LongTy;
@@ -3012,18 +3013,14 @@ static void RemoveSelectorFromWarningCache(Sema &S, Expr* Arg) {
 }
 
 
-bool Sema::CheckMulleObjCFunctionDefined( Scope *S, SourceLocation Loc, char *Name)
+bool Sema::CheckMulleObjCFunctionDefined( Scope *S, SourceLocation Loc, StringRef Name)
 {
-   DeclContext               *E;
    DeclarationName           DN;
    DeclContextLookupResult   R;
-   ASTContext                *Ctx;
    IdentifierInfo            *II;
    
    // hacked together without a clue
-   E   = S->getEntity();
-   Ctx = &E->getParentASTContext();
-   II  = &Ctx->Idents.get( Name);
+   II  = &Context.Idents.get( Name);
    DN  = DeclarationName( II);
    
    //

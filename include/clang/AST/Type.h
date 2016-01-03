@@ -1699,8 +1699,6 @@ public:
 
   bool isOpenCLSpecificType() const;            // Any OpenCL specific type
    
-  // @mulle-objc@ arguments: isToVoidPointerCastableType
-  bool isToVoidPointerCastableType() const;    // mulle OBJC convenience
   /// Determines if this type, which must satisfy
   /// isObjCLifetimeType(), is implicitly __unsafe_unretained rather
   /// than implicitly __strong.
@@ -5459,33 +5457,7 @@ inline bool Type::isIntegerType() const {
   }
   return false;
 }
-
-// @mulle-objc@ arguments: will it fit ? isToVoidPointerCastableType
-inline bool Type::isToVoidPointerCastableType() const /* const */ {
-   if (const BuiltinType *BT = dyn_cast<BuiltinType>(CanonicalType))
-   {
-      // stuff we don't coerce
-      if( BT->getKind() == BuiltinType::Float)
-         return( false);
-      if( BT->getKind() == BuiltinType::Double)
-         return( false);
-      if( BT->getKind() == BuiltinType::LongLong)
-         return( false);
-      if( BT->getKind() == BuiltinType::ULongLong)
-         return( false);
-      return BT->getKind() > BuiltinType::Void &&
-      BT->getKind() <= BuiltinType::NullPtr;
-   }
-   
-   // OK...
-   if (const EnumType *ET = dyn_cast<EnumType>(CanonicalType))
-      // Enums are scalar types, but only if they are defined.  Incomplete enums
-      // are not treated as scalar types.
-      return IsEnumDeclComplete(ET->getDecl());
-   
-   return isAnyPointerType();
-}
-   
+  
 inline bool Type::isScalarType() const {
   if (const BuiltinType *BT = dyn_cast<BuiltinType>(CanonicalType))
     return BT->getKind() > BuiltinType::Void &&

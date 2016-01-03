@@ -2380,18 +2380,14 @@ Sema::BuildQualifiedDeclarationNameExpr(CXXScopeSpec &SS,
 }
 
 
-/* @mulle-objc@ parameters: create an expression to access _param */
-ExprResult   Sema::GetMulle_paramExpr( Scope *S, CXXScopeSpec &SS, SourceLocation Loc, char *Name)
+/* @mulle-objc@ parameters: GetMulle_paramExpr create an expression to access _param by name */
+ExprResult   Sema::GetMulle_paramExpr( Scope *S, CXXScopeSpec &SS, SourceLocation Loc, StringRef Name)
 {
-   ASTContext        *Ctx;
-   DeclContext       *E;
    DeclarationName   DN;
    IdentifierInfo    *II;
    
    // hacked together without a clue
-   E   = S->getEntity();
-   Ctx = &E->getParentASTContext();
-   II  = &Ctx->Idents.get( Name);
+   II  = &Context.Idents.get( Name);
    DN  = DeclarationName( II);
    
    LookupResult R( *this, DN, Loc, LookupOrdinaryName);
@@ -2404,26 +2400,51 @@ ExprResult   Sema::GetMulle_paramExpr( Scope *S, CXXScopeSpec &SS, SourceLocatio
 }
 
 
-/* @mulle-objc@ parameters: create an expression to access _param->field */
+ExprResult   Sema::GetMulle_paramExprAsType( QualType type, Scope *S, CXXScopeSpec &SS, SourceLocation Loc, StringRef Name)
+{
+   DeclarationName   DN;
+   IdentifierInfo    *II;
+   ExprResult        E;
+   
+   // hacked together without a clue
+   II  = &Context.Idents.get( Name);
+   DN  = DeclarationName( II);
+   
+   LookupResult R( *this, DN, Loc, LookupOrdinaryName);
+   LookupParsedName( R, S, &SS, false);
+   if( ! R.empty())
+   {
+      ValueDecl *VD = dyn_cast<ValueDecl>( R.getFoundDecl());
+      if( VD)
+      {
+         E = BuildDeclRefExpr( VD, type, VK_LValue, Loc, &SS);
+         E.get()->viewAST();
+         return( E);
+      }
+   }
+   
+   // this can't really happen
+   return ExprError();
+}
+
+
+
+/* @mulle-objc@ parameters: GetMulle_paramFieldExpr create an expression to access _param->field */
 ExprResult
-Sema::GetMulle_paramFieldExpr( FieldDecl *FD, SourceLocation Loc, Scope *S, CXXScopeSpec &SS)
+Sema::GetMulle_paramFieldExpr( FieldDecl *FD, Scope *S, CXXScopeSpec &SS, SourceLocation Loc)
 {
      // this couldn't be any easier... 
      DeclarationNameInfo   memberNameInfo( FD->getDeclName(), Loc);
      DeclAccessPair        fakeFoundDecl = DeclAccessPair::make(FD, FD->getAccess());
-     ASTContext            *Ctx;
-     DeclContext           *E;
-
-     E   = S->getEntity();
-     Ctx = &E->getParentASTContext();
-     ExprResult BaseExpr = GetMulle_paramExpr( S, SS, Loc, (char *) "_param");
+     ExprResult BaseExpr = GetMulle_paramExpr( S, SS, Loc, "_param");
      ExprResult CastExpr = DefaultLvalueConversion( BaseExpr.get());
 /*     ExprResult CastExpr = ImplicitCastExpr::Create(*Ctx, BaseExpr.get()->getType(), CK_LValueToRValue, BaseExpr.get(), nullptr, VK_RValue);
 */
-     ExprResult Result   = MemberExpr::Create( *Ctx,
+     ExprResult Result   = MemberExpr::Create( Context,
                                               CastExpr.get(),
                                               true,
-                                              SS.getWithLocInContext(*Ctx),
+                                              SourceLocation(),   // (nat) blind add
+                                              SS.getWithLocInContext(Context),
                                               SourceLocation(), // invalid template location
                                               FD,
                                               fakeFoundDecl,
@@ -2448,7 +2469,7 @@ Sema::GetMulle_paramFieldExpr( FieldDecl *FD, SourceLocation Loc, Scope *S, CXXS
 ///
 /// Returns a null sentinel to indicate trivial success.
 ExprResult
-Sema::LookupInObjCMethod(LookupResult &Lookup, Scope *S,
+Sema::LookupInObjCMethod(LookupResult &Lookup, Scope *S, CXXScopeSpec &SS,
                          IdentifierInfo *II, bool AllowBuiltinCreation) {
   SourceLocation Loc = Lookup.getNameLoc();
   ObjCMethodDecl *CurMethod = getCurMethodDecl();
@@ -2487,7 +2508,7 @@ Sema::LookupInObjCMethod(LookupResult &Lookup, Scope *S,
      
      FD = CurMethod->FindParamRecordField( II);
      if( FD)
-        return( GetMulle_paramFieldExpr( FD, Loc, S, SS));
+        return( GetMulle_paramFieldExpr( FD, S, SS, Loc));
   }
   
   ObjCInterfaceDecl *IFace = nullptr;

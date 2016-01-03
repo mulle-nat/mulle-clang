@@ -5965,7 +5965,7 @@ TypedefDecl *ASTContext::getObjCIdDecl() const {
 
 TypedefDecl *ASTContext::getObjCSelDecl() const {
   if (!ObjCSelDecl) {
-    // @mulle-objc@ selector: change type to long
+    // @mulle-objc@ selector: change type to unsigned long
     QualType T = getLangOpts().ObjCRuntime.hasMulleMetaABI() ? UnsignedLongTy
                                                              : getPointerType(ObjCBuiltinSelTy);
     ObjCSelDecl = buildImplicitTypedef(T, "SEL");

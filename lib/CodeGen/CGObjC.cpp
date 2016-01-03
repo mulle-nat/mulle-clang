@@ -391,13 +391,14 @@ RValue CodeGenFunction::EmitObjCMessageExpr(const ObjCMessageExpr *E,
   QualType ResultType = method ? method->getReturnType() : E->getType();
 
   
-  // @mulle-objc@ codegen: added a patchpoint for GenerateCallArgs
+  // @mulle-objc@ call: added a patchpoint for GenerateCallArgs
   // take arguments, push it into one big struct
   // Emit this argument
   //
   CallArgList   Args;  // this contains llvm stuff
-
-  Runtime.GenerateCallArgs( Args, *this, E);
+  LValue        *alloca;
+  
+  alloca = Runtime.GenerateCallArgs( Args, *this, E);
 
   // For delegate init calls in ARC, do an unsafe store of null into
   // self.  This represents the call taking direct ownership of that
@@ -454,6 +455,19 @@ RValue CodeGenFunction::EmitObjCMessageExpr(const ObjCMessageExpr *E,
     Builder.CreateStore(newSelf, selfAddr);
   }
 
+  //
+  // @mulle-objc@ call: tell optimizer the lifetime is done for this alloca
+  // non-mulle runtimes will NULL here
+  if( alloca)
+  {
+      llvm::Type  *type  = ConvertTypeForMem( alloca->getType());
+      unsigned     size  = CGM.getDataLayout().getTypeAllocSize( type);
+      llvm::Value *SizeV = llvm::ConstantInt::get(Int64Ty, size);
+   
+      EmitLifetimeEnd( SizeV, alloca->getAddress());
+      delete alloca;  // <<<--- very unclang like, check this
+  }
+  
   return AdjustObjCObjectType(*this, E->getType(), result);
 }
 
@@ -503,39 +517,29 @@ void CodeGenFunction::StartObjCMethod(const ObjCMethodDecl *OMD,
 
   args.push_back(OMD->getSelfDecl());
   args.push_back(OMD->getCmdDecl());
-<<<<<<< HEAD
- // @mulle-objc@ Push ParmamDecl on args Decl
- // Ignore others
-  if( OMD->getParamDecl())
-     args.push_back(OMD->getParamDecl());
 
-<<<<<<< HEAD
-   //  for (const auto *PI : OMD->params())
-   // args.push_back(PI);
-=======
-  args.append(OMD->param_begin(), OMD->param_end());
->>>>>>> 7ab883b8e23498801e0038289a8ddfeb62e995c8
-=======
->>>>>>> mulle_objclang_36
-
- // @mulle-objc@ arguments: Push ParamDecl on args Decl, the _param pointer
+ // @mulle-objc@ MetaABI arguments: Push ParamDecl on args Decl, the _param pointer
  // Ignore others
  
    if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
    {
       if( OMD->getParamDecl())
          args.push_back(OMD->getParamDecl());
+      else
+         if( OMD->isOneVoidPointerParam())
+            args.push_back( OMD->parameters()[ 0]);
    }
    else
    {
-      for (const auto *PI : OMD->params())
-         args.push_back(PI);
+      args.append(OMD->param_begin(), OMD->param_end());
    }
    
   CurGD = OMD;
   CurEHLocation = OMD->getLocEnd();
 
-  StartFunction(OMD, OMD->getReturnType(), Fn, FI, args,
+ // @mulle-objc@ MetaABI arguments: Use FI.getReturnType() because it's void *
+
+  StartFunction(OMD, FI.getReturnType(), Fn, FI, args,
                 OMD->getLocation(), StartLoc);
 
   // In ARC, certain methods get an extra cleanup.
@@ -1279,7 +1283,7 @@ CodeGenFunction::generateObjCSetterBody(const ObjCImplementationDecl *classImpl,
 
   
   //
-  // @mulle-objc@ property: gotta make this access our paramDecl instead
+  // @mulle-objc@ MetaAPI property: gotta make this access our paramDecl instead
   //
   // this code really should be runtime specific
   //
@@ -1296,7 +1300,7 @@ CodeGenFunction::generateObjCSetterBody(const ObjCImplementationDecl *classImpl,
       argType = FD->getType().getNonReferenceType();
       DeclarationNameInfo   memberNameInfo( FD->getDeclName(), SourceLocation());
       
-      MemberExpr   memberExpr( &param, true, FD,
+      MemberExpr   memberExpr( &param, true, SourceLocation(), FD,
                               memberNameInfo, argType,
                               VK_LValue, OK_Ordinary);
       expr = &memberExpr;

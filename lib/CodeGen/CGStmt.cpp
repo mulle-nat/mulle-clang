@@ -1070,8 +1070,52 @@ void CodeGenFunction::EmitReturnStmt(const ReturnStmt &S) {
     RValue Result = EmitReferenceBindingToExpr(RV);
     Builder.CreateStore(Result.getScalarVal(), ReturnValue);
   } else {
+    // @mulle-objc@ return value: put rval into _param if needed
+     const ObjCMethodDecl   *MD = dyn_cast<ObjCMethodDecl>( CurFuncDecl);
+     RecordDecl             *RD = nullptr;
+     QualType     recordTy;
+     QualType     recordPtrTy;
+     llvm::Type  *llvmRecType;
+     llvm::Type  *llvmPointerType;
+     llvm::Value *param;
+     llvm::Value *paramAddr;
+     
+     if( MD)
+     {
+        RD = MD->getRvalRecord();
+        if( RD)
+        {
+           recordTy    = CGM.getContext().getTagDeclType( RD);
+           recordPtrTy = CGM.getContext().getPointerType( recordTy);
+           llvmRecType = CGM.getTypes().ConvertTypeForMem( recordTy);
+           llvmPointerType = llvmRecType->getPointerTo();
+           
+           unsigned alignment = CGM.getContext().getTypeAlignInChars( recordPtrTy).getQuantity();
+         
+         // get _param address (known to be big enough)
+            param = LocalDeclMap[MD->getParamDecl()];
+            paramAddr = Builder.CreateBitCast(Builder.CreateAlignedLoad( param, alignment, "_param.rval"), llvmPointerType);
+        }
+      }
+     
     switch (getEvaluationKind(RV->getType())) {
     case TEK_Scalar:
+      // @mulle-objc@ return value: wrap scalar in aggregate, return pointer
+      if( RD)
+      {
+         llvm::Value *exprResult = EmitScalarExpr(RV);
+
+         // store ScalarExpr in alloca
+         LValue Record = MakeNaturalAlignAddrLValue( paramAddr, recordTy);
+         LValue Field = EmitLValueForField( Record, *RD->field_begin());
+         EmitStoreOfScalar(exprResult, Field);
+
+         // store pointer in returnValue
+         // OMIT this, it's superflous
+         //llvm::Value *newParam = Builder.CreateBitCast( paramAddr, VoidPtrTy);
+         //Builder.CreateStore( newParam, ReturnValue);
+         break;
+      }
       Builder.CreateStore(EmitScalarExpr(RV), ReturnValue);
       break;
     case TEK_Complex:
@@ -1081,6 +1125,22 @@ void CodeGenFunction::EmitReturnStmt(const ReturnStmt &S) {
       break;
     case TEK_Aggregate: {
       CharUnits Alignment = getContext().getTypeAlignInChars(RV->getType());
+      // @mulle-objc@ return value: emit aggregate, return pointer to it
+      if( RD)
+      {
+         // emit aggregate expression
+         EmitAggExpr(RV, AggValueSlot::forAddr( paramAddr, Alignment,
+                                                Qualifiers(),
+                                                AggValueSlot::IsDestructed,
+                                                AggValueSlot::DoesNotNeedGCBarriers,
+                                                AggValueSlot::IsNotAliased));
+         
+         // store pointer in returnValue
+         // OMIT this, it's superflous
+         //llvm::Value *newParam = Builder.CreateBitCast( paramAddr, VoidPtrTy);
+         //Builder.CreateStore( newParam, ReturnValue);
+         break;
+      }
       EmitAggExpr(RV, AggValueSlot::forAddr(ReturnValue, Alignment,
                                             Qualifiers(),
                                             AggValueSlot::IsDestructed,

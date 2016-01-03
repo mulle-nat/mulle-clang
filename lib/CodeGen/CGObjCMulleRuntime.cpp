@@ -13,10 +13,11 @@
 //
 // This is a tweaked copy of CGObjCMac.cpp. Because those files are as private
 // as possible for some reason, inheritance would have been difficult and not
-// very future proof.
+// very future proof. Then stuff got started thrown out and tweaked to taste.
+// - OK, this is cargo cult programming :)
 //
-// Then stuff got started thrown out and tweaked to taste. OK, this is cargo
-// cult programming :)
+// Most of the code isn't really used. Whenever this reaches
+// a state of usefulness, unused stuff should get thrown out eventually.
 //
 // @mulle-objc@ Memo: code places, that I modified, should be marked with this
 //              followed by a comment, what to see there
@@ -31,8 +32,10 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
+#include "clang/AST/ParentMap.h"
 #include "clang/AST/RecordLayout.h"
 #include "clang/AST/StmtObjC.h"
+#include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/Basic/LangOptions.h"
 #include "clang/CodeGen/CGFunctionInfo.h"
 #include "clang/Frontend/CodeGenOptions.h"
@@ -51,6 +54,10 @@
 #include "llvm/Support/raw_ostream.h"
 #include <cstdio>
 
+#include "clang/AST/SelectorLocationsKind.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/Compiler.h"
+
 using namespace clang;
 using namespace CodeGen;
 
@@ -65,67 +72,81 @@ namespace {
       
    public:
       // The types of these functions don't really matter because we
-      // should always bitcast before calling them.
+      // should always bitcast before calling them. (??)
       
       /// id mulle_objc_object_inline_call (id, SEL, void *)
       ///
       /// The messenger, used for all message sends, except super calls
       /// might need another one, when params is null..
       ///
-      llvm::Constant *getMessageSendFn() const {
+      llvm::Constant *getMessageSendFn( int optLevel) const {
+         StringRef    name;
          // Add the non-lazy-bind attribute, since objc_msgSend is likely to
          // be called a lot.
-         llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy, ParamsPtrTy };
-         return
-         CGM.CreateRuntimeFunction(llvm::FunctionType::get(ObjectPtrTy,
-                                                           params, true),
-                                   "mulle_objc_object_inline_call",
-                                   llvm::AttributeSet::get(CGM.getLLVMContext(),
-                                                           llvm::AttributeSet::FunctionIndex,
-                                                           llvm::Attribute::NonLazyBind));
-      }
+         switch( optLevel)
+         {
+         default : name = "mulle_objc_object_inline_call"; break;
+         case  1 : name = "mulle_objc_object_call"; break;
+         case -1 :
+         case 0  : name = "mulle_objc_object_no_inline_call"; break;
+         }
 
+         llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy, ParamsPtrTy };
+         llvm::Constant *C;
+         
+         C  =  CGM.CreateRuntimeFunction(llvm::FunctionType::get(ObjectPtrTy,
+                                                              params, false),
+                                         name,
+                                         llvm::AttributeSet::get(CGM.getLLVMContext(),
+                                                                 llvm::AttributeSet::FunctionIndex,
+                                                                 llvm::Attribute::NonLazyBind));
+         // HACK
+         //if (auto *F = dyn_cast<llvm::Function>(C))
+         //   F->setCallingConv( llvm::CallingConv::Fast);
+           return( C);
+      }
+      
       llvm::Constant *getMessageSendAllocFn() const {
-         llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy };
-         return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidTy,
-                                                                  params, true),
-                                          "_mulle_objc_class_alloc_object");
+         llvm::Type *params[] = { ObjectPtrTy };
+         return CGM.CreateRuntimeFunction(llvm::FunctionType::get( ObjectPtrTy,
+                                                                  params, false),
+                                          "mulle_objc_class_alloc_instance");
       }
 
       llvm::Constant *getMessageSendNewFn() const {
-         llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy };
-         return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidTy,
-                                                                  params, true),
-                                          "_mulle_objc_class_new_object");
+         llvm::Type *params[] = { ObjectPtrTy };
+         return CGM.CreateRuntimeFunction(llvm::FunctionType::get( ObjectPtrTy,
+                                                                  params, false),
+                                          "mulle_objc_class_new_instance");
       }
       
       llvm::Constant *getMessageSendRetainFn() const {
-         llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy };
-         return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidTy,
-                                                                  params, true),
-                                          "_mulle_objc_object_retain");
+         llvm::Type *params[] = { ObjectPtrTy };
+         return CGM.CreateRuntimeFunction(llvm::FunctionType::get( ObjectPtrTy,
+                                                                  params, false),
+                                          "mulle_objc_object_retain");
       }
 
       llvm::Constant *getMessageSendReleaseFn() const {
-         llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy };
+         llvm::Type *params[] = { ObjectPtrTy };
          return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidTy,
-                                                                  params, true),
-                                          "_mulle_objc_object_release");
+                                                                  params, false),
+                                          "mulle_objc_object_release");
       }
       
       llvm::Constant *getMessageSendAutoreleaseFn() const {
-         llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy };
-         return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidTy,
-                                                                  params, true),
-                                          "_mulle_objc_object_autorelease");
+         llvm::Type *params[] = { ObjectPtrTy };
+         return CGM.CreateRuntimeFunction(llvm::FunctionType::get( ObjectPtrTy,
+                                                                  params, false),
+                                          "mulle_objc_object_autorelease");
       }
 
       // improve legacy code to basically a no-op
       llvm::Constant *getMessageSendZoneFn() const {
-         llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy };
-         return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidTy,
-                                                                  params, true),
-                                          "_mulle_objc_object_zone");
+         llvm::Type *params[] = { ObjectPtrTy };
+         return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidPtrTy,
+                                                                  params, false),
+                                          "mulle_objc_object_zone");
       }
       
       /// id mulle_objc_object_call_class_id (id, SEL, void *, CLASSID)
@@ -134,16 +155,16 @@ namespace {
       ///
       llvm::Constant *getMessageSendSuperFn() const {
          llvm::Type *params[] = { ObjectPtrTy, ClassIDTy, SelectorIDTy, ParamsPtrTy  };
-         return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidTy,
-                                                                  params, true),
-                                          "_mulle_objc_object_call_class_id");
+         return CGM.CreateRuntimeFunction(llvm::FunctionType::get(ObjectPtrTy,
+                                                                  params, false),
+                                          "mulle_objc_object_call_class_id");
       }
 
       llvm::Constant *getMessageSendMetaSuperFn() const {
          llvm::Type *params[] = { ObjectPtrTy, ClassIDTy, SelectorIDTy, ParamsPtrTy  };
-         return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidTy,
-                                                                  params, true),
-                                          "_mulle_objc_class_call_class_id");
+         return CGM.CreateRuntimeFunction(llvm::FunctionType::get(ObjectPtrTy,
+                                                                  params, false),
+                                          "mulle_objc_class_call_class_id");
       }
       
       
@@ -181,6 +202,8 @@ namespace {
       llvm::Type *ClassListTy;
       llvm::Type *CategoryListTy;
       llvm::Type *LoadInfoTy;
+      
+      llvm::Type *Array5ObjectPtrTy;
       
    private:
       /// ProtocolPtrTy - LLVM type for external protocol handles
@@ -220,19 +243,11 @@ namespace {
       llvm::Type *CachePtrTy;
       
       
-      llvm::Constant *getClassFn() const {
-         llvm::Type *params[] = { ObjectPtrTy };
-         return CGM.CreateRuntimeFunction(llvm::FunctionType::get(ObjectPtrTy,
-                                                                  params, true),
-                                          "_mulle_objc_object_get_class");
-      }
-      
-      // TODO: this is too slow use inlinable method
       llvm::Constant *getGetRuntimeClassFn() {
          llvm::Type *params[] = { ClassIDTy };
          
-         return CGM.CreateRuntimeFunction(llvm::FunctionType::get(ObjectPtrTy,
-                                                                  params, true),
+         return CGM.CreateRuntimeFunction(llvm::FunctionType::get( ObjectPtrTy,
+                                                                  params, false),
                                           "mulle_objc_unfailing_get_class");
       }
       
@@ -522,6 +537,9 @@ namespace {
       llvm::Type *MethodListTy;
       /// MethodListPtrTy - LLVM type for struct objc_method_list *.
       llvm::Type *MethodListPtrTy;
+      /// Array5ObjectPtrTy - LLVM type for void *array[ 5], which is used for
+      /// rounding.
+      llvm::Type *Array5ObjectPtrTy;
       
       /// ExceptionDataTy - LLVM type for struct _objc_exception_data.
       llvm::Type *ExceptionDataTy;
@@ -793,6 +811,14 @@ namespace {
       
       llvm::Function *GetMethodDefinition(const ObjCMethodDecl *MD);
       
+      // dup from COdeGenModule, but easier here
+      llvm::StructType *NSConstantStringType;
+      llvm::StringMap<llvm::GlobalVariable *> NSConstantStringMap;
+
+      llvm::StringMapEntry<llvm::GlobalVariable *> &GetNSConstantStringMapEntry( const StringLiteral *Literal, unsigned &StringLength);
+   
+      llvm::Constant *GenerateConstantString(const StringLiteral *SL) override;
+      
       /// BuildIvarLayout - Builds ivar layout bitmap for the class
       /// implementation for the __strong or __weak case.
       ///
@@ -865,8 +891,27 @@ namespace {
       llvm::Constant *GetProtocolRef(const ObjCProtocolDecl *PD);
       
       // common helper function, turning names into abbreviated MD5 hashes
-      llvm::Constant *HashConstantForString( StringRef sref);
-      
+      llvm::Constant *_HashConstantForString( StringRef sref, uint64_t first_valid);
+      llvm::Constant *HashClassConstantForString( StringRef sref)
+      {
+         return( _HashConstantForString( sref, 0x20));
+      }
+      llvm::Constant *HashProtocolConstantForString( StringRef sref)
+      {
+         return( HashClassConstantForString( sref));
+      }
+      llvm::Constant *HashCategoryConstantForString( StringRef sref)
+      {
+         return( _HashConstantForString( sref, 0x0));
+      }
+      llvm::Constant *HashSelConstantForString( StringRef sref)
+      {
+         return( _HashConstantForString( sref, 0x0));
+      }
+      llvm::Constant *HashIvarConstantForString( StringRef sref)
+      {
+         return( HashSelConstantForString( sref));
+      }
       
       /// CreateMetadataVar - Create a global variable with internal
       /// linkage for use by the Objective-C runtime.
@@ -894,15 +939,13 @@ namespace {
       CGObjCCommonMulleRuntime(CodeGen::CodeGenModule &cgm) :
       CGObjCRuntime(cgm), VMContext(cgm.getLLVMContext()) { }
       
-      llvm::Constant *GenerateConstantString(const StringLiteral *SL) override;
+      virtual llvm::ConstantStruct *CreateNSConstantStringStruct( StringRef S, unsigned StringLength) = 0;
+      llvm::StructType *GetOrCreateNSConstantStringType( void);
+      llvm::StructType *CreateNSConstantStringType( void);
       
       llvm::Function *GenerateMethod(const ObjCMethodDecl *OMD,
                                      const ObjCContainerDecl *CD=nullptr) override;
 
-      virtual void  GenerateCallArgs( CallArgList &Args,
-                                      CodeGenFunction &CGF,
-                                      const ObjCMessageExpr *Expr) override;
-      
       virtual void GenerateProtocol(const ObjCProtocolDecl *PD) override;
       
       /// GetOrEmitProtocol - Get the protocol object for the given
@@ -1043,6 +1086,30 @@ namespace {
       
       llvm::Function *ModuleInitFunction() override;
       
+
+      CodeGen::RValue CommonFunctionCall(CodeGen::CodeGenFunction &CGF,
+                                         llvm::Constant *Fn,
+                                         ReturnValueSlot Return,
+                                         QualType ResultType,
+                                         QualType FnResultType,
+                                         const CGFunctionInfo &FI,
+                                         llvm::Value *Receiver,
+                                         const CallArgList &CallArgs,
+                                         CallArgList   &ActualArgs,
+                                         llvm::Value   *Arg0,
+                                         const ObjCMethodDecl *Method);
+      
+      CodeGen::RValue CommonMessageSend(CodeGen::CodeGenFunction &CGF,
+                                        llvm::Constant *Fn,
+                                        ReturnValueSlot Return,
+                                        QualType ResultType,
+                                        llvm::Value *Receiver,
+                                        const CallArgList &CallArgs,
+                                        CallArgList &ActualArgs,
+                                        llvm::Value   *Arg0,
+                                        const ObjCMethodDecl *Method,
+                                        bool isDispatchFn);
+      
       CodeGen::RValue GenerateMessageSend(CodeGen::CodeGenFunction &CGF,
                                           ReturnValueSlot Return,
                                           QualType ResultType,
@@ -1077,6 +1144,14 @@ namespace {
       void GenerateClass(const ObjCImplementationDecl *ClassDecl) override;
       
       void RegisterAlias(const ObjCCompatibleAliasDecl *OAD) override {}
+      
+      RecordDecl  *CreateOnTheFlyRecordDecl( CodeGenFunction &CGF, const ObjCMessageExpr *Expr);
+      RecordDecl  *CreateVariadicOnTheFlyRecordDecl( CodeGenFunction &CGF, const ObjCMessageExpr *Expr, RecordDecl *RD);
+      
+      virtual LValue  *GenerateCallArgs( CallArgList &Args,
+                                        CodeGenFunction &CGF,
+                                        const ObjCMessageExpr *Expr) override;
+      
       
       llvm::Value *GenerateProtocolRef(CodeGenFunction &CGF,
                                        const ObjCProtocolDecl *PD) override;
@@ -1120,7 +1195,9 @@ namespace {
       llvm::Value *EmitIvarOffset(CodeGen::CodeGenFunction &CGF,
                                   const ObjCInterfaceDecl *Interface,
                                   const ObjCIvarDecl *Ivar) override;
+
       
+      llvm::ConstantStruct *CreateNSConstantStringStruct( StringRef S, unsigned StringLength) override;
       /// GetClassGlobal - Return the global variable for the Objective-C
       /// class of the given name.
       llvm::GlobalVariable *GetClassGlobal(const std::string &Name,
@@ -1250,16 +1327,17 @@ struct NullReturnState {
 /* *** Helper Functions *** */
 
 /// getConstantGEP() - Help routine to construct simple GEPs.
+/// TODO: (nat) why not inherit ?
 static llvm::Constant *getConstantGEP(llvm::LLVMContext &VMContext,
-                                      llvm::Constant *C,
-                                      unsigned idx0,
+                                      llvm::GlobalVariable *C, unsigned idx0,
                                       unsigned idx1) {
-   llvm::Value *Idxs[] = {
-      llvm::ConstantInt::get(llvm::Type::getInt32Ty(VMContext), idx0),
-      llvm::ConstantInt::get(llvm::Type::getInt32Ty(VMContext), idx1)
-   };
-   return llvm::ConstantExpr::getGetElementPtr(C, Idxs);
+  llvm::Value *Idxs[] = {
+    llvm::ConstantInt::get(llvm::Type::getInt32Ty(VMContext), idx0),
+    llvm::ConstantInt::get(llvm::Type::getInt32Ty(VMContext), idx1)
+  };
+  return llvm::ConstantExpr::getGetElementPtr(C->getValueType(), C, Idxs);
 }
+
 
 /* *** CGObjCMulleRuntime Public Interface *** */
 
@@ -1279,7 +1357,7 @@ llvm::Value *CGObjCMulleRuntime::GetClass(CodeGenFunction &CGF,
    llvm::Value *rval;
    llvm::Value *classPtr;
    
-   classID  = HashConstantForString( ID->getName());
+   classID  = HashClassConstantForString( ID->getName());
    classPtr = CGF.EmitNounwindRuntimeCall(ObjCTypes.getGetRuntimeClassFn(),
                                classID, "mulle_objc_unfailing_get_class"); // string what for ??
    rval     = CGF.Builder.CreateBitCast( classPtr, ObjCTypes.ObjectPtrTy);
@@ -1313,136 +1391,199 @@ llvm::Constant *CGObjCMulleRuntime::GetEHType(QualType T) {
    llvm_unreachable("asking for catch type for ObjC type in fragile runtime");
 }
 
-/// Generate a constant CFString object.
-/*
- struct __builtin_CFString {
- const int *isa; // point to __CFConstantStringClassReference
- int flags;
- const char *str;
- long length;
- };
- */
-
-/// or Generate a constant NSString object.
-/*
- struct __builtin_NSString {
- const int *isa; // point to __NSConstantStringClassReference
- const char *str;
- unsigned int length;
- };
- */
-
+///  Generate a constant NSString object.
 //
-// { LONG_MAX, MULLE_OBJC_METHOD_ID( 0x423aeba60e4eb3be), "VfL Bochum 1848" };
-// 0x423aeba60e4eb3be == NXConstantString
-//
-
-llvm::Constant *CGObjCCommonMulleRuntime::GenerateConstantString(
-                                                        const StringLiteral *SL) {
-   return (CGM.getLangOpts().NoConstantCFStrings == 0 ?
-           CGM.GetAddrOfConstantCFString(SL) :
-           CGM.GetAddrOfConstantString(SL));
+// { LONG_MAX, <isa>, "VfL Bochum 1848", 15 };
+//               ^--magic needed
+llvm::StructType *CGObjCCommonMulleRuntime::CreateNSConstantStringType( void)
+{
+   ASTContext   &Context = CGM.getContext();
+   
+   // Construct the type for a constant NSString.
+   RecordDecl *D = Context.buildImplicitRecord("__builtin_NSString");
+   D->startDefinition();
+   
+   QualType FieldTypes[4];
+   
+   // const unsigned long  retainCount;
+   FieldTypes[0] = Context.UnsignedLongTy;
+   // const void *isa;
+   FieldTypes[1] = Context.VoidPtrTy;
+   
+   // unsigned char *str;
+   FieldTypes[2] = Context.getPointerType(Context.CharTy.withConst());
+   // unsigned int length;
+   FieldTypes[3] = Context.UnsignedIntTy;
+   
+   // Create fields
+   for (unsigned i = 0; i < 4; ++i) {
+      FieldDecl *Field = FieldDecl::Create(Context, D,
+                                           SourceLocation(),
+                                           SourceLocation(), nullptr,
+                                           FieldTypes[i], /*TInfo=*/nullptr,
+                                           /*BitWidth=*/nullptr,
+                                           /*Mutable=*/false,
+                                           ICIS_NoInit);
+      Field->setAccess(AS_public);
+      D->addDecl(Field);
+   }
+   
+   D->completeDefinition();
+   
+   QualType NSTy = Context.getTagDeclType(D);
+   return( cast<llvm::StructType>( CGM.getTypes().ConvertType(NSTy)));
 }
 
-enum {
-   kCFTaggedObjectID_Integer = (1 << 1) + 1
-};
+
+/// \brief The LLVM type corresponding to NSConstantString.
+llvm::StructType *CGObjCCommonMulleRuntime::GetOrCreateNSConstantStringType( void)
+{
+   if( ! NSConstantStringType)
+      NSConstantStringType = CreateNSConstantStringType();
+   return( NSConstantStringType);
+}
+
+
+//
+// this is basically CodeGenModule::GetAddrOfConstantString copy/pasted
+// and slighlty tweaked. Why this code is in CodeGenModule beats me..
+//
+
+llvm::ConstantStruct *CGObjCMulleRuntime::CreateNSConstantStringStruct( StringRef S, unsigned StringLength)
+{
+   llvm::Constant *Fields[4];
+   ASTContext   *Context;
+   
+   Context = &CGM.getContext();
+   
+   // drop LONG_MAX
+   llvm::Type *Ty = CGM.getTypes().ConvertType(CGM.getContext().LongTy);
+   Fields[0] = llvm::ConstantInt::get(Ty, LONG_MAX);
+   
+   std::string SymbolName = "NSConstantString";
+   llvm::GlobalVariable *Symbol = CGM.getModule().getGlobalVariable(SymbolName);
+   
+   //
+   // this is a pointer to a struct _mulle_objc_class, but we don't have this
+   // struct here, so we fake it with a "load" class type, and noone would
+   // notice, except because I am writing it here and because someone probably
+   // implements typesafe linking in the future, just to be a pain in the ass
+   //
+   if (! Symbol)
+      Symbol = new llvm::GlobalVariable( CGM.getModule(), ObjCTypes.ClassTy, false,
+                                        llvm::GlobalValue::ExternalLinkage,
+                                        nullptr, SymbolName);
+   Fields[1] = llvm::ConstantExpr::getBitCast( Symbol,
+                                               CGM.VoidPtrTy);
+   //MakeAddrLValue( Symbol, CGM.VoidPtrTy);
+   // String pointer.
+   llvm::Constant *C =
+   llvm::ConstantDataArray::getString(VMContext, S);
+   
+   llvm::GlobalValue::LinkageTypes Linkage;
+   bool isConstant;
+   Linkage = llvm::GlobalValue::PrivateLinkage;
+   isConstant = ! CGM.getLangOpts().WritableStrings;
+   
+   auto *GV = new llvm::GlobalVariable( CGM.getModule(), C->getType(), isConstant,
+                                       Linkage, C, ".str");
+   GV->setUnnamedAddr(true);
+   
+   // Don't enforce the target's minimum global alignment, since the only use
+   // of the string is via this class initializer.
+   CharUnits Align = CGM.getContext().getTypeAlignInChars(CGM.getContext().CharTy);
+   GV->setAlignment(Align.getQuantity());
+   Fields[2] = getConstantGEP( VMContext, GV, 0, 0);
+   
+   // String length.
+   Ty = CGM.getTypes().ConvertType(CGM.getContext().UnsignedIntTy);
+   Fields[3] = llvm::ConstantInt::get(Ty, StringLength);
+   
+   llvm::StructType *StructType;
+   
+   StructType = GetOrCreateNSConstantStringType();
+   // The struct.
+   
+   return( (llvm::ConstantStruct *) llvm::ConstantStruct::get( StructType, Fields));
+}
+
+
+static llvm::StringMapEntry<llvm::GlobalVariable *> &
+GetConstantStringEntry(llvm::StringMap<llvm::GlobalVariable *> &Map,
+                       const StringLiteral *Literal, unsigned &StringLength)
+{
+  StringRef String = Literal->getString();
+  StringLength = String.size();
+  return *Map.insert(std::make_pair(String, nullptr)).first;
+}
+
+
+llvm::StringMapEntry<llvm::GlobalVariable *> &
+CGObjCCommonMulleRuntime::GetNSConstantStringMapEntry( const StringLiteral *Literal, unsigned &StringLength) {
+   return( GetConstantStringEntry( NSConstantStringMap, Literal, StringLength));
+}
+
+
+llvm::Constant *CGObjCCommonMulleRuntime::GenerateConstantString( const StringLiteral *SL)
+{
+   unsigned StringLength = 0;
+   llvm::StringMapEntry<llvm::GlobalVariable *> &Entry =
+   GetNSConstantStringMapEntry( SL, StringLength);
+   
+   if (auto *C = Entry.second)
+      return C;
+   
+   llvm::GlobalVariable   *GV;
+   llvm::ConstantStruct   *NSStringHeader = CreateNSConstantStringStruct( Entry.first(), StringLength);
+   
+   GV = new llvm::GlobalVariable(CGM.getModule(), NSStringHeader->getType(), true,
+                                 llvm::GlobalVariable::PrivateLinkage, NSStringHeader,
+                                 "_unnamed_nsstring_header");
+   // FIXME. Fix section.
+   GV->setSection( "__DATA,__objc_stringobj,regular,no_dead_strip");
+   Entry.second = GV;
+   
+   // skip header, index "object"
+   //   C = NSStringHeader->getAggregateElement(2);
+
+   llvm::Constant *C;
+   
+   // The vtable address point is 2.
+   //   C = NSStringHeader->getAggregateElement( 1);
+   C = getConstantGEP( VMContext, GV, 0, 2);
+   C = llvm::ConstantExpr::getBitCast( C, CGM.VoidPtrTy);
+   
+   llvm::GlobalAlias  *GA;
+   GA = llvm::GlobalAlias::create( CGM.VoidPtrTy,
+                                  llvm::GlobalVariable::WeakAnyLinkage,
+                                  Twine( "_unnamed_nsstring_"),
+                                  C,
+                                  &CGM.getModule());
+   // FIXME. Fix section.
+   return( GA);
+}
 
 
 #pragma mark -
 #pragma mark message sending
-
-/// Generate code for a message send expression.
-CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction &CGF,
-                                               ReturnValueSlot Return,
-                                               QualType ResultType,
-                                               Selector Sel,
-                                               llvm::Value *Receiver,
-                                               const CallArgList &CallArgs,
-                                               const ObjCInterfaceDecl *Class,
-                                               const ObjCMethodDecl *Method)
+// @mulle-objc@: CommonFunctionCall, send message to self and super
+CodeGen::RValue   CGObjCMulleRuntime::CommonFunctionCall(CodeGen::CodeGenFunction &CGF,
+                                                         llvm::Constant *Fn,
+                                                         ReturnValueSlot Return,
+                                                         QualType ResultType,
+                                                         QualType FnResultType,
+                                                         const CGFunctionInfo &FI,
+                                                         llvm::Value *Receiver,
+                                                         const CallArgList &CallArgs,
+                                                         CallArgList   &ActualArgs,
+                                                         llvm::Value   *Arg0,
+                                                         const ObjCMethodDecl *Method)
 {
-   llvm::Value   *Arg0;
-   QualType      Arg0Ty;
-   CallArgList   ActualArgs;
-   llvm::Value   *selID;
-   llvm::Constant *Fn;
-   std::string  selName;
-
-   selName = Sel.getAsString();
-   Fn      = nullptr;
-   
-   // figure out where to send the message
-   // layme.. should probably use a map for this
-   switch( CallArgs.size())
-   {
-   case 0 :  //
-      if( selName == "alloc")
-      {
-         Fn = ObjCTypes.getMessageSendAllocFn();
-         if( ! Method)
-            ResultType = CGF.getContext().getObjCInstanceType();
-         break;
-      }
-      if( selName == "new")
-      {
-         Fn = ObjCTypes.getMessageSendNewFn();
-         if( ! Method)
-            ResultType = CGF.getContext().getObjCInstanceType();
-         break;
-      }
-      if( selName == "autorelease")
-      {
-         Fn = ObjCTypes.getMessageSendAutoreleaseFn();
-         if( ! Method)
-            ResultType = CGF.getContext().getObjCInstanceType();
-         break;
-      }
-      if( selName == "release")
-      {
-         Fn = ObjCTypes.getMessageSendReleaseFn();
-         if( ! Method)
-            ResultType = CGF.getContext().VoidTy;
-         break;
-      }
-      if( selName == "retain")
-      {
-         Fn = ObjCTypes.getMessageSendRetainFn();
-         if( ! Method)
-            ResultType = CGF.getContext().getObjCInstanceType();
-         break;
-      }
-      if( selName == "zone")
-      {
-         Fn = ObjCTypes.getMessageSendZoneFn();
-         if( ! Method)
-            ResultType = CGF.getContext().VoidPtrTy;
-         break;
-      }
-   }
-   
-   Arg0 = CGF.Builder.CreateBitCast(Receiver, ObjCTypes.ObjectPtrTy);
-   ActualArgs.add(RValue::get(Arg0), CGF.getContext().getObjCInstanceType());
-   if( Fn == nullptr)  // regular method send call
-   {
-      selID = EmitSelector(CGF, Sel);
-      ActualArgs.add(RValue::get( selID), CGF.getContext().getObjCSelType());
-      ActualArgs.addFrom( CallArgs);
-   }
-   
-   
-   if (Method)
-      assert(CGM.getContext().getCanonicalType(Method->getReturnType()) ==
-             CGM.getContext().getCanonicalType(ResultType) &&
-             "Result type mismatch!");
-   
-   // it's always the same, so actually this could be cached somewhere
-   MessageSendInfo MSI = getMessageSendInfo( nullptr, ResultType, ActualArgs);
    NullReturnState nullReturn;
    
-   if (CGM.ReturnSlotInterferesWithArgs(MSI.CallInfo))
+   if (CGM.ReturnSlotInterferesWithArgs( FI))
       nullReturn.init(CGF, Arg0);
-
+   
    bool requiresnullCheck = false;
    
    if (CGM.getLangOpts().ObjCAutoRefCount && Method)
@@ -1457,13 +1598,217 @@ CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction
          }
       }
    
-   if( ! Fn)
-      Fn = ObjCTypes.getMessageSendFn();
-   Fn = llvm::ConstantExpr::getBitCast( Fn, MSI.MessengerType);
-   RValue rvalue = CGF.EmitCall(MSI.CallInfo, Fn, Return, ActualArgs);
+   const CGFunctionInfo &argsInfo =
+   CGM.getTypes().arrangeFreeFunctionCall( FnResultType,
+                                           ActualArgs,
+                                           FunctionType::ExtInfo(),
+                                           RequiredArgs::All);
+   RValue rvalue = CGF.EmitCall( argsInfo, Fn, Return, ActualArgs);
+   llvm::Value *V;
+   
+   // now cast this to actual return value
+   // figure out, what we get back
+   RecordDecl  *RV = Method->getRvalRecord();
+
+   // if method returns a pointer to result alloca, than there is a RV
+   if( RV)
+   {
+      llvm::Value *Dst;
+      
+      // create a alloca and memcpy stuff in there
+      CharUnits Alignment = CGM.getContext().getTypeAlignInChars( ResultType);
+      Dst = CGF.Builder.CreateAlloca( CGF.getTypes().ConvertTypeForMem( ResultType));
+      
+      //
+      // ignore the return value, and "know" that we are using arg[2] as return
+      // storage. This should have the advantage, that the alloca up there can
+      // be optimized away by the compiler.
+      //
+      RValue  param = ActualArgs[ 2].RV;
+      
+      V = param.getAggregateAddr();
+      CGF.EmitAggregateCopy( Dst, V,  ResultType, param.isVolatileQualified(), Alignment);
+
+      rvalue = RValue::get( Dst); // I hope this works fine...
+   }
+   else
+   {
+      V = rvalue.getScalarVal();
+      if( V && V->getType() != CGF.getTypes().ConvertTypeForMem( ResultType))
+      {
+         V = CGF.Builder.CreateBitOrPointerCast(V, CGF.getTypes().ConvertTypeForMem( ResultType));
+         rvalue = RValue::get(V);
+      }
+   }
+   
+   // it would be a good time to end the lifetime of the arg[2] alloca now
+   // but this is done elsewhere, as not to disturb the method signatures
+   // too much
+   
    return nullReturn.complete(CGF, rvalue, ResultType, CallArgs,
                               requiresnullCheck ? Method : nullptr);
 }
+
+
+
+CodeGen::RValue CGObjCMulleRuntime::CommonMessageSend(CodeGen::CodeGenFunction &CGF,
+                                                      llvm::Constant *Fn,
+                                                      ReturnValueSlot Return,
+                                                      QualType ResultType,
+                                                      llvm::Value *Receiver,
+                                                      const CallArgList &CallArgs,
+                                                      CallArgList   &ActualArgs,
+                                                      llvm::Value   *Arg0,
+                                                      const ObjCMethodDecl *Method,
+                                                      bool isDispatchFn)
+{
+   /* now common code with super follows */
+   
+   if (Method)
+      assert(CGM.getContext().getCanonicalType(Method->getReturnType()) ==
+             CGM.getContext().getCanonicalType(ResultType) &&
+             "Result type mismatch!");
+   
+   
+   //
+   // this runs through patched code, to produce what we need
+   //
+   if( ! Fn)
+   {
+      int optLevel = CGM.getLangOpts().OptimizeSize ? -1 : CGM.getCodeGenOpts().OptimizationLevel;
+      Fn = ObjCTypes.getMessageSendFn( optLevel); // : ObjCTypes.getMessageSendFn0();
+      isDispatchFn = true;
+   }
+   
+   if( isDispatchFn && ! CallArgs.size())
+   {
+      llvm::Value   *Arg2;
+      // pushing a bogus Arg0 again is probably cheaper than nulling
+      // but then maybe not
+      // we need this for _params
+      Arg2 = CGF.Builder.CreateBitCast( Receiver, ObjCTypes.ParamsPtrTy);
+      ActualArgs.add( RValue::get( Arg2), CGF.getContext().VoidPtrTy);
+   }
+
+   MessageSendInfo MSI = getMessageSendInfo( Method, ResultType, ActualArgs);
+   
+   return( CommonFunctionCall( CGF,
+                              Fn,
+                              Return,
+                              ResultType,
+                              CGF.getContext().VoidPtrTy,
+                              MSI.CallInfo,
+                              Receiver,
+                              CallArgs,
+                              ActualArgs,
+                              Arg0,
+                              Method));
+}
+
+
+
+/// Generate code for a message send expression.
+CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction &CGF,
+                                               ReturnValueSlot Return,
+                                               QualType ResultType,
+                                               Selector Sel,
+                                               llvm::Value *Receiver,
+                                               const CallArgList &CallArgs,
+                                               const ObjCInterfaceDecl *Class,
+                                               const ObjCMethodDecl *Method)
+{
+   llvm::Value   *Arg0;
+   CallArgList   ActualArgs;
+   llvm::Value   *selID;
+   llvm::Constant *Fn;
+   std::string  selName;
+   int          nArgs;
+   QualType     TmpResultType;
+   
+   selName = Sel.getAsString();
+   Fn      = nullptr;
+   
+   // figure out where to send the message
+   // layme.. should probably use a map for this
+   nArgs = CallArgs.size();
+   switch( nArgs)
+   {
+   case 0 :  //
+      if( selName == "alloc")
+      {
+         Fn         = ObjCTypes.getMessageSendAllocFn();
+         ResultType = CGF.getContext().getObjCInstanceType();
+         break;
+      }
+      if( selName == "new")
+      {
+         Fn         = ObjCTypes.getMessageSendNewFn();
+         ResultType = CGF.getContext().getObjCInstanceType();
+         break;
+      }
+      if( selName == "autorelease")
+      {
+         Fn         = ObjCTypes.getMessageSendAutoreleaseFn();
+         ResultType = CGF.getContext().getObjCInstanceType();
+         break;
+      }
+      if( selName == "release")
+      {
+         Fn         = ObjCTypes.getMessageSendReleaseFn();
+         ResultType = CGF.getContext().VoidTy;
+         break;
+      }
+      if( selName == "retain")
+      {
+         Fn         = ObjCTypes.getMessageSendRetainFn();
+         ResultType = CGF.getContext().getObjCInstanceType();
+         break;
+      }
+         
+      /* could just make this a nullptr */
+      if( selName == "zone")
+      {
+         Fn = ObjCTypes.getMessageSendZoneFn();
+         ResultType = CGF.getContext().VoidPtrTy;
+         break;
+      }
+   }
+   
+   Arg0 = CGF.Builder.CreateBitCast(Receiver, ObjCTypes.ObjectPtrTy);
+   ActualArgs.add(RValue::get(Arg0), CGF.getContext().getObjCInstanceType());
+   if( Fn == nullptr)  // regular method send call
+   {
+      selID = EmitSelector(CGF, Sel);
+      ActualArgs.add(RValue::get( selID), CGF.getContext().getObjCSelType());
+      ActualArgs.addFrom( CallArgs);
+      return( CommonMessageSend( CGF, Fn, Return, ResultType, Receiver, CallArgs, ActualArgs, Arg0, Method, Fn == nullptr));
+   }
+   
+   const CGFunctionInfo &argsInfo =
+   CGM.getTypes().arrangeFreeFunctionCall( ResultType,
+                                           ActualArgs,
+                                           FunctionType::ExtInfo(),
+                                           RequiredArgs::All);
+   unsigned int   a_size;
+   unsigned int   c_size;
+   
+   a_size = ActualArgs.size();
+   c_size = CallArgs.size();
+   
+   return( CommonFunctionCall( CGF,
+                               Fn,
+                               Return,
+                               ResultType,
+                               ResultType,
+                               argsInfo,
+                               Receiver,
+                               CallArgs,
+                               ActualArgs,
+                               Arg0,
+                               Method));
+}
+
+
 
 /// Generates a message send where the super is the receiver.  This is
 /// a message send to self with special delivery semantics indicating
@@ -1481,108 +1826,748 @@ CGObjCMulleRuntime::GenerateMessageSendSuper(CodeGen::CodeGenFunction &CGF,
                                     const ObjCMethodDecl *Method)
 {
    llvm::Value   *Arg0;
-   QualType      Arg0Ty;
    CallArgList   ActualArgs;
    llvm::Value   *selID;
    llvm::Value   *classID;
-   
-   selID   = EmitSelector(CGF, Sel);
-   classID = EmitClassID( CGF, Class->getSuperClass());
-   
+
+
    Arg0 = CGF.Builder.CreateBitCast(Receiver, ObjCTypes.ObjectPtrTy);
-   ActualArgs.add(RValue::get(Arg0), CGF.getContext().getObjCInstanceType());
-   ActualArgs.add(RValue::get( classID), CGF.getContext().getObjCSelType());
+   ActualArgs.add(RValue::get( Arg0), CGF.getContext().getObjCInstanceType());
+
+   classID = EmitClassID( CGF, Class->getSuperClass());
+   ActualArgs.add(RValue::get( classID), CGF.getContext().LongTy);
+
+   selID   = EmitSelector(CGF, Sel);
    ActualArgs.add(RValue::get( selID), CGF.getContext().getObjCSelType());
+
    ActualArgs.addFrom( CallArgs);
    
    // add classID
    // a class is not really an ObjCSelType but soo similiar, good enough
    
    // TODO add parameter for Class to call
-//   ActualArgs.add(RValue::get(  selID), CGF.getContext().getObjCSelType());
-   
-   if (Method)
-      assert(CGM.getContext().getCanonicalType(Method->getReturnType()) ==
-             CGM.getContext().getCanonicalType(ResultType) &&
-             "Result type mismatch!");
-   
-   // it's always the same, so actually this could be cached somewhere
-   MessageSendInfo MSI = getMessageSendInfo( nullptr, ResultType, ActualArgs);
-   NullReturnState nullReturn;
-   
-   if (CGM.ReturnSlotInterferesWithArgs(MSI.CallInfo))
-      nullReturn.init(CGF, Arg0);
-
-   bool requiresnullCheck = false;
-   
-   if (CGM.getLangOpts().ObjCAutoRefCount && Method)
-      for (const auto *ParamDecl : Method->params())
-      {
-         if (ParamDecl->hasAttr<NSConsumedAttr>())
-         {
-            if (!nullReturn.NullBB)
-               nullReturn.init(CGF, Arg0);
-            requiresnullCheck = true;
-            break;
-         }
-      }
+   //   ActualArgs.add(RValue::get(  selID), CGF.getContext().getObjCSelType());
    
    llvm::Constant *Fn;
    
-   if( IsClassMessage)
-      Fn = llvm::ConstantExpr::getBitCast( ObjCTypes.getMessageSendMetaSuperFn(), MSI.MessengerType);
-   else
-      Fn = llvm::ConstantExpr::getBitCast( ObjCTypes.getMessageSendSuperFn(), MSI.MessengerType);
-   RValue rvalue = CGF.EmitCall(MSI.CallInfo, Fn, Return, ActualArgs);
-   return nullReturn.complete(CGF, rvalue, ResultType, CallArgs,
-                              requiresnullCheck ? Method : nullptr);
+   Fn = IsClassMessage ? ObjCTypes.getMessageSendMetaSuperFn() : ObjCTypes.getMessageSendSuperFn();
+   return( CommonMessageSend( CGF, Fn, Return, ResultType, Receiver, CallArgs, ActualArgs, Arg0, Method, true));
+}
+
+/* 
+ * Analyze AST for parameter usage. 
+ */
+
+static   Expr  *unparenthesizedAndUncastedExpr( Expr *expr)
+{
+   CastExpr  *cast;
+   ParenExpr  *parenExpr;
+   
+   for(;;)
+   {
+      if( (parenExpr = dyn_cast< ParenExpr>( expr)))
+      {
+         expr = parenExpr->getSubExpr();
+         continue;
+      }
+      
+      if( (cast = dyn_cast< CastExpr>( expr)))
+      {
+         expr = cast->getSubExpr();
+         continue;
+      }
+      return( expr);
+   }
 }
 
 
+struct find_info
+{
+   Stmt   *next;
+   bool   insideLoop;
+};
+
+
+struct find_info   findNextStatementInBody( Stmt *s, Stmt *body)
+{
+   Stmt        *parent;
+   bool        found;
+   ParentMap   ParentMap( body);
+   struct find_info  info;
+   
+   info.insideLoop = false;
+   info.next       = nullptr;
+   
+   assert( ParentMap.getParent( s));
+   
+   for(;;)
+   {
+      parent = ParentMap.getParent( s);
+      if( ! parent)
+         break;
+      
+      if( dyn_cast< DoStmt>( parent) ||
+          dyn_cast< WhileStmt>( parent) ||
+          dyn_cast< ForStmt>( parent))
+      {
+         info.insideLoop = true;
+      }
+      
+      if( ! info.next)
+         for (Stmt::child_iterator
+              I = parent->child_begin(), E = parent->child_end(); I != E; ++I)
+         {
+            Stmt *child = *I;
+            
+            if( found)
+            {
+               info.next = child;
+               break;
+            }
+            
+            if( child == s)
+               found = true;
+         }
+      
+      s = parent;
+   }
+   
+   return( info);
+}
+
+
+
+class MulleStatementVisitor : public RecursiveASTVisitor<MulleStatementVisitor>
+{
+  std::set<Decl *>   taintedLoves;
+
+  ObjCMethodDecl     *Method;
+  ObjCMessageExpr    *Call;
+  Stmt               *NextStatement;
+  bool               returnFalseIfTainted;
+  bool               stopCollectingTaints;
+  
+public:
+  MulleStatementVisitor( ObjCMethodDecl *M, ObjCMessageExpr *C)
+  {
+     Method = M;
+     Call   = C;
+     taintedLoves.insert( Method->getParamDecl());
+  }
+
+  void   getTaintedLoves( std::set<Decl *> *result)
+  {
+     result->insert( taintedLoves.begin(), taintedLoves.end());
+  }
+  
+protected:
+  MulleStatementVisitor( ObjCMethodDecl *M, std::set<Decl *> *taints)
+  {
+     Method       = M;
+     taintedLoves.insert( taints->begin(), taints->end());
+     returnFalseIfTainted = true;
+  }
+
+public:
+   bool VisitStmt(Stmt *s)
+   {
+      if( NextStatement == s)
+      {
+         returnFalseIfTainted = true;
+         stopCollectingTaints = true;
+      }
+      return( true);
+   }
+
+  bool VisitLabelStmt( LabelStmt *s)
+  {
+     //
+     // we bail if we find a label before before the [call]
+     // we could collect labels before the call and check
+     // that the goto doesn't hit any known label
+     //
+     if( ! NextStatement)
+     {
+        taintedLoves.clear();
+        return( false);
+     }
+     return( true);
+  }
+
+   //
+   // check if left side is a pointer, check if right side
+   // contains a taint, if yes, assume left side is tainted
+   // downside:
+   //   s = &tmp[ _param->width]
+   // gets tainted, but its fairly complicated to parse this
+   // correctly
+   //
+   bool VisitBinaryOperator( BinaryOperator *op)
+   {
+      Expr         *lhs;
+      Expr         *rhs;
+      DeclRefExpr  *ref;
+      
+      if( stopCollectingTaints)
+         return( true);
+      
+      switch( op->getOpcode())
+      {
+      case BO_Assign    :
+      case BO_MulAssign :
+      case BO_DivAssign :
+      case BO_RemAssign :
+      case BO_AddAssign :
+      case BO_SubAssign :
+      case BO_ShlAssign :
+      case BO_ShrAssign :
+      case BO_AndAssign :
+      case BO_XorAssign :
+      case BO_OrAssign  :
+         break;
+      default           :
+         return( true);
+      }
+      
+      // ok check if leftside is a pointer
+      lhs = op->getLHS();
+      lhs = unparenthesizedAndUncastedExpr( lhs);
+      if( (ref = dyn_cast< DeclRefExpr>( lhs)))
+      {
+         ValueDecl   *value;
+      
+         value = ref->getDecl();
+         if( value->getType()->isPointerType())
+         {
+            // check if rhs is tainted, we don't check deeply, if any
+            // taint is mentioned, we assume this pointer is also now tainted
+            // its not too bad though, taints don't necessarily mean, that
+            // the optimization can't happen
+            
+            rhs = op->getRHS();
+            if( isStatementTainted( rhs))
+               taintedLoves.insert( value);
+         }
+      }
+      return( true);
+   }
+
+   bool  isStatementTainted( Stmt *s)
+   {
+      MulleStatementVisitor   SubVisitor( Method, &taintedLoves);
+
+      return( ! SubVisitor.TraverseStmt( s));
+   }
+
+   bool VisitObjCMessageExpr(ObjCMessageExpr *d)
+   {
+      if( d == Call)
+      {
+         struct find_info  info;
+         
+         info = findNextStatementInBody( d, Method->getBody());
+         if( info.insideLoop)
+            return( false);
+         NextStatement = info.next;
+      }
+      return( true);
+   }
+   
+   bool VisitDeclRefExpr(DeclRefExpr *d)
+   {
+      ValueDecl   *value;
+      
+      value = d->getDecl();
+      // lol @ c++ sets
+      if( taintedLoves.find( value) != taintedLoves.end())
+      {
+         if( returnFalseIfTainted)
+            return( false);
+      }
+      return( true);
+   }
+};
+
+
+
+/* 
+ * Analyze AST for parameter usage. 
+ */
+// some general thoughts:
+// 1. we know that the contents of _param reside on the stack and are created
+//    by the compiler
+// 2. we can therefore rule out that anything in _param intentionally points
+//    into param
+// 3. Run through the whole function until we encounter the MesssageExpr,
+//    collect  variables that may alias our _param in the meantime. If we hit a
+//    label we return false (currently)
+// 4. Find the next statement after MesssageExpr
+// 5. Continue with the regular callbacks until this statement hits
+// 6. Now continue the flow of the statements including this one.
+//    If we hit a loop statement going up the parents
+//    we return false. If we find a DeclVarExpr hitting the taints we return false.
+// 6. We reach the end, we return true
+//
+
+static bool  param_unused_after_expr( ObjCMethodDecl *Method, ObjCMessageExpr *Expr)
+{
+   // cache this later
+   ASTContext             *Context;
+   MulleStatementVisitor   Visitor( Method, Expr);
+   
+   Context    = &Method->getASTContext();
+   Stmt *Body = Method->getBody();
+   return( Visitor.TraverseStmt( Body));
+}
+
+
+/*
+ * Argument construction
+ */
+static size_t  rounded_type_length( ASTContext *context, QualType type1, QualType type2)
+{
+   struct TypeInfo Type1Info = context->getTypeInfo( type1);
+   struct TypeInfo Type2Info = context->getTypeInfo( type2);
+   size_t   size;
+   size_t   unit;
+   size_t   length;
+   
+   unit   = (Type2Info.Width + 7) / 8;
+   size   = (Type1Info.Width + 7) / 8;
+   
+   length = (size + (unit - 1)) / unit;
+   return( length);
+}
+
+
+
+// doppeltgemoppelt vermutlich
+
+struct struct_info
+{
+   QualType    recTy;
+   QualType    ptrTy;
+   llvm::Type  *llvmType;
+   size_t      size;
+};
+
+
+static void  fill_struct_info_from_recTy( struct struct_info *info, CodeGenModule *CGM)
+{
+   info->ptrTy    = CGM->getContext().getPointerType( info->recTy);
+   info->llvmType = CGM->getTypes().ConvertTypeForMem( info->recTy);
+   info->size     = CGM->getDataLayout().getTypeAllocSize( info->llvmType);
+}
+
+
+static void  fill_struct_info( struct struct_info *info, CodeGenModule *CGM, TagDecl *Decl)
+{
+   info->recTy    = CGM->getContext().getTagDeclType( Decl);
+   fill_struct_info_from_recTy( info, CGM);
+}
+
+
+static RecordDecl   *create_union_type( ASTContext *context, QualType paramType, QualType spaceType, QualType rvalType, bool hasRvalType)
+{
+   QualType       FieldTypes[3];
+   const char     *FieldNames[3];
+   unsigned int   i, n;
+   
+   RecordDecl  *UD = context->buildImplicitRecord( "_u_args");
+   
+   UD->setTagKind( TTK_Union);
+   UD->startDefinition();
+
+   FieldTypes[0] = paramType;
+   FieldNames[0] = "v";
+
+   FieldTypes[1] = spaceType;
+   FieldNames[1] = "space";
+
+   n = 2;
+   if( hasRvalType)
+   {
+      FieldTypes[2] = rvalType;
+      FieldNames[2] = "rval";
+      ++n;
+   }
+   for( i = 0; i < n; i++)
+   {
+      FieldDecl *Field = FieldDecl::Create( *context,
+                                            UD,
+                                            SourceLocation(),
+                                            SourceLocation(),
+                                            &context->Idents.get( FieldNames[i]),
+                                            FieldTypes[i], /*TInfo=*/nullptr,
+                                            /*BitWidth=*/nullptr,
+                                            /*Mutable=*/false,
+                                            ICIS_NoInit);
+      Field->setAccess( AS_public);
+      UD->addDecl( Field);
+   }
+   
+   UD->completeDefinition();
+
+   return( UD);
+}
+
+
+
+RecordDecl  *CGObjCMulleRuntime::CreateOnTheFlyRecordDecl( CodeGenFunction &CGF, const ObjCMessageExpr *Expr)
+{
+   ASTContext   *Context;
+   StringRef    FieldName;
+   StringRef    RecordName;
+   char         buf[ 32];
+   
+   Context = &CGM.getContext();
+   sprintf( buf, "generic.args_%d", Expr->getNumArgs());
+   RecordName = buf;
+   
+   IdentifierInfo  *RecordID = &Context->Idents.get( RecordName);
+   
+   ObjCMethodDecl *OnTheFlyDeclContext;
+   
+   TypeSourceInfo *ReturnTInfo = nullptr;
+   OnTheFlyDeclContext =
+      ObjCMethodDecl::Create( *Context,
+                              SourceLocation(), SourceLocation(),
+                              Expr->getSelector(),
+                              QualType(),
+                              ReturnTInfo,
+                              Context->getTranslationUnitDecl(),
+                          /*isInstance=*/false, /*isVariadic=*/false,
+                          /*isPropertyAccessor=*/false,
+                          /*isImplicitlyDeclared=*/true,
+                          /*isDefined=*/false, ObjCMethodDecl::Required,
+                          /*HasRelatedResultType=*/false);
+   
+   // (DeclContext *) CGF.CurFuncDecl is a hack
+   RecordDecl  *RD = RecordDecl::Create( *Context, TTK_Struct, OnTheFlyDeclContext, SourceLocation(), SourceLocation(), RecordID);
+
+   for (unsigned i = 0, e = Expr->getNumArgs(); i != e; ++i)
+   {
+      FieldDecl   *FD;
+   
+      sprintf( buf, "param_%d", i);
+      FieldName = buf;
+
+      IdentifierInfo  *FieldID = &Context->Idents.get( FieldName);
+      FD = FieldDecl::Create(  *Context, RD,
+                               SourceLocation(), SourceLocation(),
+                               FieldID,
+                               Context->ObjCBuiltinIdTy,
+                               Context->CreateTypeSourceInfo( Context->ObjCBuiltinIdTy, 0),
+                               NULL,
+                               false,  // Mutable... only for C++
+                               ICIS_NoInit);
+      RD->addDecl( FD);
+   }
+   RD->completeDefinition();
+   
+   return( RD);
+}
+
+
+RecordDecl  *CGObjCMulleRuntime::CreateVariadicOnTheFlyRecordDecl( CodeGenFunction &CGF,
+                                                                   const ObjCMessageExpr *Expr,
+                                                                   RecordDecl *RD)
+{
+   ASTContext   *Context;
+   StringRef    FieldName;
+   StringRef    RecordName;
+   char         buf[ 32];
+   
+   Context = &CGM.getContext();
+
+   // try to reuse identifier for all, as we are in codegen I don't think
+   // it matters
+   
+   IdentifierInfo  *RecordID = &Context->Idents.get( "variadic_expr");
+   
+   ObjCMethodDecl *OnTheFlyDeclContext;
+   
+   TypeSourceInfo *ReturnTInfo = nullptr;
+   OnTheFlyDeclContext =
+      ObjCMethodDecl::Create( *Context,
+                              SourceLocation(), SourceLocation(),
+                              Expr->getSelector(),
+                              QualType(),
+                              ReturnTInfo,
+                              Context->getTranslationUnitDecl(),
+                          /*isInstance=*/false, /*isVariadic=*/false,
+                          /*isPropertyAccessor=*/false,
+                          /*isImplicitlyDeclared=*/true,
+                          /*isDefined=*/false, ObjCMethodDecl::Required,
+                          /*HasRelatedResultType=*/false);
+   
+   // (DeclContext *) CGF.CurFuncDecl is a hack
+   RecordDecl  *RD2 = RecordDecl::Create( *Context, TTK_Struct, OnTheFlyDeclContext, SourceLocation(), SourceLocation(), RecordID);
+
+
+   /* copy over parameters from Record decl first */
+   unsigned int FieldNo;
+   
+   FieldNo = 0;
+   for (RecordDecl::field_iterator Field = RD->field_begin(),
+       FieldEnd = RD->field_end(); Field != FieldEnd; ++Field, ++FieldNo)
+   {
+      FieldDecl   *FD;
+      
+      sprintf( buf, "param_%d", FieldNo);
+      FieldName = buf;
+
+      IdentifierInfo  *FieldID = &Context->Idents.get( FieldName);
+      FD = FieldDecl::Create(  *Context, RD2,
+                               SourceLocation(), SourceLocation(),
+                               FieldID,
+                               Field->getType(),
+                               Field->getTypeSourceInfo(),
+                               NULL,
+                               false,  // Mutable... only for C++
+                               ICIS_NoInit);
+      RD2->addDecl( FD);
+   }
+
+   /* 
+    * Now copy over remaining variadic arguments. Arguments have been
+    * already promoted (bummer)
+    */
+   for (unsigned i = FieldNo, e = Expr->getNumArgs(); i != e; ++i)
+   {
+      FieldDecl   *FD;
+      Expr::Expr  *arg;
+      QualType    type;
+      
+      sprintf( buf, "param_%d", i);
+      FieldName = buf;
+
+      arg = const_cast<Expr::Expr *>( Expr->getArg( i));
+      type = arg->getType();
+      
+      IdentifierInfo  *FieldID = &Context->Idents.get( FieldName);
+      FD = FieldDecl::Create(  *Context, RD2,
+                               SourceLocation(), SourceLocation(),
+                               FieldID,
+                               type,
+                               Context->CreateTypeSourceInfo( type, 0),
+                               NULL,
+                               false,  // Mutable... only for C++
+                               ICIS_NoInit);
+      RD2->addDecl( FD);
+   }
+   
+   
+   RD2->completeDefinition();
+   
+   return( RD2);
+}
+
 /// Creat the CallArgList
 /// Here we stuff all arguments into a alloca struct
-/// @mulle-objc@ stuff values into alloca
-void  CGObjCCommonMulleRuntime::GenerateCallArgs( CallArgList &Args,
-                                                  CodeGenFunction &CGF,
-                                                  const ObjCMessageExpr *Expr)
+/// @mulle-objc@ call: stuff values into alloca
+///
+LValue  *CGObjCMulleRuntime::GenerateCallArgs( CallArgList &Args,
+                                               CodeGenFunction &CGF,
+                                               const ObjCMessageExpr *Expr)
 {
-   unsigned  nArgs;
+   unsigned             nArgs;
+   struct struct_info   record_info;
+   struct struct_info   rval_info;
+   struct struct_info   void_info;
+   bool                 emitEnd;
+   RecordDecl           *RD;
+   RecordDecl           *RV;
    
    nArgs = Expr->getNumArgs();
    if( ! nArgs)
-      return;
+      return( nullptr);
    
    // Initialize the captured struct.
+   RD = NULL;
+   RV = NULL;
+   
    const ObjCMethodDecl *method = Expr->getMethodDecl();
-   RecordDecl *RD = method->getParamRecord();
-
-   if( RD)
+   if( ! method)
    {
-      QualType RecTy = CGM.getContext().getTagDeclType( RD);
-      QualType PtrTy = CGM.getContext().getPointerType( RecTy);
-      
-      LValue   Record = CGF.MakeNaturalAlignAddrLValue( CGF.CreateMemTemp( RecTy, "__objc__param.storage"), RecTy);
-      
-      //
-      // push values into record
-      // (todo) if only one arg and it is convertible to void *
-      //        then don't alloca
-      //
-      unsigned int i = 0;
-      for( RecordDecl::field_iterator CurField = RD->field_begin(), SentinelField = RD->field_end(); CurField != SentinelField; CurField++)
-      {
-         Expr::Expr  *arg;
-         
-         arg = const_cast<Expr::Expr *>( Expr->getArg( i));
-         
-         LValue LV = CGF.EmitLValueForFieldInitialization( Record, *CurField);
-         CGF.EmitInitializerForField( *CurField, LV, arg, None);
-         
-         ++i;
-      }
-      
-      Args.add( RValue::get( Record.getAddress()), PtrTy);
+      if( Expr->getNumArgs() > 1)
+         RD = CreateOnTheFlyRecordDecl( CGF, Expr);
    }
+   else
+   {
+      RD = method->getParamRecord();
+      RV = method->getRvalRecord();
+      if( method->isVariadic())
+         RD = CreateVariadicOnTheFlyRecordDecl( CGF, Expr, RD);
+   }
+   
+
+   // special case, argument is void * compatible, there is no paramRecord.
+   // yet one argument will have been passed
+   if( ! RD)
+   {
+      assert( ! RV);
+      
+      const Expr::Expr  *Arg = const_cast<Expr::Expr *>( Expr->getArg( 0));
+
+      if( Arg->isIntegerConstantExpr(CGM.getContext()))
+      {
+         TypeSourceInfo *TInfo = CGM.getContext().getTrivialTypeSourceInfo(CGM.getContext().VoidPtrTy, SourceLocation());
+         Arg  = CStyleCastExpr::Create( CGM.getContext(),
+                                            CGM.getContext().VoidPtrTy,
+                                            VK_RValue,
+                                            CK_IntegralToPointer,
+                                            (Expr::Expr *) Arg,
+                                            NULL,
+                                            TInfo,
+                                            SourceLocation(),
+                                            SourceLocation());
+      }
+      CGF.EmitCallArg( Args, Arg, CGM.getContext().VoidPtrTy);
+      return( nullptr);
+   }
+   
+   fill_struct_info( &record_info, &CGM, RD);
+   if( RV)
+      fill_struct_info( &rval_info, &CGM, RV);
+
+   //
+   // at this point, we alloca something and copy all the values
+   // into the alloca, at a later time, we check
+   // if we can't reuse the input _param block, and if yes substitute
+   // values. The allocaed block needs to be big enough to hold the
+   // void *[5] pointer units
+   //
+   // We make a proper union type here (maybe pedantic)
+   //
+   llvm::APInt   units( 32, 5);
+   
+   // construct  void  *[5];
+   QualType Void5PtrTy = CGM.getContext().getConstantArrayType( CGM.getContext().VoidPtrTy,
+                                                          units,
+                                                          ArrayType::Normal,
+                                                          0);
+
+      
+   // determine 'n' in  void  *[5][ n] and construct type
+   llvm::APInt   units2( 32, rounded_type_length( &CGM.getContext(), record_info.recTy, Void5PtrTy));
+   QualType array2Type = CGM.getContext().getConstantArrayType( Void5PtrTy,
+                                                                units2,
+                                                                ArrayType::Normal,
+                                                                0);
+
+   // construct union { struct _param v; void  *[5][ n] space; struct _rval rval;  };
+   
+   RecordDecl   *UD = create_union_type( &CGM.getContext(), record_info.recTy, array2Type, rval_info.recTy, RV != NULL);
+   QualType     unionTy = CGM.getContext().getTagDeclType( UD);
+   
+   // now alloca the union
+   llvm::AllocaInst  *allocaed = CGF.CreateMemTemp( unionTy, "_args");  // leak ?
+   LValue   Union  = CGF.MakeNaturalAlignAddrLValue( allocaed, unionTy);
+
+   //
+   // specify beginning of life for this alloca
+   // do this always, so that the optimizer can get rid of it
+   //
+   emitEnd = ! ! CGF.EmitLifetimeStart( record_info.size, Union.getAddress());
+
+   // now get record out of union again
+   LValue Record = CGF.EmitLValueForField( Union, *UD->field_begin());
+   
+   //
+   // push values into record
+   //
+   unsigned int i = 0;
+   
+   for( RecordDecl::field_iterator CurField = RD->field_begin(), SentinelField = RD->field_end(); CurField != SentinelField; CurField++)
+   {
+      Expr::Expr  *arg;
+      
+      arg = const_cast<Expr::Expr *>( Expr->getArg( i));
+      
+      LValue LV = CGF.EmitLValueForFieldInitialization( Record, *CurField);
+      CGF.EmitInitializerForField( *CurField, LV, arg, None);
+      
+      ++i;
+   }
+
+   //
+   // ok lets see if we can't use _params as an argument
+   // basically. First see if we even have that (we could be in a C function)
+   // only do this when optimizing
+   //
+   if (CGM.getCodeGenOpts().OptimizationLevel == 0)
+      goto skip;
+
+   if (const ObjCMethodDecl *parent = dyn_cast<ObjCMethodDecl>(CGF.CurFuncDecl))
+   {
+      RecordDecl *PRD = parent->getParamRecord();
+
+      if( PRD)
+      {
+         struct struct_info   parent_info;
+         
+         fill_struct_info( &parent_info, &CGM, PRD);
+
+         size_t sizeRecord       = rounded_type_length( &CGM.getContext(), record_info.recTy, Void5PtrTy);
+         size_t sizeParentRecord = rounded_type_length( &CGM.getContext(), parent_info.recTy, Void5PtrTy);
+
+         if( sizeParentRecord >= sizeRecord)
+         {
+            //
+            // ok it would fit
+            // now we have to figure out, where we are, then follow the flow of
+            // the function and be sure, that _param won't be used again (not
+            // so easy)
+            // _param but not necessarily _rval (which is in a union with _param)
+            //
+            
+            if( param_unused_after_expr( (ObjCMethodDecl *) parent, (ObjCMessageExpr *) Expr))
+            {
+               //
+               // nice we can substitute _param, so what we do is
+               // memcpy over the contents of alloca into it
+               // the optimizer can optimize the alloca away then
+               //
+               ImplicitParamDecl  *D = parent->getParamDecl();
+               
+               DeclarationNameInfo NameInfo( D->getDeclName(), SourceLocation());
+               
+               DeclRefExpr *E = DeclRefExpr::Create( CGM.getContext(),
+                                                    NestedNameSpecifierLoc(),
+                                                    SourceLocation(),
+                                                    D,
+                                                    false,
+                                                    NameInfo,
+                                                    parent_info.recTy,
+                                                    VK_LValue);
+
+               LValue ParentRecord = CGF.EmitLValue( E);
+               // this next emit is needed, weird llvmism i dont understand
+               RValue loaded       = CGF.EmitLoadOfLValue(ParentRecord, SourceLocation());
+               
+               
+               CGF.EmitAggregateCopy( ParentRecord.getAddress(),
+                                      Record.getAddress(),
+                                      record_info.recTy,
+                                      false);
+               
+               // dont need the alloca anymore
+               llvm::Value *SizeV = llvm::ConstantInt::get( CGF.Int64Ty, record_info.size);
+               if( emitEnd)
+                  CGF.EmitLifetimeEnd( SizeV, Union.getAddress());
+               
+               Args.add( loaded, CGM.getContext().VoidPtrTy);
+               return( nullptr);
+            }
+         }
+      }
+   }
+   
+skip:
+   // we are always pushing a void through mulle_objc_calls
+   Args.add( RValue::get( Record.getAddress()), CGM.getContext().VoidPtrTy);
+   return( emitEnd ? new LValue( Record) : nullptr);
 }
 
 #pragma mark -
@@ -2232,7 +3217,7 @@ llvm::Constant *CGObjCMulleRuntime::GetOrEmitProtocol(const ObjCProtocolDecl *PD
 {
    StringRef    sref( PD->getIdentifier()->getName());
    
-   return( HashConstantForString( sref));
+   return( HashProtocolConstantForString( sref));
 }
 
 
@@ -2240,13 +3225,13 @@ llvm::Constant *CGObjCMulleRuntime::GetOrEmitProtocolRef(const ObjCProtocolDecl 
 {
    StringRef    sref( PD->getIdentifier()->getName());
    
-   return( HashConstantForString( sref));
+   return( HashProtocolConstantForString( sref));
 }
 
 
 /*
- just a list of protocol IDs,
- which gets stuck on a category or on a class
+   just a list of protocol IDs,
+   which gets stuck on a category or on a class
  */
 llvm::Constant *
 CGObjCMulleRuntime::EmitProtocolIDList(Twine Name,
@@ -2451,7 +3436,7 @@ void CGObjCMulleRuntime::GenerateCategory(const ObjCCategoryImplDecl *OCD) {
       ClassMethods.push_back(GetMethodConstant(I));
    
    llvm::Constant *Values[5];
-   Values[ 0] = HashConstantForString( Interface->getName());
+   Values[ 0] = HashClassConstantForString( Interface->getName());
    Values[ 1] = GetClassName(Interface->getObjCRuntimeNameAsString());
    LazySymbols.insert(Interface->getIdentifier());
    Values[2] = EmitMethodList("OBJC_CATEGORY_CLASS_METHODS_" + ExtName.str(),
@@ -2592,12 +3577,12 @@ void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
    
    ObjCInterfaceDecl *Super = Interface->getSuperClass();
 
-   Values[ 0] =  llvm::ConstantExpr::getBitCast( HashConstantForString( ID->getObjCRuntimeNameAsString()), ObjCTypes.ClassIDTy);
+   Values[ 0] =  llvm::ConstantExpr::getBitCast( HashClassConstantForString( ID->getObjCRuntimeNameAsString()), ObjCTypes.ClassIDTy);
    Values[ 1] = GetClassName(ID->getObjCRuntimeNameAsString());
 
    if( Super)
    {
-      Values[ 2] = llvm::ConstantExpr::getBitCast( HashConstantForString( Super->getObjCRuntimeNameAsString()), ObjCTypes.ClassIDTy);
+      Values[ 2] = llvm::ConstantExpr::getBitCast( HashClassConstantForString( Super->getObjCRuntimeNameAsString()), ObjCTypes.ClassIDTy);
       Values[ 3] = GetClassName( Super->getObjCRuntimeNameAsString());
    }
    else
@@ -2704,7 +3689,7 @@ llvm::Constant *CGObjCMulleRuntime::GetIvarConstant( const ObjCInterfaceDecl *OI
                                                      const ObjCIvarDecl *IVD)
 {
    llvm::Constant *Ivar[] = {
-      llvm::ConstantExpr::getBitCast( HashConstantForString( IVD->getNameAsString()),
+      llvm::ConstantExpr::getBitCast( HashIvarConstantForString( IVD->getNameAsString()),
                                        ObjCTypes.SelectorIDTy),
       GetIvarName( IVD),
       GetIvarType(IVD),
@@ -2739,7 +3724,7 @@ llvm::Constant *CGObjCMulleRuntime::GetMethodConstant(const ObjCMethodDecl *MD) 
       return nullptr;
    
    llvm::Constant *Method[] = {
-      llvm::ConstantExpr::getBitCast( HashConstantForString( MD->getSelector().getAsString()),
+      llvm::ConstantExpr::getBitCast( HashSelConstantForString( MD->getSelector().getAsString()),
                                        ObjCTypes.SelectorIDTy),
       llvm::ConstantExpr::getBitCast(GetMethodVarName(MD->getSelector()),
                                      ObjCTypes.Int8PtrTy),
@@ -2874,7 +3859,7 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
    // late ?)
    FinishModule();
    
-  if( ImplementedClasses.empty() && DefinedCategories.empty())
+  if( DefinedClasses.empty() && DefinedCategories.empty())
     return nullptr;
    
    // build up the necessary info structure now and emit it
@@ -2921,7 +3906,7 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
   llvm::FunctionType *FT =
     llvm::FunctionType::get(Builder.getVoidTy(),
                             llvm::PointerType::getUnqual(ObjCTypes.LoadInfoTy), true);
-  llvm::Value *Register = CGM.CreateRuntimeFunction( FT, "mulle_objc_load_info_unfailing_enqueue");
+  llvm::Value *Register = CGM.CreateRuntimeFunction( FT, "mulle_objc_loadinfo_locked_unfailing_enqueue");
   Builder.CreateCall( Register, LoadInfo);
   Builder.CreateRetVoid();
 
@@ -3907,11 +4892,17 @@ llvm::Constant *CGObjCMulleRuntime::EmitModuleSymbols() {
    return llvm::ConstantExpr::getBitCast(GV, ObjCTypes.SymtabPtrTy);
 }
 
+
 llvm::Constant *CGObjCMulleRuntime::EmitClassRefFromId(CodeGenFunction &CGF,
                                            IdentifierInfo *II) {
+   CallArgList  ActualArgs;
+   llvm::Constant  *Hash;
+   ReturnValueSlot Return;
+
    LazySymbols.insert(II);
    
-   return( HashConstantForString( II->getName()));
+   Hash = HashClassConstantForString( II->getName());
+   return( Hash);
 }
 
 llvm::Constant *CGObjCMulleRuntime::EmitClassRef(CodeGenFunction &CGF,
@@ -3924,8 +4915,7 @@ llvm::Constant *CGObjCMulleRuntime::EmitNSAutoreleasePoolClassRef(CodeGenFunctio
    return EmitClassRefFromId(CGF, II);
 }
 
-
-llvm::Constant *CGObjCCommonMulleRuntime::HashConstantForString( StringRef sref)
+llvm::Constant *CGObjCCommonMulleRuntime::_HashConstantForString( StringRef sref, uint64_t first_valid)
 {
    unsigned WordSizeInBits = CGM.getTarget().getPointerWidth(0);
    unsigned ByteSizeInBits = CGM.getTarget().getCharWidth();
@@ -3947,7 +4937,7 @@ llvm::Constant *CGObjCCommonMulleRuntime::HashConstantForString( StringRef sref)
       value  |= hash[ i];
    }
    
-   if( value == 0 || value == (uint64_t) -1)
+   if( value < first_valid || value == (uint64_t) -1)
    {
       // FAIL! FIX
       std::string  fail;
@@ -3975,7 +4965,7 @@ llvm::Constant *CGObjCMulleRuntime::EmitSelector(CodeGenFunction &CGF, Selector 
 {
    llvm::StringRef   sref( Sel.getAsString());
    
-   return( HashConstantForString( sref));
+   return( HashSelConstantForString( sref));
 }
 
 
@@ -3983,7 +4973,7 @@ llvm::Constant *CGObjCMulleRuntime::EmitClassID(CodeGenFunction &CGF, const ObjC
 {
    llvm::StringRef   sref( Class->getNameAsString());
    
-   return( HashConstantForString( sref));
+   return( HashClassConstantForString( sref));
 }
 
 
@@ -4481,6 +5471,11 @@ llvm::Constant *CGObjCCommonMulleRuntime::GetIvarType(const ObjCIvarDecl *Ivar)
    std::string TypeStr;
    QualType PType = Ivar->getType();
    
+   //
+   // find property of same name (how?), if yes, encode
+   // '@' differently as '@', '=' or '~' depending
+   // on assignment
+   //
    CGM.getContext().getObjCEncodingForTypeImpl(PType, TypeStr, true, true, nullptr,
                               true     /*OutermostType*/,
                               false    /*EncodingProperty*/,
@@ -4488,7 +5483,7 @@ llvm::Constant *CGObjCCommonMulleRuntime::GetIvarType(const ObjCIvarDecl *Ivar)
                               false    /*EncodeBlockParameters*/,
                               false    /*EncodeClassNames*/);
    
-   // IvarTypes is always empty...
+   // remember these crazy containers, insert on what looks like a read
    llvm::GlobalVariable *&Entry = IvarTypes[TypeStr];
    
    if (!Entry)
@@ -4633,7 +5628,6 @@ ObjCCommonTypesHelper::ObjCCommonTypesHelper(CodeGen::CodeGenModule &cgm)
 
 ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
 : ObjCCommonTypesHelper(cgm) {
-
 
    // struct _objc_method_description {
    //   SEL name;

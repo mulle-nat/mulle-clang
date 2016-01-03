@@ -1566,6 +1566,7 @@ llvm::Constant *CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
 
 #pragma mark -
 #pragma mark message sending
+// @mulle-objc@: CommonFunctionCall, send message to self and super
 CodeGen::RValue   CGObjCMulleRuntime::CommonFunctionCall(CodeGen::CodeGenFunction &CGF,
                                                          llvm::Constant *Fn,
                                                          ReturnValueSlot Return,
@@ -1603,14 +1604,46 @@ CodeGen::RValue   CGObjCMulleRuntime::CommonFunctionCall(CodeGen::CodeGenFunctio
                                            FunctionType::ExtInfo(),
                                            RequiredArgs::All);
    RValue rvalue = CGF.EmitCall( argsInfo, Fn, Return, ActualArgs);
-   // now cast this to actual return value
-   llvm::Value *V = rvalue.getScalarVal();
+   llvm::Value *V;
    
-   if( V && V->getType() != CGF.getTypes().ConvertTypeForMem( ResultType))
+   // now cast this to actual return value
+   // figure out, what we get back
+   RecordDecl  *RV = Method->getRvalRecord();
+
+   // if method returns a pointer to result alloca, than there is a RV
+   if( RV)
    {
-      V = CGF.Builder.CreateBitOrPointerCast(V, CGF.getTypes().ConvertTypeForMem( ResultType));
-      rvalue = RValue::get(V);
+      llvm::Value *Dst;
+      
+      // create a alloca and memcpy stuff in there
+      CharUnits Alignment = CGM.getContext().getTypeAlignInChars( ResultType);
+      Dst = CGF.Builder.CreateAlloca( CGF.getTypes().ConvertTypeForMem( ResultType));
+      
+      //
+      // ignore the return value, and "know" that we are using arg[2] as return
+      // storage. This should have the advantage, that the alloca up there can
+      // be optimized away by the compiler.
+      //
+      RValue  param = ActualArgs[ 2].RV;
+      
+      V = param.getAggregateAddr();
+      CGF.EmitAggregateCopy( Dst, V,  ResultType, param.isVolatileQualified(), Alignment);
+
+      rvalue = RValue::get( Dst); // I hope this works fine...
    }
+   else
+   {
+      V = rvalue.getScalarVal();
+      if( V && V->getType() != CGF.getTypes().ConvertTypeForMem( ResultType))
+      {
+         V = CGF.Builder.CreateBitOrPointerCast(V, CGF.getTypes().ConvertTypeForMem( ResultType));
+         rvalue = RValue::get(V);
+      }
+   }
+   
+   // it would be a good time to end the lifetime of the arg[2] alloca now
+   // but this is done elsewhere, as not to disturb the method signatures
+   // too much
    
    return nullReturn.complete(CGF, rvalue, ResultType, CallArgs,
                               requiresnullCheck ? Method : nullptr);
@@ -2134,11 +2167,11 @@ static void  fill_struct_info( struct struct_info *info, CodeGenModule *CGM, Tag
 }
 
 
-static RecordDecl   *create_union_type( ASTContext *context, QualType paramType, QualType spaceType)
+static RecordDecl   *create_union_type( ASTContext *context, QualType paramType, QualType spaceType, QualType rvalType, bool hasRvalType)
 {
-   QualType       FieldTypes[2];
-   const char     *FieldNames[2];
-   unsigned int   i;
+   QualType       FieldTypes[3];
+   const char     *FieldNames[3];
+   unsigned int   i, n;
    
    RecordDecl  *UD = context->buildImplicitRecord( "_u_args");
    
@@ -2151,7 +2184,14 @@ static RecordDecl   *create_union_type( ASTContext *context, QualType paramType,
    FieldTypes[1] = spaceType;
    FieldNames[1] = "space";
 
-   for( i = 0; i < 2; i++)
+   n = 2;
+   if( hasRvalType)
+   {
+      FieldTypes[2] = rvalType;
+      FieldNames[2] = "rval";
+      ++n;
+   }
+   for( i = 0; i < n; i++)
    {
       FieldDecl *Field = FieldDecl::Create( *context,
                                             UD,
@@ -2333,9 +2373,11 @@ LValue  *CGObjCMulleRuntime::GenerateCallArgs( CallArgList &Args,
 {
    unsigned             nArgs;
    struct struct_info   record_info;
+   struct struct_info   rval_info;
    struct struct_info   void_info;
    bool                 emitEnd;
    RecordDecl           *RD;
+   RecordDecl           *RV;
    
    nArgs = Expr->getNumArgs();
    if( ! nArgs)
@@ -2343,6 +2385,8 @@ LValue  *CGObjCMulleRuntime::GenerateCallArgs( CallArgList &Args,
    
    // Initialize the captured struct.
    RD = NULL;
+   RV = NULL;
+   
    const ObjCMethodDecl *method = Expr->getMethodDecl();
    if( ! method)
    {
@@ -2352,6 +2396,7 @@ LValue  *CGObjCMulleRuntime::GenerateCallArgs( CallArgList &Args,
    else
    {
       RD = method->getParamRecord();
+      RV = method->getRvalRecord();
       if( method->isVariadic())
          RD = CreateVariadicOnTheFlyRecordDecl( CGF, Expr, RD);
    }
@@ -2361,6 +2406,8 @@ LValue  *CGObjCMulleRuntime::GenerateCallArgs( CallArgList &Args,
    // yet one argument will have been passed
    if( ! RD)
    {
+      assert( ! RV);
+      
       const Expr::Expr  *Arg = const_cast<Expr::Expr *>( Expr->getArg( 0));
 
       if( Arg->isIntegerConstantExpr(CGM.getContext()))
@@ -2381,6 +2428,8 @@ LValue  *CGObjCMulleRuntime::GenerateCallArgs( CallArgList &Args,
    }
    
    fill_struct_info( &record_info, &CGM, RD);
+   if( RV)
+      fill_struct_info( &rval_info, &CGM, RV);
 
    //
    // at this point, we alloca something and copy all the values
@@ -2407,9 +2456,9 @@ LValue  *CGObjCMulleRuntime::GenerateCallArgs( CallArgList &Args,
                                                                 ArrayType::Normal,
                                                                 0);
 
-   // construct union { struct _param v; void  *[5][ n] space };
+   // construct union { struct _param v; void  *[5][ n] space; struct _rval rval;  };
    
-   RecordDecl   *UD = create_union_type( &CGM.getContext(), record_info.recTy, array2Type);
+   RecordDecl   *UD = create_union_type( &CGM.getContext(), record_info.recTy, array2Type, rval_info.recTy, RV != NULL);
    QualType     unionTy = CGM.getContext().getTagDeclType( UD);
    
    // now alloca the union

@@ -298,6 +298,7 @@ CodeGenTypes::arrangeObjCMessageSendSignature(const ObjCMethodDecl *MD,
                                               QualType receiverType) {
   SmallVector<CanQualType, 16> argTys;
   CallingConv                  callConv;
+  CanQualType                  returnType;
   
   bool IsWindows = getContext().getTargetInfo().getTriple().isOSWindows();
   
@@ -321,8 +322,10 @@ CodeGenTypes::arrangeObjCMessageSendSignature(const ObjCMethodDecl *MD,
       
       // fix up calling convention for MD, to be like mulle_objc_object_inline_call
       // it would be nice to not just use the default, but use the actual one
-      // with which mulle_objc_object_inline_call
+      // with which mulle_objc_object_inline_call was declared
       callConv = Context.getDefaultCallingConvention( false, false);
+      
+      returnType = Context.VoidPtrTy;
    }
    else
    {
@@ -332,6 +335,7 @@ CodeGenTypes::arrangeObjCMessageSendSignature(const ObjCMethodDecl *MD,
       }
       callConv = getCallingConventionForDecl( MD, IsWindows);
 
+      returnType = GetReturnType(MD->getReturnType());
    }
 
   FunctionType::ExtInfo einfo;
@@ -347,8 +351,9 @@ CodeGenTypes::arrangeObjCMessageSendSignature(const ObjCMethodDecl *MD,
   RequiredArgs required =
     (MD->isVariadic() ? RequiredArgs(argTys.size()) : RequiredArgs::All);
 
+  // @mulle-objc@ fix returnType to void *
   return arrangeLLVMFunctionInfo(
-      GetReturnType(MD->getReturnType()), /*instanceMethod=*/false,
+      returnType, /*instanceMethod=*/false,
       /*chainCall=*/false, argTys, einfo, required);
 }
 

@@ -175,6 +175,9 @@ private:
 
   // @mulle-objc@ parameters: ivars ParamRecord
   RecordDecl    *ParamRecord;
+  
+  // return value record (if needed)
+  RecordDecl    *RvalRecord;
    
   /// List of attributes for this method declaration.
   SourceLocation DeclEndLoc; // the location of the ';' or '{'.
@@ -251,6 +254,7 @@ private:
 /// @mulle-objc@ parameters: initialize storage of parameter ivars
         ParamDecl( nullptr) {
     ParamRecord = nullptr;
+    RvalRecord = nullptr;
     IsOneVoidPointerParam = false;
     setImplicit(isImplicitlyDeclared);
    }
@@ -409,18 +413,25 @@ public:
   }
 
   // @mulle-objc@ parameters: paramRecord, paramDecl accessors
+  // struct {}
   RecordDecl   *getParamRecord() const { return ParamRecord; }
   void setParamRecord( RecordDecl  *RD) { ParamRecord = RD; }
 
+  // struct {}  *param
   ImplicitParamDecl * getParamDecl() const { return ParamDecl; }
   void setParamDecl(ImplicitParamDecl *PD) { ParamDecl = PD; }
 
   bool isOneVoidPointerParam() const { return IsOneVoidPointerParam; }
   void setIsOneVoidPointerParam(bool Flag) { IsOneVoidPointerParam = Flag; }
 
+  // struct {} rval;
+  RecordDecl   *getRvalRecord() const { return RvalRecord; }
+  void setRvalRecord( RecordDecl  *RD) { RvalRecord = RD; }
+
+
   // @mulle-objc@ parameters:  method FindParamRecordField for parameters
   FieldDecl  *FindParamRecordField( IdentifierInfo *II);
-   
+
   /// createImplicitParams - Used to lazily create the self and cmd
   /// implict parameters. This must be called prior to using getSelfDecl()
   /// or getCmdDecl(). The call is ignored if the implicit paramters

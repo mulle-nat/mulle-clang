@@ -537,7 +537,9 @@ void CodeGenFunction::StartObjCMethod(const ObjCMethodDecl *OMD,
   CurGD = OMD;
   CurEHLocation = OMD->getLocEnd();
 
-  StartFunction(OMD, OMD->getReturnType(), Fn, FI, args,
+ // @mulle-objc@ MetaABI arguments: Use FI.getReturnType() because it's void *
+
+  StartFunction(OMD, FI.getReturnType(), Fn, FI, args,
                 OMD->getLocation(), StartLoc);
 
   // In ARC, certain methods get an extra cleanup.

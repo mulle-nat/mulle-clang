@@ -7324,7 +7324,8 @@ public:
     bool isVariadic, bool MethodDefinition);
 
    // @mulle-objc@ parameters: additional method SetMulleObjCParam
-   void SetMulleObjCParam( ObjCMethodDecl *ObjCMethod, Selector Sel, SmallVector<ParmVarDecl*, 16> Params, SourceLocation   MethodLoc,
+   // Why do I have to specify the size of the vector when passing ??
+   void SetMulleObjCParam( ObjCMethodDecl *ObjCMethod, Selector Sel, SmallVector<ParmVarDecl*, 16> *Params, QualType resultType, SourceLocation   MethodLoc,
    SourceLocation   EndLoc, SourceLocation SelectorLoc);
 
   ObjCMethodDecl *LookupMethodInQualifiedType(Selector Sel,
@@ -7335,7 +7336,7 @@ public:
 
   bool CheckARCMethodDecl(ObjCMethodDecl *method);
   bool inferObjCARCLifetime(ValueDecl *decl);
-  bool isVoidPointerParameterCompatible( ParmVarDecl *Param);
+  bool isVoidPointerCompatible( QualType type);
 
   ExprResult
   HandleExprPropertyRefExpr(const ObjCObjectPointerType *OPT,

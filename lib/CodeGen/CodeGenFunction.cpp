@@ -694,6 +694,14 @@ void CodeGenFunction::StartFunction(GlobalDecl GD,
   if (CGM.getCodeGenOpts().InstrumentForProfiling)
     EmitMCountInstrumentation();
 
+  // @mulle-objc@ return value: change type to "void *" always (if not void)
+  // obviously it would be nicer to place this into the else in the
+  // code jungle below, but the reindentation scares me
+  
+  if( CGM.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+     if( ! RetTy->isVoidType())
+         RetTy = CGM.getContext().VoidPtrTy;
+
   if (RetTy->isVoidType()) {
     // Void type; nothing to return.
     ReturnValue = nullptr;
@@ -718,7 +726,7 @@ void CodeGenFunction::StartFunction(GlobalDecl GD,
     llvm::Value *Addr = Builder.CreateStructGEP(nullptr, EI, Idx);
     ReturnValue = Builder.CreateLoad(Addr, "agg.result");
   } else {
-    ReturnValue = CreateIRTemp(RetTy, "retval");
+     ReturnValue = CreateIRTemp(RetTy, "retval");
 
     // Tell the epilog emitter to autorelease the result.  We do this
     // now so that various specialized functions can suppress it

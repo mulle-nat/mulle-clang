@@ -4098,15 +4098,47 @@ static void mergeInterfaceMethodToImpl(Sema &S,
 //
 void   Sema::SetMulleObjCParam( ObjCMethodDecl *ObjCMethod,
    Selector Sel,
-   SmallVector<ParmVarDecl*, 16> Params,
+   SmallVector<ParmVarDecl*, 16> *Params,
+   QualType resultType,
    SourceLocation   MethodLoc,
    SourceLocation   EndLoc,
    SourceLocation   SelectorLoc)
 {
    StringRef  RecordName;
+   bool       rvalAsStruct;
    
-   if( ! Params.size())
+   rvalAsStruct = ! resultType->isVoidType() && ! isVoidPointerCompatible( resultType);
+   if( ! rvalAsStruct && ! Params->size())
       return;
+
+   if( rvalAsStruct)
+   {
+      // i am lazy and stuff records into records...
+      // if( ! resultType->isRecordType())
+      {
+         RecordName = "rval." + Sel.getAsString();
+         IdentifierInfo  *RecordID = &Context.Idents.get( RecordName);
+   
+         RecordDecl  *RD = RecordDecl::Create( Context, TTK_Struct, CurContext, MethodLoc, EndLoc, RecordID);
+         FieldDecl   *FD;
+     
+         FD = FieldDecl::Create( Context, RD,
+                             MethodLoc, EndLoc,
+                             &Context.Idents.get("rval"),
+                             resultType,
+                             nullptr,
+                             nullptr,
+                             false,  // Mutable... only for C++
+                             ICIS_NoInit);
+         RD->addDecl( FD);
+         RD->completeDefinition();
+         
+         // some voodoo, blindly copied
+         AddAlignmentAttributesForRecord(RD);
+         AddMsStructLayoutForRecord(RD);
+         ObjCMethod->setRvalRecord( RD);
+      }
+   }
    
    //
    // this could be trouble, if someone has declared the same method
@@ -4117,9 +4149,9 @@ void   Sema::SetMulleObjCParam( ObjCMethodDecl *ObjCMethod,
    
    RecordDecl  *RD = RecordDecl::Create( Context, TTK_Struct, CurContext, MethodLoc, EndLoc, RecordID);
    
-   for (unsigned i = 0, e = Params.size(); i != e; ++i)
+   for (unsigned i = 0, e = Params->size(); i != e; ++i)
    {
-      ParmVarDecl *Param = Params[ i];
+      ParmVarDecl *Param = (*Params)[ i];
       FieldDecl   *FD;
       
       FD = FieldDecl::Create( Context, RD,
@@ -4159,9 +4191,9 @@ void   Sema::SetMulleObjCParam( ObjCMethodDecl *ObjCMethod,
 }
 
 
-bool  Sema::isVoidPointerParameterCompatible( ParmVarDecl  *Param)
+bool  Sema::isVoidPointerCompatible( QualType type)
 {
-   return( Param->getType()->isPointerType());
+   return( type->isPointerType());
 }
 
 
@@ -4308,25 +4340,29 @@ Decl *Sema::ActOnMethodDeclaration(
       skip = false;
       if( Params.size() == 1 && Sel.getNumArgs() == 1 && ! isVariadic)
       {
-         //
-         // get the type, if it is compatible with void *
-         // (i.e. will be passed in same register), then
-         //
-         ParmVarDecl *Param = Params[ 0];
-         if( isVoidPointerParameterCompatible( Param))
+         // void or VoidPointer compatible return values only
+         if( resultDeclType->isVoidType() || isVoidPointerCompatible( resultDeclType))
          {
-            // reinstitute as regular parameter
-            S->AddDecl(Param);
-            IdResolver.AddDecl(Param);
-            ObjCMethod->setIsOneVoidPointerParam( true);
-            skip = true;
+            //
+            // get the type, if it is compatible with void *
+            // (i.e. will be passed in same register), then
+            //
+            ParmVarDecl *Param = Params[ 0];
+            if( isVoidPointerCompatible( Param->getType()))
+            {
+               // reinstitute as regular parameter
+               S->AddDecl(Param);
+               IdResolver.AddDecl(Param);
+               ObjCMethod->setIsOneVoidPointerParam( true);
+               skip = true;
+            }
          }
       }
       
       if( ! skip)
       {
          SourceLocation SelLoc = SelectorLocs[ 0];
-         SetMulleObjCParam( ObjCMethod, Sel, Params, MethodLoc, EndLoc, SelLoc);
+         SetMulleObjCParam( ObjCMethod, Sel, &Params, resultDeclType, MethodLoc, EndLoc, SelLoc);
       }
    }
    // DONE

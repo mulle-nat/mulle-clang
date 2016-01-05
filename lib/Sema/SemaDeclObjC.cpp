@@ -4191,9 +4191,21 @@ void   Sema::SetMulleObjCParam( ObjCMethodDecl *ObjCMethod,
 }
 
 
+// ez to remember for rval:
+// 1. if FP it's in _param,
+// 2. if __alignof__(x) > __alignof__( void *), it's in _param
+// 3. if sizeof(x) >sizeof( void *), it's in _param
+
 bool  Sema::isVoidPointerCompatible( QualType type)
 {
-   return( type->isPointerType());
+   if( Context.getTypeSize( type) > Context.getTypeSize( Context.VoidPtrTy))
+      return( false);
+
+   // should log this, as this is unusual
+   if( Context.getTypeAlign( type) > Context.getTypeAlign( Context.VoidPtrTy))
+      return( false);
+   
+   return( type->isPointerType() || type->isIntegralOrEnumerationType());
 }
 
 

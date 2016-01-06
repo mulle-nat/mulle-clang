@@ -5984,8 +5984,16 @@ TypedefDecl *ASTContext::getObjCClassDecl() const {
 
 ObjCInterfaceDecl *ASTContext::getObjCProtocolDecl() const {
   if (!ObjCProtocolClassDecl) {
-    ObjCProtocolClassDecl 
-      = ObjCInterfaceDecl::Create(*this, getTranslationUnitDecl(), 
+    // @mulle-objc@ TODO protocol: change type to unsigned long
+//    if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+//    {
+//      QualType T = getLangOpts().ObjCRuntime.hasMulleMetaABI() ? UnsignedLongTy
+//                                                             : getPointerType(ObjCBuiltinSelTy);
+//      ObjCProtocolClassDecl = (ObjCInterfaceDecl) buildImplicitTypedef(T, "Protocol");
+//    }
+//    else
+      ObjCProtocolClassDecl
+         = ObjCInterfaceDecl::Create(*this, getTranslationUnitDecl(),
                                   SourceLocation(),
                                   &Idents.get("Protocol"),
                                   /*typeParamList=*/nullptr,

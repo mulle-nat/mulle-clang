@@ -2115,6 +2115,9 @@ static bool  param_unused_after_expr( ObjCMethodDecl *Method, ObjCMessageExpr *E
    ASTContext             *Context;
    MulleStatementVisitor   Visitor( Method, Expr);
    
+   if( ! Method->getParamDecl())
+      return( false);
+   
    Context    = &Method->getASTContext();
    Stmt *Body = Method->getBody();
    return( Visitor.TraverseStmt( Body));
@@ -2307,28 +2310,32 @@ RecordDecl  *CGObjCMulleRuntime::CreateVariadicOnTheFlyRecordDecl( CodeGenFuncti
 
    /* copy over parameters from Record decl first */
    unsigned int FieldNo;
-   
+
    FieldNo = 0;
-   for (RecordDecl::field_iterator Field = RD->field_begin(),
-       FieldEnd = RD->field_end(); Field != FieldEnd; ++Field, ++FieldNo)
+   if( RD)
    {
-      FieldDecl   *FD;
       
-      sprintf( buf, "param_%d", FieldNo);
-      FieldName = buf;
-
-      IdentifierInfo  *FieldID = &Context->Idents.get( FieldName);
-      FD = FieldDecl::Create(  *Context, RD2,
-                               SourceLocation(), SourceLocation(),
-                               FieldID,
-                               Field->getType(),
-                               Field->getTypeSourceInfo(),
-                               NULL,
-                               false,  // Mutable... only for C++
-                               ICIS_NoInit);
-      RD2->addDecl( FD);
+      for (RecordDecl::field_iterator Field = RD->field_begin(),
+           FieldEnd = RD->field_end(); Field != FieldEnd; ++Field, ++FieldNo)
+      {
+         FieldDecl   *FD;
+         
+         sprintf( buf, "param_%d", FieldNo);
+         FieldName = buf;
+         
+         IdentifierInfo  *FieldID = &Context->Idents.get( FieldName);
+         FD = FieldDecl::Create(  *Context, RD2,
+                                SourceLocation(), SourceLocation(),
+                                FieldID,
+                                Field->getType(),
+                                Field->getTypeSourceInfo(),
+                                NULL,
+                                false,  // Mutable... only for C++
+                                ICIS_NoInit);
+         RD2->addDecl( FD);
+      }
    }
-
+   
    /* 
     * Now copy over remaining variadic arguments. Arguments have been
     * already promoted (bummer)
@@ -2403,27 +2410,30 @@ LValue  *CGObjCMulleRuntime::GenerateCallArgs( CallArgList &Args,
    
 
    // special case, argument is void * compatible, there is no paramRecord.
-   // yet one argument will have been passed
+   // yet one argument will likely have been passed
    if( ! RD)
    {
       assert( ! RV);
       
-      const Expr::Expr  *Arg = const_cast<Expr::Expr *>( Expr->getArg( 0));
-
-      if( Arg->isIntegerConstantExpr(CGM.getContext()))
+      if( Expr->getNumArgs())
       {
-         TypeSourceInfo *TInfo = CGM.getContext().getTrivialTypeSourceInfo(CGM.getContext().VoidPtrTy, SourceLocation());
-         Arg  = CStyleCastExpr::Create( CGM.getContext(),
-                                            CGM.getContext().VoidPtrTy,
-                                            VK_RValue,
-                                            CK_IntegralToPointer,
-                                            (Expr::Expr *) Arg,
-                                            NULL,
-                                            TInfo,
-                                            SourceLocation(),
-                                            SourceLocation());
+         const Expr::Expr  *Arg = const_cast<Expr::Expr *>( Expr->getArg( 0));
+         
+         if( Arg->isIntegerConstantExpr(CGM.getContext()))
+         {
+            TypeSourceInfo *TInfo = CGM.getContext().getTrivialTypeSourceInfo(CGM.getContext().VoidPtrTy, SourceLocation());
+            Arg  = CStyleCastExpr::Create( CGM.getContext(),
+                                          CGM.getContext().VoidPtrTy,
+                                          VK_RValue,
+                                          CK_IntegralToPointer,
+                                          (Expr::Expr *) Arg,
+                                          NULL,
+                                          TInfo,
+                                          SourceLocation(),
+                                          SourceLocation());
+         }
+         CGF.EmitCallArg( Args, Arg, CGM.getContext().VoidPtrTy);
       }
-      CGF.EmitCallArg( Args, Arg, CGM.getContext().VoidPtrTy);
       return( nullptr);
    }
    

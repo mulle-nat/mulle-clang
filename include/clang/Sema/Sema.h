@@ -7325,8 +7325,17 @@ public:
 
    // @mulle-objc@ parameters: additional method SetMulleObjCParam
    // Why do I have to specify the size of the vector when passing ??
-   void SetMulleObjCParam( ObjCMethodDecl *ObjCMethod, Selector Sel, SmallVector<ParmVarDecl*, 16> *Params, QualType resultType, SourceLocation   MethodLoc,
-   SourceLocation   EndLoc, SourceLocation SelectorLoc);
+    void   SetMulleObjCParam( ObjCMethodDecl *ObjCMethod,
+                              Selector Sel,
+                              SmallVector<ParmVarDecl*, 16> *Params,
+                              QualType resultType,
+                              unsigned int abiDesc,
+                              SourceLocation   Loc);
+    bool            typeNeedsMetaABIAlloca( QualType type);
+    bool            isMetaABIAllocaMethod( ObjCMethodDecl *ObjCMethod,
+                                          QualType resultType);
+    unsigned int    metaABIDescription( SmallVector<ParmVarDecl*, 16> &Params,
+                                       QualType resultType);
 
   ObjCMethodDecl *LookupMethodInQualifiedType(Selector Sel,
                                               const ObjCObjectPointerType *OPT,
@@ -7336,7 +7345,6 @@ public:
 
   bool CheckARCMethodDecl(ObjCMethodDecl *method);
   bool inferObjCARCLifetime(ValueDecl *decl);
-  bool isVoidPointerCompatible( QualType type);
 
   ExprResult
   HandleExprPropertyRefExpr(const ObjCObjectPointerType *OPT,

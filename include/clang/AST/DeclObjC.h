@@ -195,7 +195,7 @@ private:
    /// Para,Decl - Decl for the implicit _param parameter. This is lazily
    /// constructed by ActOnMethodDeclaration.
   ImplicitParamDecl *ParamDecl;
-  bool              IsOneVoidPointerParam;
+  bool              _isMetaABIVoidPointerParam;
   SelectorLocationsKind getSelLocsKind() const {
     return (SelectorLocationsKind)SelLocsKind;
   }
@@ -255,7 +255,7 @@ private:
         ParamDecl( nullptr) {
     ParamRecord = nullptr;
     RvalRecord = nullptr;
-    IsOneVoidPointerParam = false;
+    _isMetaABIVoidPointerParam = false;
     setImplicit(isImplicitlyDeclared);
    }
 
@@ -421,8 +421,8 @@ public:
   ImplicitParamDecl * getParamDecl() const { return ParamDecl; }
   void setParamDecl(ImplicitParamDecl *PD) { ParamDecl = PD; }
 
-  bool isOneVoidPointerParam() const { return IsOneVoidPointerParam; }
-  void setIsOneVoidPointerParam(bool Flag) { IsOneVoidPointerParam = Flag; }
+  bool isMetaABIVoidPointerParam() const { return _isMetaABIVoidPointerParam; }
+  void setMetaABIVoidPointerParam(bool Flag) { _isMetaABIVoidPointerParam = Flag; }
 
   // struct {} rval;
   RecordDecl   *getRvalRecord() const { return RvalRecord; }

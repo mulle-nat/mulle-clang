@@ -321,14 +321,12 @@ void Sema::ActOnStartOfObjCMethodDef(Scope *FnBodyScope, Decl *D) {
   PushOnScopeChains(MDecl->getSelfDecl(), FnBodyScope);
   PushOnScopeChains(MDecl->getCmdDecl(), FnBodyScope);
    // @mulle-objc@ MetaABI parameters: save scope for later retrieval in ActonMethod
-   if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
-   {
-      if( MDecl->getParamDecl())
-         PushOnScopeChains(MDecl->getParamDecl(), FnBodyScope);
-      else
-         if( MDecl->isOneVoidPointerParam())
-            PushOnScopeChains( MDecl->parameters()[ 0], FnBodyScope);
-  }
+   bool hasMetaABIParam;
+   
+   hasMetaABIParam = getLangOpts().ObjCRuntime.hasMulleMetaABI() && MDecl->getParamDecl();
+   if( hasMetaABIParam)
+      PushOnScopeChains(MDecl->getParamDecl(), FnBodyScope);
+
   // The ObjC parser requires parameter names so there's no need to check.
   CheckParmsForFunctionDef(MDecl->param_begin(), MDecl->param_end(),
                            /*CheckParameterNames=*/false);
@@ -344,7 +342,7 @@ void Sema::ActOnStartOfObjCMethodDef(Scope *FnBodyScope, Decl *D) {
      // @mulle-objc@ parameters: Remove Parameters from Scope
      // (nat) pushing the param identifier on the scope is done here
      //
-     if( ! getLangOpts().ObjCRuntime.hasMulleMetaABI())
+     if( ! hasMetaABIParam)
      {
        if (Param->getIdentifier())
          PushOnScopeChains(Param, FnBodyScope);
@@ -4096,50 +4094,78 @@ static void mergeInterfaceMethodToImpl(Sema &S,
 //
 // @mulle-objc@ parameters: creates a struct from method parameters
 //
+
+#define MetaABIVoidPtrRval    0x0
+#define MetaABIVoidPtrParam   0x1
+#define MetaABIRvalAsStruct   0x2
+#define MetaABIParamAsStruct  0x4
+
+
+unsigned int   Sema::metaABIDescription( SmallVector<ParmVarDecl*, 16> &Params,
+                                         QualType resultType)
+{
+   unsigned int   desc;
+   
+   desc = resultType->isVoidType() ? 0 : MetaABIVoidPtrRval;
+   if( typeNeedsMetaABIAlloca( resultType))
+      desc = MetaABIRvalAsStruct;
+   
+   switch( Params.size())
+   {
+   case 0 :
+      break;
+   case 1 :
+      if( typeNeedsMetaABIAlloca( Params[ 0]->getType()))
+         desc |= MetaABIParamAsStruct;
+      else
+         desc |= MetaABIVoidPtrParam;
+      break;
+      
+   default :
+      desc |= MetaABIParamAsStruct;
+      break;
+   }
+   return( desc);
+}
+
+
 void   Sema::SetMulleObjCParam( ObjCMethodDecl *ObjCMethod,
-   Selector Sel,
-   SmallVector<ParmVarDecl*, 16> *Params,
-   QualType resultType,
-   SourceLocation   MethodLoc,
-   SourceLocation   EndLoc,
-   SourceLocation   SelectorLoc)
+                                Selector Sel,
+                                SmallVector<ParmVarDecl*, 16> *Params,
+                                QualType resultType,
+                                unsigned int abiDesc,
+                                SourceLocation   Loc)
 {
    StringRef  RecordName;
-   bool       rvalAsStruct;
+   QualType   PtrTy;
    
-   rvalAsStruct = ! resultType->isVoidType() && ! isVoidPointerCompatible( resultType);
-   if( ! rvalAsStruct && ! Params->size())
-      return;
-
-   if( rvalAsStruct)
+   // - (void *) foo; is ez no parameter or bogus parameter
+   if( abiDesc & MetaABIRvalAsStruct)
    {
       // i am lazy and stuff records into records...
-      // if( ! resultType->isRecordType())
-      {
-         RecordName = "rval." + Sel.getAsString();
-         IdentifierInfo  *RecordID = &Context.Idents.get( RecordName);
-   
-         RecordDecl  *RD = RecordDecl::Create( Context, TTK_Struct, CurContext, MethodLoc, EndLoc, RecordID);
-         FieldDecl   *FD;
-     
-         FD = FieldDecl::Create( Context, RD,
-                             MethodLoc, EndLoc,
+      RecordName = "rval." + Sel.getAsString();
+      IdentifierInfo  *RecordID = &Context.Idents.get( RecordName);
+      
+      RecordDecl  *RD = RecordDecl::Create( Context, TTK_Struct, CurContext, Loc, Loc, RecordID);
+      FieldDecl   *FD;
+      
+      FD = FieldDecl::Create( Context, RD,
+                             Loc, Loc,
                              &Context.Idents.get("rval"),
                              resultType,
                              nullptr,
                              nullptr,
                              false,  // Mutable... only for C++
                              ICIS_NoInit);
-         RD->addDecl( FD);
-         RD->completeDefinition();
-         
-         // some voodoo, blindly copied
-         AddAlignmentAttributesForRecord(RD);
-         AddMsStructLayoutForRecord(RD);
-         ObjCMethod->setRvalRecord( RD);
-      }
+      RD->addDecl( FD);
+      RD->completeDefinition();
+      
+      // some voodoo, blindly copied
+      AddAlignmentAttributesForRecord(RD);
+      AddMsStructLayoutForRecord(RD);
+      ObjCMethod->setRvalRecord( RD);
    }
-   
+
    //
    // this could be trouble, if someone has declared the same method
    // already ? check this
@@ -4147,7 +4173,7 @@ void   Sema::SetMulleObjCParam( ObjCMethodDecl *ObjCMethod,
    RecordName = "p." + Sel.getAsString();
    IdentifierInfo  *RecordID = &Context.Idents.get( RecordName);
    
-   RecordDecl  *RD = RecordDecl::Create( Context, TTK_Struct, CurContext, MethodLoc, EndLoc, RecordID);
+   RecordDecl  *RD = RecordDecl::Create( Context, TTK_Struct, CurContext, Loc, Loc, RecordID);
    
    for (unsigned i = 0, e = Params->size(); i != e; ++i)
    {
@@ -4177,11 +4203,11 @@ void   Sema::SetMulleObjCParam( ObjCMethodDecl *ObjCMethod,
    //
    // convert record to a QualType
    QualType RecTy = Context.getTagDeclType(RD);
-   QualType PtrTy = Context.getPointerType( RecTy);
+   PtrTy = Context.getPointerType( RecTy);
    
    ImplicitParamDecl  *Param = ImplicitParamDecl::Create(Context,
                                                          ObjCMethod,
-                                                         SelectorLoc,
+                                                         Loc,
                                                          &Context.Idents.get("_param"),
                                                          PtrTy);
    
@@ -4196,16 +4222,22 @@ void   Sema::SetMulleObjCParam( ObjCMethodDecl *ObjCMethod,
 // 2. if __alignof__(x) > __alignof__( void *), it's in _param
 // 3. if sizeof(x) >sizeof( void *), it's in _param
 
-bool  Sema::isVoidPointerCompatible( QualType type)
+bool  Sema::typeNeedsMetaABIAlloca( QualType type)
 {
    if( Context.getTypeSize( type) > Context.getTypeSize( Context.VoidPtrTy))
-      return( false);
-
+      return( true);
    // should log this, as this is unusual
    if( Context.getTypeAlign( type) > Context.getTypeAlign( Context.VoidPtrTy))
+      return( true);
+   
+   if( type->isVoidType())
+      return( false);
+   if( type->isPointerType())
+      return( false);
+   if( type->isIntegralOrEnumerationType())
       return( false);
    
-   return( type->isPointerType() || type->isIntegralOrEnumerationType());
+   return( true);
 }
 
 
@@ -4341,41 +4373,29 @@ Decl *Sema::ActOnMethodDeclaration(
   //
   // The actual ParameterBlock that is used for code generation
   // is kept separately. For now we assume that there
-  // is alwas a _param block, except if there are not arguments.
-  // The optimization for one parameter fitting into a void *,
-  // is done a) during call  and  b) during access of the parameter
+  // is alwas a _param block, except if there are no arguments.
+  // If we have only one parameter fitting into a void *,
+  // we also don't need a _param block, but keep the argument as is
   //
    if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
    {
-      bool   skip;
+      unsigned int   desc;
       
-      skip = false;
-      if( Params.size() == 1 && Sel.getNumArgs() == 1 && ! isVariadic)
+      desc = metaABIDescription( Params, resultDeclType);
+      if( isVariadic)
+         desc |= MetaABIParamAsStruct;
+
+      if( desc == MetaABIVoidPtrParam)
       {
-         // void or VoidPointer compatible return values only
-         if( resultDeclType->isVoidType() || isVoidPointerCompatible( resultDeclType))
-         {
-            //
-            // get the type, if it is compatible with void *
-            // (i.e. will be passed in same register), then
-            //
-            ParmVarDecl *Param = Params[ 0];
-            if( isVoidPointerCompatible( Param->getType()))
-            {
-               // reinstitute as regular parameter
-               S->AddDecl(Param);
-               IdResolver.AddDecl(Param);
-               ObjCMethod->setIsOneVoidPointerParam( true);
-               skip = true;
-            }
-         }
+         ParmVarDecl *Param = Params[ 0];
+         // reinstitute as regular parameter
+         S->AddDecl(Param);
+         IdResolver.AddDecl(Param);
+         ObjCMethod->setMetaABIVoidPointerParam( true);
       }
-      
-      if( ! skip)
-      {
-         SourceLocation SelLoc = SelectorLocs[ 0];
-         SetMulleObjCParam( ObjCMethod, Sel, &Params, resultDeclType, MethodLoc, EndLoc, SelLoc);
-      }
+      else
+         if( desc)
+            SetMulleObjCParam( ObjCMethod, Sel, &Params, resultDeclType, desc, MethodLoc);
    }
    // DONE
    

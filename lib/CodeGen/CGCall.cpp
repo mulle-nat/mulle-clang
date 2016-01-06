@@ -317,7 +317,7 @@ CodeGenTypes::arrangeObjCMessageSendSignature(const ObjCMethodDecl *MD,
          argTys.push_back( Context.getCanonicalParamType( PtrTy));
       }
       else
-         if( MD->isOneVoidPointerParam())
+         if( MD->isMetaABIVoidPointerParam())
             argTys.push_back( Context.getCanonicalParamType( Context.VoidPtrTy));
       
       // fix up calling convention for MD, to be like mulle_objc_object_inline_call
@@ -340,10 +340,10 @@ CodeGenTypes::arrangeObjCMessageSendSignature(const ObjCMethodDecl *MD,
 
   FunctionType::ExtInfo einfo;
   
-  // @mulle-objc@ fix call convention
+  // @mulle-objc@ message signature: fix call convention
   einfo = einfo.withCallingConv( callConv);
 
-  // @mulle-objc@ probably need to fix or skip this
+  // @mulle-objc@ message signature: probably need to fix or skip this
   if (getContext().getLangOpts().ObjCAutoRefCount &&
       MD->hasAttr<NSReturnsRetainedAttr>())
     einfo = einfo.withProducesResult(true);
@@ -351,7 +351,7 @@ CodeGenTypes::arrangeObjCMessageSendSignature(const ObjCMethodDecl *MD,
   RequiredArgs required =
     (MD->isVariadic() ? RequiredArgs(argTys.size()) : RequiredArgs::All);
 
-  // @mulle-objc@ fix returnType to void *
+  // @mulle-objc@ message signature: fix returnType to void *
   return arrangeLLVMFunctionInfo(
       returnType, /*instanceMethod=*/false,
       /*chainCall=*/false, argTys, einfo, required);
@@ -1930,7 +1930,7 @@ void CodeGenFunction::EmitFunctionProlog(const CGFunctionInfo &FI,
         auto AI = FnArgs[FirstIRArg];
         llvm::Value *V = AI;
 
-        // @mulle-objc@ make self nullable in llvm if so desired 
+        // @mulle-objc@ make `self nullable in llvm if so desired 
         if (const ImplicitParamDecl *IPD = dyn_cast<ImplicitParamDecl>(Arg)) {
           if (IPD->getAttr<NonNullAttr>())
             AI->addAttr(llvm::AttributeSet::get(getLLVMContext(),
@@ -2008,7 +2008,6 @@ void CodeGenFunction::EmitFunctionProlog(const CGFunctionInfo &FI,
         // Ensure the argument is the correct type.
         if (V->getType() != ArgI.getCoerceToType())
           V = Builder.CreateBitCast(V, ArgI.getCoerceToType());
-
         if (isPromoted)
           V = emitArgumentDemotion(*this, Arg, V);
 
@@ -2025,8 +2024,23 @@ void CodeGenFunction::EmitFunctionProlog(const CGFunctionInfo &FI,
         // in here, add a cast to the argument type.
         llvm::Type *LTy = ConvertType(Arg->getType());
         if (V->getType() != LTy)
-          V = Builder.CreateBitCast(V, LTy);
+        {
+         // @mulle-objc@ function argument, cast from void pointer to long (if needed)
+            if( CGM.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+            {
+               if( AI->getArgNo() == 2) // after _cmd
+               {
+                  // got to be but check anyway, cast it to long
+                  if( V->getType()->isPointerTy() && Arg->getType()->isIntegerType())
+                  {
+                     V = Builder.CreatePtrToInt( V, ConvertType( getContext().LongTy));
+                     V = Builder.CreateIntCast( V, LTy, true);
+                  }
+               }
+            }
 
+          V = Builder.CreateBitCast(V, LTy);
+        }
         ArgVals.push_back(ValueAndIsPtr(V, HaveValue));
         break;
       }

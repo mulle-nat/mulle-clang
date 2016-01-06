@@ -2127,12 +2127,12 @@ void Sema::ProcessPropertyDecl(ObjCPropertyDecl *property,
       //
       if( Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
       {
-         if( ! isVoidPointerCompatible( property->getType()))
+         if( typeNeedsMetaABIAlloca( property->getType()))
          {
             SmallVector<ParmVarDecl*, 16> Params;
             Params.push_back(Argument);
             
-            SetMulleObjCParam( SetterMethod, property->getSetterName(), &Params, property->getType(), Loc, Loc, Loc);
+            SetMulleObjCParam( SetterMethod, property->getSetterName(), &Params, property->getType(), 0x2, Loc);
          }
       }
 

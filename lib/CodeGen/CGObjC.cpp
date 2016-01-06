@@ -521,13 +521,9 @@ void CodeGenFunction::StartObjCMethod(const ObjCMethodDecl *OMD,
  // @mulle-objc@ MetaABI arguments: Push ParamDecl on args Decl, the _param pointer
  // Ignore others
  
-   if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+   if( getLangOpts().ObjCRuntime.hasMulleMetaABI() && OMD->getParamDecl())
    {
-      if( OMD->getParamDecl())
-         args.push_back(OMD->getParamDecl());
-      else
-         if( OMD->isOneVoidPointerParam())
-            args.push_back( OMD->parameters()[ 0]);
+      args.push_back(OMD->getParamDecl());
    }
    else
    {
@@ -1291,7 +1287,7 @@ CodeGenFunction::generateObjCSetterBody(const ObjCImplementationDecl *classImpl,
   ParmVarDecl *argDecl = *setterMethod->param_begin();
   QualType argType = argDecl->getType().getNonReferenceType();
   
-   if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+   if( getLangOpts().ObjCRuntime.hasMulleMetaABI() && setterMethod->getParamDecl())
    {
       ValueDecl *paramDecl = setterMethod->getParamDecl();
       DeclRefExpr param(paramDecl, false, paramDecl->getType(),

@@ -1101,19 +1101,32 @@ void CodeGenFunction::EmitReturnStmt(const ReturnStmt &S) {
     switch (getEvaluationKind(RV->getType())) {
     case TEK_Scalar:
       // @mulle-objc@ return value: wrap scalar in aggregate, return pointer
-      if( RD)
+      if( MD)
       {
          llvm::Value *exprResult = EmitScalarExpr(RV);
-
-         // store ScalarExpr in alloca
-         LValue Record = MakeNaturalAlignAddrLValue( paramAddr, recordTy);
-         LValue Field = EmitLValueForField( Record, *RD->field_begin());
-         EmitStoreOfScalar(exprResult, Field);
-
-         // store pointer in returnValue
-         // OMIT this, it's superflous
-         //llvm::Value *newParam = Builder.CreateBitCast( paramAddr, VoidPtrTy);
-         //Builder.CreateStore( newParam, ReturnValue);
+            
+         if( RD)
+         {
+            // store ScalarExpr in alloca
+            LValue Record = MakeNaturalAlignAddrLValue( paramAddr, recordTy);
+            LValue Field = EmitLValueForField( Record, *RD->field_begin());
+            EmitStoreOfScalar(exprResult, Field);
+            
+            // store pointer in returnValue
+            // OMIT this, it's superflous
+            //llvm::Value *newParam = Builder.CreateBitCast( paramAddr, VoidPtrTy);
+            //Builder.CreateStore( newParam, ReturnValue);
+            break;
+         }
+         QualType  longType;
+         
+         if( ! RV->getType()->isPointerType())
+         {
+            longType   = CGM.getContext().LongTy;
+            exprResult = Builder.CreateSExtOrBitCast( exprResult, getTypes().ConvertTypeForMem( longType));
+         }
+         exprResult = Builder.CreateBitOrPointerCast( exprResult, getTypes().ConvertTypeForMem( getContext().VoidPtrTy));
+         Builder.CreateStore( exprResult, ReturnValue);
          break;
       }
       Builder.CreateStore(EmitScalarExpr(RV), ReturnValue);

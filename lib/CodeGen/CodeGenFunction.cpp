@@ -694,13 +694,18 @@ void CodeGenFunction::StartFunction(GlobalDecl GD,
   if (CGM.getCodeGenOpts().InstrumentForProfiling)
     EmitMCountInstrumentation();
 
-  // @mulle-objc@ return value: change type to "void *" always (if not void)
+  // @mulle-objc@ return value: change return type of method to "void *" always (if not void)
   // obviously it would be nicer to place this into the else in the
   // code jungle below, but the reindentation scares me
   
   if( CGM.getLangOpts().ObjCRuntime.hasMulleMetaABI())
-     if( ! RetTy->isVoidType())
-         RetTy = CGM.getContext().VoidPtrTy;
+  {
+     if( dyn_cast_or_null< ObjCMethodDecl>( CurCodeDecl))
+     {
+        if( ! RetTy->isVoidType())
+           RetTy = CGM.getContext().VoidPtrTy;
+     }
+  }
 
   if (RetTy->isVoidType()) {
     // Void type; nothing to return.

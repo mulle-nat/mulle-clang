@@ -1101,7 +1101,11 @@ void CodeGenFunction::EmitReturnStmt(const ReturnStmt &S) {
     switch (getEvaluationKind(RV->getType())) {
     case TEK_Scalar:
       // @mulle-objc@ return value: wrap scalar in aggregate, return pointer
-      if( MD)
+      if( ! MD)
+      {
+         Builder.CreateStore(EmitScalarExpr(RV), ReturnValue);
+         break;
+      }
       {
          llvm::Value *exprResult = EmitScalarExpr(RV);
             
@@ -1120,7 +1124,7 @@ void CodeGenFunction::EmitReturnStmt(const ReturnStmt &S) {
          }
          QualType  longType;
          
-         if( ! RV->getType()->isPointerType())
+         if( RV->getType()->isIntegralOrEnumerationType())
          {
             longType   = CGM.getContext().LongTy;
             exprResult = Builder.CreateSExtOrBitCast( exprResult, getTypes().ConvertTypeForMem( longType));
@@ -1129,8 +1133,6 @@ void CodeGenFunction::EmitReturnStmt(const ReturnStmt &S) {
          Builder.CreateStore( exprResult, ReturnValue);
          break;
       }
-      Builder.CreateStore(EmitScalarExpr(RV), ReturnValue);
-      break;
     case TEK_Complex:
       EmitComplexExprIntoLValue(RV,
                      MakeNaturalAlignAddrLValue(ReturnValue, RV->getType()),

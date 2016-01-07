@@ -325,7 +325,11 @@ CodeGenTypes::arrangeObjCMessageSendSignature(const ObjCMethodDecl *MD,
       // with which mulle_objc_object_inline_call was declared
       callConv = Context.getDefaultCallingConvention( false, false);
       
-      returnType = Context.VoidPtrTy;
+      // @mulle-objc@ method signature: fix returnType to void * (Part I)
+      if( MD->getReturnType()->isVoidType())
+         returnType = Context.VoidTy;
+      else
+         returnType = Context.VoidPtrTy;
    }
    else
    {
@@ -351,7 +355,7 @@ CodeGenTypes::arrangeObjCMessageSendSignature(const ObjCMethodDecl *MD,
   RequiredArgs required =
     (MD->isVariadic() ? RequiredArgs(argTys.size()) : RequiredArgs::All);
 
-  // @mulle-objc@ message signature: fix returnType to void *
+  // @mulle-objc@ method signature: fix returnType to void * (Part II)
   return arrangeLLVMFunctionInfo(
       returnType, /*instanceMethod=*/false,
       /*chainCall=*/false, argTys, einfo, required);
@@ -2025,16 +2029,19 @@ void CodeGenFunction::EmitFunctionProlog(const CGFunctionInfo &FI,
         llvm::Type *LTy = ConvertType(Arg->getType());
         if (V->getType() != LTy)
         {
-         // @mulle-objc@ function argument, cast from void pointer to long (if needed)
+         // @mulle-objc@ function argument _param, cast from void pointer to long (methods only)
             if( CGM.getLangOpts().ObjCRuntime.hasMulleMetaABI())
             {
-               if( AI->getArgNo() == 2) // after _cmd
+               if( dyn_cast_or_null<ObjCMethodDecl>(CurCodeDecl))
                {
-                  // got to be but check anyway, cast it to long
-                  if( V->getType()->isPointerTy() && Arg->getType()->isIntegerType())
+                  if( AI->getArgNo() == 2) // after _cmd
                   {
-                     V = Builder.CreatePtrToInt( V, ConvertType( getContext().LongTy));
-                     V = Builder.CreateIntCast( V, LTy, true);
+                     // got to be but check anyway, cast it to long
+                     if( V->getType()->isPointerTy() && Arg->getType()->isIntegerType())
+                     {
+                        V = Builder.CreatePtrToInt( V, ConvertType( getContext().LongTy));
+                        V = Builder.CreateIntCast( V, LTy, true);
+                     }
                   }
                }
             }

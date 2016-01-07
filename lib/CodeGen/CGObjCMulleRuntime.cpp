@@ -1608,7 +1608,9 @@ CodeGen::RValue   CGObjCMulleRuntime::CommonFunctionCall(CodeGen::CodeGenFunctio
    
    // now cast this to actual return value
    // figure out, what we get back
-   RecordDecl  *RV = Method->getRvalRecord();
+   RecordDecl  *RV = nullptr;
+   if( Method)
+      RV = Method->getRvalRecord();
 
    // if method returns a pointer to result alloca, than there is a RV
    if( RV)
@@ -1805,7 +1807,7 @@ CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction
                                CallArgs,
                                ActualArgs,
                                Arg0,
-                               Method));
+                               nullptr));
 }
 
 

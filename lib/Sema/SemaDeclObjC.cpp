@@ -4229,15 +4229,14 @@ bool  Sema::typeNeedsMetaABIAlloca( QualType type)
    // should log this, as this is unusual
    if( Context.getTypeAlign( type) > Context.getTypeAlign( Context.VoidPtrTy))
       return( true);
+   if( type->isFloatingType())
+      return( true);
+   if( type->isUnionType())
+      return( true);
+   if( type->isStructureOrClassType())
+      return( true);
    
-   if( type->isVoidType())
-      return( false);
-   if( type->isPointerType())
-      return( false);
-   if( type->isIntegralOrEnumerationType())
-      return( false);
-   
-   return( true);
+   return( false);
 }
 
 

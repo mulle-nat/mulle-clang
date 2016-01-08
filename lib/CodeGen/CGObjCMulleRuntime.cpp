@@ -2397,12 +2397,7 @@ LValue  *CGObjCMulleRuntime::GenerateCallArgs( CallArgList &Args,
    RV = NULL;
    
    const ObjCMethodDecl *method = Expr->getMethodDecl();
-   if( ! method)
-   {
-      if( Expr->getNumArgs() > 1)
-         RD = CreateOnTheFlyRecordDecl( CGF, Expr);
-   }
-   else
+   if( method)
    {
       RD = method->getParamRecord();
       RV = method->getRvalRecord();

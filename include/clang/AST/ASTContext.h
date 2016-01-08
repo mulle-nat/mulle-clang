@@ -225,7 +225,8 @@ class ASTContext : public RefCountedBase<ASTContext> {
   mutable TypedefDecl *ObjCClassDecl;
 
   /// \brief The typedef for the predefined \c Protocol class in Objective-C.
-  mutable ObjCInterfaceDecl *ObjCProtocolClassDecl;
+/// @mulle-objc@ change type of ObjCProtocolClassDecl
+  mutable NamedDecl *ObjCProtocolClassDecl;
   
   /// \brief The typedef for the predefined 'BOOL' type.
   mutable TypedefDecl *BOOLDecl;
@@ -1535,7 +1536,8 @@ public:
 
   /// \brief Retrieve the Objective-C class declaration corresponding to 
   /// the predefined \c Protocol class.
-  ObjCInterfaceDecl *getObjCProtocolDecl() const;
+  /// @mulle-objc@ change type of getObjCProtocolDecl
+  NamedDecl *getObjCProtocolDecl() const;
 
   /// \brief Retrieve declaration of 'BOOL' typedef
   TypedefDecl *getBOOLDecl() const {
@@ -1554,7 +1556,10 @@ public:
   
   /// \brief Retrieve the type of the Objective-C \c Protocol class.
   QualType getObjCProtoType() const {
-    return getObjCInterfaceType(getObjCProtocolDecl());
+   /// @mulle-objc@ change type of getObjCProtocolDecl
+    if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+      return getTypeDeclType( (TypedefDecl *) getObjCProtocolDecl());
+    return getObjCInterfaceType( (ObjCInterfaceDecl *) getObjCProtocolDecl());
   }
   
   /// \brief Retrieve the C type declaration corresponding to the predefined

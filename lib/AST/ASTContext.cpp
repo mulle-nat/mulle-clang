@@ -5966,7 +5966,7 @@ TypedefDecl *ASTContext::getObjCIdDecl() const {
 TypedefDecl *ASTContext::getObjCSelDecl() const {
   if (!ObjCSelDecl) {
     // @mulle-objc@ selector: change type to unsigned long
-    QualType T = getLangOpts().ObjCRuntime.hasMulleMetaABI() ? UnsignedLongTy
+    QualType T = getLangOpts().ObjCRuntime.hasMulleMetaABI() ? LongTy
                                                              : getPointerType(ObjCBuiltinSelTy);
     ObjCSelDecl = buildImplicitTypedef(T, "SEL");
   }
@@ -5982,16 +5982,17 @@ TypedefDecl *ASTContext::getObjCClassDecl() const {
   return ObjCClassDecl;
 }
 
-ObjCInterfaceDecl *ASTContext::getObjCProtocolDecl() const {
+/// @mulle-objc@ change type of getObjCProtocolDecl
+NamedDecl *ASTContext::getObjCProtocolDecl() const {
   if (!ObjCProtocolClassDecl) {
     // @mulle-objc@ TODO protocol: change type to unsigned long
-//    if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
-//    {
-//      QualType T = getLangOpts().ObjCRuntime.hasMulleMetaABI() ? UnsignedLongTy
-//                                                             : getPointerType(ObjCBuiltinSelTy);
-//      ObjCProtocolClassDecl = (ObjCInterfaceDecl) buildImplicitTypedef(T, "Protocol");
-//    }
-//    else
+    if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+    {
+      QualType T = getLangOpts().ObjCRuntime.hasMulleMetaABI() ? LongTy
+                                                             : getPointerType(ObjCBuiltinSelTy);
+      ObjCProtocolClassDecl = buildImplicitTypedef(T, "PROTOCOL");
+    }
+    else
       ObjCProtocolClassDecl
          = ObjCInterfaceDecl::Create(*this, getTranslationUnitDecl(),
                                   SourceLocation(),

@@ -1100,7 +1100,7 @@ void CodeGenFunction::EmitReturnStmt(const ReturnStmt &S) {
      
     switch (getEvaluationKind(RV->getType())) {
     case TEK_Scalar:
-      // @mulle-objc@ return value: wrap scalar in aggregate, return pointer
+      // @mulle-objc@ return value: wrap scalar in aggregate, return pointer if in method
       if( ! MD)
       {
          Builder.CreateStore(EmitScalarExpr(RV), ReturnValue);

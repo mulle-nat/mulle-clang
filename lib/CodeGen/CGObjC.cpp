@@ -523,7 +523,7 @@ void CodeGenFunction::StartObjCMethod(const ObjCMethodDecl *OMD,
  
    if( getLangOpts().ObjCRuntime.hasMulleMetaABI() && OMD->getParamDecl())
    {
-      args.push_back(OMD->getParamDecl());
+      args.push_back( OMD->getParamDecl());
    }
    else
    {

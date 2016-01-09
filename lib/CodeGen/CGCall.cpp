@@ -3342,6 +3342,23 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
         else
           V = Builder.CreateLoad(RV.getAggregateAddr());
 
+         // @mulle-objc@ function call argument, cast into void *, if dst is objc method
+	if( ArgNo == 2 && CGM.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+	{
+            const ObjCMethodDecl *MD = dyn_cast_or_null<ObjCMethodDecl>(TargetDecl);
+            
+            if( MD && ! MD->getParamDecl())
+	    {
+               // promote all non pointers to long and make them pointers
+	       if( ! V->getType()->isPointerTy())
+	       {
+                  // is this right ?
+                  V = Builder.CreateSExt( V, ConvertType( getContext().LongTy));
+	          V = Builder.CreateIntToPtr( V, ArgInfo.getCoerceToType());
+	       }
+	    }
+	}
+	
         // We might have to widen integers, but we should never truncate.
         if (ArgInfo.getCoerceToType() != V->getType() &&
             V->getType()->isIntegerTy())

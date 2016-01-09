@@ -1603,7 +1603,7 @@ CodeGen::RValue   CGObjCMulleRuntime::CommonFunctionCall(CodeGen::CodeGenFunctio
                                            ActualArgs,
                                            FunctionType::ExtInfo(),
                                            RequiredArgs::All);
-   RValue rvalue = CGF.EmitCall( argsInfo, Fn, Return, ActualArgs);
+   RValue rvalue = CGF.EmitCall( argsInfo, Fn, Return, ActualArgs, Method);
    llvm::Value *V;
    
    // now cast this to actual return value
@@ -1615,12 +1615,6 @@ CodeGen::RValue   CGObjCMulleRuntime::CommonFunctionCall(CodeGen::CodeGenFunctio
    // if method returns a pointer to result alloca, than there is a RV
    if( RV)
    {
-      llvm::Value *Dst;
-      
-      // create a alloca and memcpy stuff in there
-      CharUnits Alignment = CGM.getContext().getTypeAlignInChars( ResultType);
-      Dst = CGF.Builder.CreateAlloca( CGF.getTypes().ConvertTypeForMem( ResultType));
-      
       //
       // ignore the return value, and "know" that we are using arg[2] as return
       // storage. This should have the advantage, that the alloca up there can
@@ -1628,10 +1622,31 @@ CodeGen::RValue   CGObjCMulleRuntime::CommonFunctionCall(CodeGen::CodeGenFunctio
       //
       RValue  param = ActualArgs[ 2].RV;
       
-      V = param.getAggregateAddr();
-      CGF.EmitAggregateCopy( Dst, V,  ResultType, param.isVolatileQualified(), Alignment);
+      V = param.getScalarVal();
+      if( ResultType->isStructureOrClassType())
+      {
+         // use return value slot, which is an allocaed aggregate of proper type
+         CharUnits Alignment = CGM.getContext().getTypeAlignInChars( ResultType);
+         llvm::Value *Dst = Return.getValue();
+         
+         if( ! Dst)
+            Dst = CGF.Builder.CreateAlloca( CGF.getTypes().ConvertTypeForMem( ResultType));
 
-      rvalue = RValue::get( Dst); // I hope this works fine...
+         //
+         // memcpy stuff from _param
+         //
+            
+         CGF.EmitAggregateCopy( Dst, V,  ResultType, true, Alignment);
+         rvalue = RValue::getAggregate( Dst); // I hope this works fine...
+      }
+      else
+      {
+        // retrieve from pointer
+         QualType PtrResultType = CGF.getContext().getPointerType(ResultType);
+         V = CGF.Builder.CreateBitOrPointerCast( V,CGF.getTypes().ConvertTypeForMem( PtrResultType));
+         V = CGF.Builder.CreateLoad( V);
+         rvalue = RValue::get(V);
+      }
    }
    else
    {
@@ -2274,6 +2289,9 @@ RecordDecl  *CGObjCMulleRuntime::CreateOnTheFlyRecordDecl( CodeGenFunction &CGF,
 }
 
 
+/* variadic alloca, could have size of struct block in
+ * front, for interpreters / storage (?)
+ */
 RecordDecl  *CGObjCMulleRuntime::CreateVariadicOnTheFlyRecordDecl( CodeGenFunction &CGF,
                                                                    const ObjCMessageExpr *Expr,
                                                                    RecordDecl *RD)
@@ -2388,10 +2406,6 @@ LValue  *CGObjCMulleRuntime::GenerateCallArgs( CallArgList &Args,
    RecordDecl           *RD;
    RecordDecl           *RV;
    
-   nArgs = Expr->getNumArgs();
-   if( ! nArgs)
-      return( nullptr);
-   
    // Initialize the captured struct.
    RD = NULL;
    RV = NULL;
@@ -2405,7 +2419,6 @@ LValue  *CGObjCMulleRuntime::GenerateCallArgs( CallArgList &Args,
          RD = CreateVariadicOnTheFlyRecordDecl( CGF, Expr, RD);
    }
    
-
    // special case, argument is void * compatible, there is no paramRecord.
    // yet one argument will likely have been passed
    if( ! RD)

@@ -2029,7 +2029,7 @@ void CodeGenFunction::EmitFunctionProlog(const CGFunctionInfo &FI,
         llvm::Type *LTy = ConvertType(Arg->getType());
         if (V->getType() != LTy)
         {
-         // @mulle-objc@ function argument _param, cast from void pointer to long (methods only)
+         // @mulle-objc@ function argument _param, cast from void pointer to uintptr_t (methods only)
             if( CGM.getLangOpts().ObjCRuntime.hasMulleMetaABI())
             {
                if( dyn_cast_or_null<ObjCMethodDecl>(CurCodeDecl))
@@ -2039,7 +2039,7 @@ void CodeGenFunction::EmitFunctionProlog(const CGFunctionInfo &FI,
                      // got to be but check anyway, cast it to long
                      if( V->getType()->isPointerTy() && Arg->getType()->isIntegerType())
                      {
-                        V = Builder.CreatePtrToInt( V, ConvertType( getContext().LongTy));
+                        V = Builder.CreatePtrToInt( V, ConvertType( getContext().getUIntPtrType()));
                         V = Builder.CreateIntCast( V, LTy, true);
                      }
                   }

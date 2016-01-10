@@ -334,7 +334,7 @@ llvm::Type *CodeGenTypes::ConvertType(QualType T) {
       // @mulle-objc@ id,class,sel: change type to long
       if( getContext().getLangOpts().ObjCRuntime.hasMulleMetaABI())
          ResultType = llvm::IntegerType::get(getLLVMContext(),
-                                 static_cast<unsigned>(Context.getTypeSize(Context.LongTy)));
+                                 static_cast<unsigned>(Context.getTypeSize(Context.getUIntPtrType())));
       else
          ResultType = llvm::Type::getInt8Ty(getLLVMContext());
       break;

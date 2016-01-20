@@ -325,7 +325,6 @@ llvm::Type *CodeGenTypes::ConvertType(QualType T) {
 
   case Type::Builtin: {
     switch (cast<BuiltinType>(Ty)->getKind()) {
-    case BuiltinType::Void:
     case BuiltinType::ObjCId:
     case BuiltinType::ObjCClass:
     case BuiltinType::ObjCSel:
@@ -336,6 +335,7 @@ llvm::Type *CodeGenTypes::ConvertType(QualType T) {
          ResultType = llvm::IntegerType::get(getLLVMContext(),
                                  static_cast<unsigned>(Context.getTypeSize(Context.getUIntPtrType())));
       else
+    case BuiltinType::Void:
          ResultType = llvm::Type::getInt8Ty(getLLVMContext());
       break;
 

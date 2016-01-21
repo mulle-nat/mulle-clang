@@ -1079,6 +1079,7 @@ void CodeGenFunction::EmitReturnStmt(const ReturnStmt &S) {
      llvm::Type  *llvmPointerType;
      llvm::Value *param;
      llvm::Value *paramAddr;
+     unsigned alignment = 0;
      
      if( MD)
      {
@@ -1090,11 +1091,8 @@ void CodeGenFunction::EmitReturnStmt(const ReturnStmt &S) {
            llvmRecType = CGM.getTypes().ConvertTypeForMem( recordTy);
            llvmPointerType = llvmRecType->getPointerTo();
            
-           unsigned alignment = CGM.getContext().getTypeAlignInChars( recordPtrTy).getQuantity();
-         
          // get _param address (known to be big enough)
             param = LocalDeclMap[MD->getParamDecl()];
-            paramAddr = Builder.CreateBitCast(Builder.CreateAlignedLoad( param, alignment, "_param.rval"), llvmPointerType);
         }
       }
      
@@ -1112,6 +1110,9 @@ void CodeGenFunction::EmitReturnStmt(const ReturnStmt &S) {
          if( RD)
          {
             // store ScalarExpr in alloca
+            alignment = CGM.getContext().getTypeAlignInChars( recordPtrTy).getQuantity();
+            paramAddr = Builder.CreateBitCast( Builder.CreateAlignedLoad( param, alignment, "_param.rval"), llvmPointerType);
+            
             LValue Record = MakeNaturalAlignAddrLValue( paramAddr, recordTy);
             LValue Field = EmitLValueForField( Record, *RD->field_begin());
             EmitStoreOfScalar(exprResult, Field);
@@ -1144,6 +1145,10 @@ void CodeGenFunction::EmitReturnStmt(const ReturnStmt &S) {
       if( RD)
       {
          // emit aggregate expression
+         // cast paramAddr to return value...
+         alignment = CGM.getContext().getTypeAlignInChars( RV->getType()).getQuantity();
+         paramAddr = Builder.CreateBitCast( Builder.CreateAlignedLoad( param, alignment, "_param.rval"), getTypes().ConvertTypeForMem( RV->getType())->getPointerTo());
+         
          EmitAggExpr(RV, AggValueSlot::forAddr( paramAddr, Alignment,
                                                 Qualifiers(),
                                                 AggValueSlot::IsDestructed,

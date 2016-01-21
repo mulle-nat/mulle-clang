@@ -1871,13 +1871,16 @@ CGObjCMulleRuntime::GenerateMessageSendSuper(CodeGen::CodeGenFunction &CGF,
    return( CommonMessageSend( CGF, Fn, Return, ResultType, Receiver, CallArgs, ActualArgs, Arg0, Method, true));
 }
 
+
+#pragma mark -
+#pragma mark AST analysis for _param reuse
 /* 
  * Analyze AST for parameter usage. 
  */
 
 static   Expr  *unparenthesizedAndUncastedExpr( Expr *expr)
 {
-   CastExpr  *cast;
+   CastExpr   *castExpr;
    ParenExpr  *parenExpr;
    
    for(;;)
@@ -1888,9 +1891,9 @@ static   Expr  *unparenthesizedAndUncastedExpr( Expr *expr)
          continue;
       }
       
-      if( (cast = dyn_cast< CastExpr>( expr)))
+      if( (castExpr = dyn_cast< CastExpr>( expr)))
       {
-         expr = cast->getSubExpr();
+         expr = castExpr->getSubExpr();
          continue;
       }
       return( expr);
@@ -1905,50 +1908,51 @@ struct find_info
 };
 
 
-struct find_info   findNextStatementInBody( Stmt *s, Stmt *body)
+bool   findNextStatementInParent( Stmt *s, Stmt *parent, struct find_info *info)
 {
-   Stmt        *parent;
-   bool        found;
-   ParentMap   ParentMap( body);
-   struct find_info  info;
+   bool   found;
    
-   info.insideLoop = false;
-   info.next       = nullptr;
+   found = false;
    
-   assert( ParentMap.getParent( s));
-   
-   for(;;)
+   for (Stmt::child_iterator
+        I = parent->child_begin(), E = parent->child_end(); I != E; ++I)
    {
-      parent = ParentMap.getParent( s);
-      if( ! parent)
-         break;
+      Stmt *child = *I;
       
+      if( found)
+      {
+         info->next = child;
+         break;
+      }
+      
+      if( child == s)
+         found = true;
+      else
+         found = findNextStatementInParent( s, child, info);
+   }
+   
+   if( found)
+   {
       if( dyn_cast< DoStmt>( parent) ||
           dyn_cast< WhileStmt>( parent) ||
           dyn_cast< ForStmt>( parent))
       {
-         info.insideLoop = true;
+         info->insideLoop = true;
       }
-      
-      if( ! info.next)
-         for (Stmt::child_iterator
-              I = parent->child_begin(), E = parent->child_end(); I != E; ++I)
-         {
-            Stmt *child = *I;
-            
-            if( found)
-            {
-               info.next = child;
-               break;
-            }
-            
-            if( child == s)
-               found = true;
-         }
-      
-      s = parent;
    }
    
+   return( found);
+}
+
+
+struct find_info   findNextStatementInBody( Stmt *s, Stmt *body)
+{
+   struct find_info  info;
+   
+   info.next       = nullptr;
+   info.insideLoop = false;
+   
+   findNextStatementInParent( s, body, &info);
    return( info);
 }
 
@@ -1970,6 +1974,9 @@ public:
      Method = M;
      Call   = C;
      taintedLoves.insert( Method->getParamDecl());
+     NextStatement = nullptr;
+     returnFalseIfTainted = false;
+     stopCollectingTaints = false;
   }
 
   void   getTaintedLoves( std::set<Decl *> *result)
@@ -1980,14 +1987,19 @@ public:
 protected:
   MulleStatementVisitor( ObjCMethodDecl *M, std::set<Decl *> *taints)
   {
-     Method       = M;
+     Method = M;
+     Call   = nullptr;
+     NextStatement = nullptr;
      taintedLoves.insert( taints->begin(), taints->end());
      returnFalseIfTainted = true;
+     stopCollectingTaints = false;
   }
 
 public:
+   // this is always called and more qualified functions later too with same Stmt
    bool VisitStmt(Stmt *s)
    {
+      //fprintf( stderr, "%s %p (%s)\n", s->getStmtClassName(), s, __PRETTY_FUNCTION__);
       if( NextStatement == s)
       {
          returnFalseIfTainted = true;
@@ -2003,6 +2015,7 @@ public:
      // we could collect labels before the call and check
      // that the goto doesn't hit any known label
      //
+     //fprintf( stderr, "%s %p (%s)\n", s->getStmtClassName(), s, __PRETTY_FUNCTION__);
      if( ! NextStatement)
      {
         taintedLoves.clear();
@@ -2025,6 +2038,7 @@ public:
       Expr         *rhs;
       DeclRefExpr  *ref;
       
+     //fprintf( stderr, "%s %p (%s)\n", op->getStmtClassName(), op, __PRETTY_FUNCTION__);
       if( stopCollectingTaints)
          return( true);
       
@@ -2078,6 +2092,8 @@ public:
 
    bool VisitObjCMessageExpr(ObjCMessageExpr *d)
    {
+      //fprintf( stderr, "%s %p (%s)\n", d->getStmtClassName(), d, __PRETTY_FUNCTION__);
+ 
       if( d == Call)
       {
          struct find_info  info;
@@ -2094,6 +2110,8 @@ public:
    {
       ValueDecl   *value;
       
+      //fprintf( stderr, "%s %p (%s)\n", d->getStmtClassName(), d, __PRETTY_FUNCTION__);
+
       value = d->getDecl();
       // lol @ c++ sets
       if( taintedLoves.find( value) != taintedLoves.end())
@@ -2398,7 +2416,6 @@ LValue  *CGObjCMulleRuntime::GenerateCallArgs( CallArgList &Args,
                                                CodeGenFunction &CGF,
                                                const ObjCMessageExpr *Expr)
 {
-   unsigned             nArgs;
    struct struct_info   record_info;
    struct struct_info   rval_info;
    struct struct_info   void_info;
@@ -2513,8 +2530,8 @@ LValue  *CGObjCMulleRuntime::GenerateCallArgs( CallArgList &Args,
 
    //
    // ok lets see if we can't use _params as an argument
-   // basically. First see if we even have that (we could be in a C function)
-   // only do this when optimizing
+   // First see if we even have that (we could be in a C function)
+   // only do this when optimizing.
    //
    if (CGM.getCodeGenOpts().OptimizationLevel == 0)
       goto skip;
@@ -2566,8 +2583,7 @@ LValue  *CGObjCMulleRuntime::GenerateCallArgs( CallArgList &Args,
                // this next emit is needed, weird llvmism i dont understand
                RValue loaded       = CGF.EmitLoadOfLValue(ParentRecord, SourceLocation());
                
-               
-               CGF.EmitAggregateCopy( ParentRecord.getAddress(),
+               CGF.EmitAggregateCopy( loaded.getScalarVal(),
                                       Record.getAddress(),
                                       record_info.recTy,
                                       false);

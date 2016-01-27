@@ -878,6 +878,24 @@ void Parser::ParseObjCPropertyAttribute(ObjCDeclSpec &DS) {
 
     SourceLocation AttrName = ConsumeToken(); // consume last attribute name
 
+    // @mulle-objc@ remove strong, weak and friends
+    if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+    {
+      //  check that we know it, could also issue a warning maybe ?
+      if( ! (II->isStr("readonly") ||
+          II->isStr("assign") ||
+          II->isStr("retain") ||
+          II->isStr("copy") ||
+          II->isStr("getter") ||
+          II->isStr("setter")))
+      {
+        Diag(Tok, diag::err_mulle_objc_no_support_for_property_modifier)
+          << II->getNameStart();
+        SkipUntil(tok::r_paren, StopAtSemi);
+        return;
+      }
+    }
+    
     if (II->isStr("readonly"))
       DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_readonly);
     else if (II->isStr("assign"))
@@ -1187,12 +1205,18 @@ void Parser::ParseObjCTypeQualifierList(ObjCDeclSpec &DS,
         Nullability = NullabilityKind::NonNull;
         break;
 
-      case objc_nullable: 
-        Qual = ObjCDeclSpec::DQ_CSNullability;
-        Nullability = NullabilityKind::Nullable;
-        break;
+      case objc_nullable:
+        // @mulle-objc@ remove nullable which is the wrong philosophy
+        if( ! getLangOpts().ObjCRuntime.hasMulleMetaABI())
+        {
+           Qual = ObjCDeclSpec::DQ_CSNullability;
+           Nullability = NullabilityKind::Nullable;
+           break;
+        }
+        Diag(Tok, diag::err_mulle_objc_no_nullable);
+        // fallthru to unspecified
 
-      case objc_null_unspecified: 
+      case objc_null_unspecified:
         Qual = ObjCDeclSpec::DQ_CSNullability;
         Nullability = NullabilityKind::Unspecified;
         break;
@@ -1914,10 +1938,15 @@ void Parser::ParseObjCClassInstanceVariables(Decl *interfaceDecl,
       }
       
       switch (Tok.getObjCKeywordID()) {
+      case tok::objc_package:
+         if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+         {
+            Diag(Tok, diag::err_mulle_objc_no_package);
+            continue;
+         }
       case tok::objc_private:
       case tok::objc_public:
       case tok::objc_protected:
-      case tok::objc_package:
         visibility = Tok.getObjCKeywordID();
         ConsumeToken();
         continue;

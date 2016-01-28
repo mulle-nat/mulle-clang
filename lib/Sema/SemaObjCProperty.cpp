@@ -2079,6 +2079,18 @@ void Sema::ProcessPropertyDecl(ObjCPropertyDecl *property,
 
     AddPropertyAttrs(*this, GetterMethod, property);
 
+     //
+     // @mulle-objc@ MetaABI: fix up getter parameter if needed
+     //
+     if( Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+     {
+        if( typeNeedsMetaABIAlloca( resultTy))
+        {
+           SmallVector<ParmVarDecl*, 16> Params;
+           SetMulleObjCParam( GetterMethod, property->getSetterName(), &Params, resultTy, Sema::MetaABIRvalAsStruct, Loc);
+        }
+     }
+     
     // FIXME: Eventually this shouldn't be needed, as the lexical context
     // and the real context should be the same.
     if (lexicalDC)
@@ -2152,6 +2164,7 @@ void Sema::ProcessPropertyDecl(ObjCPropertyDecl *property,
                                                   nullptr);
       SetterMethod->setMethodParams(Context, Argument, None);
 
+      //
       // @mulle-objc@ MetaABI: fix up setter parameter
       //
       if( Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
@@ -2161,7 +2174,7 @@ void Sema::ProcessPropertyDecl(ObjCPropertyDecl *property,
             SmallVector<ParmVarDecl*, 16> Params;
             Params.push_back(Argument);
             
-            SetMulleObjCParam( SetterMethod, property->getSetterName(), &Params, property->getType(), 0x2, Loc);
+            SetMulleObjCParam( SetterMethod, property->getSetterName(), &Params, property->getType(), MetaABIParamAsStruct, Loc);
          }
          else
          {

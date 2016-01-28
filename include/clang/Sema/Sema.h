@@ -7334,6 +7334,15 @@ public:
     bool            typeNeedsMetaABIAlloca( QualType type);
     bool            isMetaABIAllocaMethod( ObjCMethodDecl *ObjCMethod,
                                           QualType resultType);
+       
+    enum MetaABIDescription
+    {
+       MetaABIVoidPtrRval   = 0x0,
+       MetaABIVoidPtrParam  = 0x1,
+       MetaABIRvalAsStruct  = 0x2,
+       MetaABIParamAsStruct = 0x4
+    };
+       
     unsigned int    metaABIDescription( SmallVector<ParmVarDecl*, 16> &Params,
                                        QualType resultType);
 

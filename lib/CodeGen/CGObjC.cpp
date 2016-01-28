@@ -607,6 +607,16 @@ void   CodeGenFunction::EmitMetaABIWriteScalarReturnValue( const Decl *FuncDecl,
 }
 
 
+void   CodeGenFunction::EmitMetaABIWriteAggregateReturnValue( const Decl *FuncDecl,
+                                                              llvm::Value *ExprResult,
+                                                              llvm::Value *Param,
+                                                              QualType ExprType)
+{
+   // surprisingly easy, too easy ?
+   EmitAggregateCopy( Param, ExprResult, ExprType);
+}
+
+
 void   CodeGenFunction::EmitMetaABIWriteReturnValue( const Decl *FuncDecl, const Expr *RV)
 {
    const ObjCMethodDecl   *MD;
@@ -1189,6 +1199,15 @@ CodeGenFunction::generateObjCGetterBody(const ObjCImplementationDecl *classImpl,
       // The return value slot is guaranteed to not be aliased, but
       // that's not necessarily the same as "on the stack", so
       // we still potentially need objc_memmove_collectable.
+      if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+      {
+         llvm::Value *param;
+         
+         param = Builder.CreateLoad( LocalDeclMap[ getterMethod->getParamDecl()], "param");
+         EmitMetaABIWriteAggregateReturnValue( getterMethod, LV.getAddress(), param, ivarType);
+         return;
+      }
+          
       EmitAggregateCopy(ReturnValue, LV.getAddress(), ivarType);
       return;
     case TEK_Scalar: {
@@ -1220,7 +1239,7 @@ CodeGenFunction::generateObjCGetterBody(const ObjCImplementationDecl *classImpl,
          // for non-direct returns we need to figure out _param her (e.g. double)
          if( getterMethod->getRvalRecord())
             param = Builder.CreateLoad( LocalDeclMap[ getterMethod->getParamDecl()], "param");
-         EmitMetaABIWriteScalarReturnValue( getterMethod, value, propType);
+         EmitMetaABIWriteScalarReturnValue( getterMethod, value, ivarType);
          return;
       }
       EmitReturnOfRValue(RValue::get(value), propType);

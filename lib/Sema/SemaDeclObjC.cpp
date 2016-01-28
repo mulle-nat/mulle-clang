@@ -4094,13 +4094,6 @@ static void mergeInterfaceMethodToImpl(Sema &S,
 //
 // @mulle-objc@ MetaABI: creates a struct from method parameters
 //
-
-#define MetaABIVoidPtrRval    0x0
-#define MetaABIVoidPtrParam   0x1
-#define MetaABIRvalAsStruct   0x2
-#define MetaABIParamAsStruct  0x4
-
-
 unsigned int   Sema::metaABIDescription( SmallVector<ParmVarDecl*, 16> &Params,
                                          QualType resultType)
 {

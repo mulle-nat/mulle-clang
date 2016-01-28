@@ -1208,12 +1208,16 @@ public:
 
   // @mulle-objc@ MetaABI: write/read return values
   void             EmitMetaABIWriteScalarReturnValue( const Decl *FuncDecl, 
-                                                      llvm::Value *exprResult,
-                                                      QualType exprType);
+                                                      llvm::Value *ExprResult,
+                                                      QualType ExprType);
+  void             EmitMetaABIWriteAggregateReturnValue( const Decl *FuncDecl,
+                                                         llvm::Value *ExprResult,
+                                                         llvm::Value *Param,
+                                                         QualType ExprType);
   void             EmitMetaABIWriteReturnValue( const Decl *FuncDecl, const Expr *RV);
   CodeGen::RValue  EmitMetaABIReadReturnValue( const ObjCMethodDecl *Method,
-                                            CodeGen::RValue rvalue,
-                                            CodeGen::RValue  param,
+                                            CodeGen::RValue Rvalue,
+                                            CodeGen::RValue Param,
                                             ReturnValueSlot Return,
                                             QualType ResultType);
    

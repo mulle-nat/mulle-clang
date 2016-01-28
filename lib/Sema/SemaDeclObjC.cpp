@@ -2703,8 +2703,22 @@ void Sema::MatchAllMethodDeclarations(const SelectorSet &InsMap,
     if (!I->isPropertyAccessor() &&
         !InsMap.count(I->getSelector())) {
       if (ImmediateClass)
+      {
+         // @mulle-objc@ language: remove warnings for unimplemented instance methods like -retain, -release which are always defined
+         if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+         {
+            std::string   s;
+            
+            s = I->getNameAsString();
+            if( s != "release" &&
+                s != "retain")
+               WarnUndefinedMethod(*this, IMPDecl->getLocation(), I, IncompleteImpl,
+                                   diag::warn_undef_method_impl);
+         }
+         else
         WarnUndefinedMethod(*this, IMPDecl->getLocation(), I, IncompleteImpl,
                             diag::warn_undef_method_impl);
+      }
       continue;
     } else {
       ObjCMethodDecl *ImpMethodDecl =
@@ -2729,8 +2743,22 @@ void Sema::MatchAllMethodDeclarations(const SelectorSet &InsMap,
       continue;
     if (!ClsMap.count(I->getSelector())) {
       if (ImmediateClass)
+      {
+         // @mulle-objc@ language: remove warnings for unimplemented class methods like +new, +alloc which are always defined
+         if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+         {
+            std::string   s;
+            
+            s = I->getNameAsString();
+            if( s != "new" &&
+                s != "alloc")
+            WarnUndefinedMethod(*this, IMPDecl->getLocation(), I, IncompleteImpl,
+                                diag::warn_undef_method_impl);
+         }
+         else
         WarnUndefinedMethod(*this, IMPDecl->getLocation(), I, IncompleteImpl,
                             diag::warn_undef_method_impl);
+      }
     } else {
       ObjCMethodDecl *ImpMethodDecl =
         IMPDecl->getClassMethod(I->getSelector());

@@ -293,7 +293,7 @@ namespace {
          Types.GetFunctionType(Types.arrangeLLVMFunctionInfo(
                                                              Ctx.VoidTy, false, false, Params, FunctionType::ExtInfo(),
                                                              RequiredArgs::All));
-         return CGM.CreateRuntimeFunction(FTy, "mulle_objc_object_set_property");
+         return CGM.CreateRuntimeFunction(FTy, "mulle_objc_object_set_object_property");
       }
       
       llvm::Constant *getOptimizedSetPropertyFn(bool atomic, bool copy) {

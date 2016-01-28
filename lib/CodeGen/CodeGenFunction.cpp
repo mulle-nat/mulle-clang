@@ -694,7 +694,7 @@ void CodeGenFunction::StartFunction(GlobalDecl GD,
   if (CGM.getCodeGenOpts().InstrumentForProfiling)
     EmitMCountInstrumentation();
 
-  // @mulle-objc@ return value: change return type of method to "void *" always (if not void)
+  // @mulle-objc@ MetaABI: change return type of method to "void *" always (if not void)
   // obviously it would be nicer to place this into the else in the
   // code jungle below, but the reindentation scares me
   

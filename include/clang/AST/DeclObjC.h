@@ -173,7 +173,7 @@ private:
   void *ParamsAndSelLocs;
   unsigned NumParams;
 
-  // @mulle-objc@ parameters: ivars ParamRecord
+  // @mulle-objc@ MetaABI: ivars ParamRecord
   RecordDecl    *ParamRecord;
   
   // return value record (if needed)
@@ -191,7 +191,7 @@ private:
   /// CmdDecl - Decl for the implicit _cmd parameter. This is lazily
   /// constructed by createImplicitParams.
   ImplicitParamDecl *CmdDecl;
-   /// @mulle-objc@ parameters: ParamDecl storage of declaration
+   /// @mulle-objc@ MetaABI: ParamDecl storage of declaration
    /// Para,Decl - Decl for the implicit _param parameter. This is lazily
    /// constructed by ActOnMethodDeclaration.
   ImplicitParamDecl *ParamDecl;
@@ -251,7 +251,7 @@ private:
         MethodDeclType(T), ReturnTInfo(ReturnTInfo), ParamsAndSelLocs(nullptr),
         NumParams(0), DeclEndLoc(endLoc), Body(), SelfDecl(nullptr),
         CmdDecl(nullptr),
-/// @mulle-objc@ parameters: initialize storage of parameter ivars
+/// @mulle-objc@ MetaABI: initialize storage of parameter ivars
         ParamDecl( nullptr) {
     ParamRecord = nullptr;
     RvalRecord = nullptr;
@@ -412,7 +412,7 @@ public:
     return llvm::map_iterator(param_end(), deref_fun(&ParmVarDecl::getType));
   }
 
-  // @mulle-objc@ parameters: paramRecord, paramDecl accessors
+  // @mulle-objc@ MetaABI: paramRecord, paramDecl accessors
   // struct {}
   RecordDecl   *getParamRecord() const { return ParamRecord; }
   void setParamRecord( RecordDecl  *RD) { ParamRecord = RD; }
@@ -429,7 +429,7 @@ public:
   void setRvalRecord( RecordDecl  *RD) { RvalRecord = RD; }
 
 
-  // @mulle-objc@ parameters:  method FindParamRecordField for parameters
+  // @mulle-objc@ MetaABI:  method FindParamRecordField for parameters
   FieldDecl  *FindParamRecordField( IdentifierInfo *II);
 
   /// createImplicitParams - Used to lazily create the self and cmd

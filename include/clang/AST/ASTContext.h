@@ -225,7 +225,7 @@ class ASTContext : public RefCountedBase<ASTContext> {
   mutable TypedefDecl *ObjCClassDecl;
 
   /// \brief The typedef for the predefined \c Protocol class in Objective-C.
-/// @mulle-objc@ change type of ObjCProtocolClassDecl
+/// @mulle-objc@ uniqueid: change type of ObjCProtocolClassDecl
   mutable NamedDecl *ObjCProtocolClassDecl;
   
   /// \brief The typedef for the predefined 'BOOL' type.
@@ -1536,7 +1536,7 @@ public:
 
   /// \brief Retrieve the Objective-C class declaration corresponding to 
   /// the predefined \c Protocol class.
-  /// @mulle-objc@ change type of getObjCProtocolDecl
+  /// @mulle-objc@ uniqueid: change type of getObjCProtocolDecl
   NamedDecl *getObjCProtocolDecl() const;
 
   /// \brief Retrieve declaration of 'BOOL' typedef
@@ -1556,7 +1556,7 @@ public:
   
   /// \brief Retrieve the type of the Objective-C \c Protocol class.
   QualType getObjCProtoType() const {
-   /// @mulle-objc@ change type of getObjCProtocolDecl
+   /// @mulle-objc@ uniqueid: change type of getObjCProtocolDecl
     if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
       return getTypeDeclType( (TypedefDecl *) getObjCProtocolDecl());
     return getObjCInterfaceType( (ObjCInterfaceDecl *) getObjCProtocolDecl());
@@ -2399,7 +2399,7 @@ public:
 private:
   void InitBuiltinType(CanQualType &R, BuiltinType::Kind K);
 
-// @mulle-objc@ need getObjCEncodingForTypeImpl to be public
+// @mulle-objc@ compiler: need getObjCEncodingForTypeImpl to be public
 public:
   // Return the Objective-C type encoding for a given type.
   void getObjCEncodingForTypeImpl(QualType t, std::string &S,

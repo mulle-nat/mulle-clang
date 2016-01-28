@@ -878,7 +878,7 @@ void Parser::ParseObjCPropertyAttribute(ObjCDeclSpec &DS) {
 
     SourceLocation AttrName = ConsumeToken(); // consume last attribute name
 
-    // @mulle-objc@ remove strong, weak and friends
+    // @mulle-objc@ language: remove strong, weak and friends
     if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
     {
       //  check that we know it, could also issue a warning maybe ?
@@ -1206,7 +1206,7 @@ void Parser::ParseObjCTypeQualifierList(ObjCDeclSpec &DS,
         break;
 
       case objc_nullable:
-        // @mulle-objc@ remove nullable which is the wrong philosophy
+        // @mulle-objc@ language: remove nullable which is the wrong philosophy
         if( ! getLangOpts().ObjCRuntime.hasMulleMetaABI())
         {
            Qual = ObjCDeclSpec::DQ_CSNullability;

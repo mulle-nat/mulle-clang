@@ -320,7 +320,7 @@ void Sema::ActOnStartOfObjCMethodDef(Scope *FnBodyScope, Decl *D) {
 
   PushOnScopeChains(MDecl->getSelfDecl(), FnBodyScope);
   PushOnScopeChains(MDecl->getCmdDecl(), FnBodyScope);
-   // @mulle-objc@ MetaABI parameters: save scope for later retrieval in ActonMethod
+   // @mulle-objc@ MetaABI: save scope for later retrieval in ActonMethod
    bool hasMetaABIParam;
    
    hasMetaABIParam = getLangOpts().ObjCRuntime.hasMulleMetaABI() && MDecl->getParamDecl();
@@ -339,7 +339,7 @@ void Sema::ActOnStartOfObjCMethodDef(Scope *FnBodyScope, Decl *D) {
       Diag(Param->getLocation(), diag::warn_arc_strong_pointer_objc_pointer) <<
             Param->getType();
     
-     // @mulle-objc@ parameters: Remove Parameters from Scope
+     // @mulle-objc@ MetaABI: Remove Parameters from Scope
      // (nat) pushing the param identifier on the scope is done here
      //
      if( ! hasMetaABIParam)
@@ -4092,7 +4092,7 @@ static void mergeInterfaceMethodToImpl(Sema &S,
 }
 
 //
-// @mulle-objc@ parameters: creates a struct from method parameters
+// @mulle-objc@ MetaABI: creates a struct from method parameters
 //
 
 #define MetaABIVoidPtrRval    0x0
@@ -4337,7 +4337,7 @@ Decl *Sema::ActOnMethodDeclaration(
       Param->setInvalidDecl();
     }
      
-     // @mulle-objc@ parameters: Remove Parameters from Scope
+     // @mulle-objc@ MetaABI: Remove Parameters from Scope
      // (nat) This is done before already.... but we don't want it anyway.
      //       Keep regular parameters outside of the scopes.
       if( ! getLangOpts().ObjCRuntime.hasMulleMetaABI())
@@ -4366,7 +4366,7 @@ Decl *Sema::ActOnMethodDeclaration(
   
   ObjCMethod->setMethodParams(Context, Params, SelectorLocs);
 
-  // @mulle-objc@ MetaABI parameters: create ParamRecord
+  // @mulle-objc@ MetaABI: create ParamRecord
   // the params are what is used for syntax checks and all the
   // other good stuff.
   //

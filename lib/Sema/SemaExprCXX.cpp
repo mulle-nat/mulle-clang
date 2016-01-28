@@ -6366,7 +6366,7 @@ static ExprResult attemptRecovery(Sema &SemaRef,
             NewSS, /*TemplateKWLoc*/ SourceLocation(), R,
             /*TemplateArgs*/ nullptr);
     } else if (auto *Ivar = dyn_cast<ObjCIvarDecl>(ND)) {
-      // @mulle-objc@ added CXXScopeSpec to arguments
+      // @mulle-objc@ compiler: added CXXScopeSpec to arguments
       return SemaRef.LookupInObjCMethod(R, Consumer.getScope(), NewSS,
                                         Ivar->getIdentifier());
     }

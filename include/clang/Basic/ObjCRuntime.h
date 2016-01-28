@@ -86,13 +86,13 @@ public:
     case GNUstep: return true;
     case ObjFW: return true;
     case iOS: return true;
-    // @mulle-objc@ is non fragile, clang inspection for mulle runtime
+    // @mulle-objc@ compuler: is not non-fragile, clang inspection for mulle runtime
     case Mulle: return false;
     }
     llvm_unreachable("bad kind");
   }
 
-  // @mulle-objc@ runtime: additional method hasMulleMetaABI to check if compiling with mulle
+  // @mulle-objc@ compiler: additional method hasMulleMetaABI to check if compiling with mulle
   bool hasMulleMetaABI() const {
     switch (getKind()) {
     case Mulle: return true;
@@ -120,7 +120,7 @@ public:
         return Arch != llvm::Triple::x86_64;
     // Except for deployment target of 10.5 or less,
     // Mac runtimes use legacy dispatch everywhere now.
-    // @mulle-objc@ is legacy dispatch, clang inspection for mulle runtime
+    // @mulle-objc@ compiler: is not legacy dispatch, clang inspection for mulle runtime
     if( getKind() == Mulle)
       return false; // Mulle dispatches differently I guess
     return true;
@@ -132,7 +132,7 @@ public:
     case FragileMacOSX:
     case MacOSX:
     case iOS:
-    // @mulle-objc@ is Gnu family, clang inspection for mulle runtime
+    // @mulle-objc@ compiler: is not Gnu family, clang inspection for mulle runtime
     case Mulle:
       return false;
     case GCC:
@@ -159,7 +159,7 @@ public:
     case GCC: return false;
     case GNUstep: return true;
     case ObjFW: return true;
-    // @mulle-objc@ allows ARC, clang inspection for mulle runtime
+    // @mulle-objc@ compiler: dont allow ARC, clang inspection for mulle runtime
     case Mulle : return false; // 4 now
     }
     llvm_unreachable("bad kind");
@@ -179,7 +179,7 @@ public:
     case GCC: return false;
     case GNUstep: return getVersion() >= VersionTuple(1, 6);
     case ObjFW: return true;
-    // @mulle-objc@ has native ARC, clang inspection for mulle runtime
+    // @mulle-objc@ compiler: has no native ARC, clang inspection for mulle runtime
     case Mulle: return false;
     }
     llvm_unreachable("bad kind");
@@ -246,7 +246,7 @@ public:
     switch (getKind()) {
     case FragileMacOSX:
     case GCC:
-    // @mulle-objc@ allow pointer arithmetic, clang inspection for mulle runtime
+    // @mulle-objc@ compiler: allow pointer arithmetic, clang inspection for mulle runtime
     case Mulle:
       return true;
     case MacOSX:
@@ -275,7 +275,7 @@ public:
     case GCC: return false;
     case GNUstep: return false;
     case ObjFW: return false;
-    // @mulle-objc@ has terminate, clang inspection for mulle runtime
+    // @mulle-objc@ compiler: has terminate, clang inspection for mulle runtime
     case Mulle: return false;
     }
     llvm_unreachable("bad kind");
@@ -290,7 +290,7 @@ public:
     case GCC: return true;
     case GNUstep: return true;
     case ObjFW: return true;
-    // @mulle-objc@ weak class import, clang inspection for mulle runtime
+    // @mulle-objc@ compiler: weak class import, clang inspection for mulle runtime
     case Mulle: return false;   // maybe so, maybe not so
     }
     llvm_unreachable("bad kind");
@@ -305,7 +305,7 @@ public:
     case GCC: return true;
     case GNUstep: return true;
     case ObjFW: return true;
-    // @mulle-objc@ unwind exceptions, clang inspection for mulle runtime
+    // @mulle-objc@ compiler: unwind exceptions, clang inspection for mulle runtime
     case Mulle: return false;
     }
     llvm_unreachable("bad kind");

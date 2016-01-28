@@ -383,7 +383,7 @@ CGObjCRuntime::getMessageSendInfo(const ObjCMethodDecl *method,
 }
 
 //
-// @mulle-objc@ codegen: to generate LLVM method argument list
+// @mulle-objc@ MetaABI: to generate LLVM method argument list
 //   this is done differently in mulle-objc so this little code
 //   snippet is placed into the runtime
 //

@@ -2225,7 +2225,7 @@ Sema::ActOnIdExpression(Scope *S, CXXScopeSpec &SS,
     // reference the ivar.
     if (ObjCIvarDecl *Ivar = R.getAsSingle<ObjCIvarDecl>()) {
       R.clear();
-      // @mulle-objc@ added CXXScopeSpec to LookupInObjCMethod arguments
+      // @mulle-objc@ compiler: added CXXScopeSpec to LookupInObjCMethod arguments
       ExprResult E(LookupInObjCMethod(R, S, SS, Ivar->getIdentifier()));
       // In a hopelessly buggy code, Objective-C instance variable
       // lookup fails and no expression will be built to reference it.
@@ -2380,7 +2380,7 @@ Sema::BuildQualifiedDeclarationNameExpr(CXXScopeSpec &SS,
 }
 
 
-/* @mulle-objc@ parameters: GetMulle_paramExpr create an expression to access _param by name */
+/* @mulle-objc@ MetaABI: GetMulle_paramExpr create an expression to access _param by name */
 ExprResult   Sema::GetMulle_paramExpr( Scope *S, CXXScopeSpec &SS, SourceLocation Loc, StringRef Name)
 {
    DeclarationName   DN;
@@ -2429,7 +2429,7 @@ ExprResult   Sema::GetMulle_paramExprAsType( QualType type, Scope *S, CXXScopeSp
 
 
 
-/* @mulle-objc@ parameters: GetMulle_paramFieldExpr create an expression to access _param->field */
+/* @mulle-objc@ MetaABI: GetMulle_paramFieldExpr create an expression to access _param->field */
 ExprResult
 Sema::GetMulle_paramFieldExpr( FieldDecl *FD, Scope *S, CXXScopeSpec &SS, SourceLocation Loc)
 {
@@ -2499,7 +2499,7 @@ Sema::LookupInObjCMethod(LookupResult &Lookup, Scope *S, CXXScopeSpec &SS,
                     Lookup.getFoundDecl()->isDefinedOutsideFunctionOrMethod());
   
   //
-  // @mulle-objc@ parameters: Create MemberExpr for _param-><name>
+  // @mulle-objc@ MetaABI: Create MemberExpr for _param-><name>
   // (nat) lookup if this is one of our parameters
   //
   if( getLangOpts().ObjCRuntime.hasMulleMetaABI())

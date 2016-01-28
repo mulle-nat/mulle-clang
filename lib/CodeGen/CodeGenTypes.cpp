@@ -330,7 +330,7 @@ llvm::Type *CodeGenTypes::ConvertType(QualType T) {
     case BuiltinType::ObjCSel:
       // LLVM void type can only be used as the result of a function call.  Just
       // map to the same as char.
-      // @mulle-objc@ id,class,sel: change type to long
+      // @mulle-objc@ uniqueid: id,class,sel: change type to uintptr_t
       if( getContext().getLangOpts().ObjCRuntime.hasMulleMetaABI())
          ResultType = llvm::IntegerType::get(getLLVMContext(),
                                  static_cast<unsigned>(Context.getTypeSize(Context.getUIntPtrType())));

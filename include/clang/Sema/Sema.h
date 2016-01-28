@@ -3632,12 +3632,12 @@ public:
                       TemplateArgumentListInfo *ExplicitTemplateArgs = nullptr,
                       ArrayRef<Expr *> Args = None, TypoExpr **Out = nullptr);
 
-  // @mulle-objc@ parameters: additional methods GetMulle_paramExpr GetMulle_paramFieldExpr
+  // @mulle-objc@ MetaABI: additional methods GetMulle_paramExpr GetMulle_paramFieldExpr
   ExprResult   GetMulle_paramExpr( Scope *S, CXXScopeSpec &SS, SourceLocation Loc, StringRef Name);
   ExprResult   GetMulle_paramFieldExpr( FieldDecl *FD, Scope *S, CXXScopeSpec &SS, SourceLocation Loc);
   ExprResult   GetMulle_paramExprAsType( QualType type, Scope *S, CXXScopeSpec &SS, SourceLocation Loc, StringRef Name);
 
-  // @mulle-objc@ added CXXScopeSpec to LookupInObjCMethod parameters
+  // @mulle-objc@ compiler: added CXXScopeSpec to LookupInObjCMethod parameters
   ExprResult LookupInObjCMethod(LookupResult &LookUp, Scope *S, CXXScopeSpec &SS,
                                 IdentifierInfo *II,
                                 bool AllowBuiltinCreation=false);
@@ -7323,7 +7323,7 @@ public:
     AttributeList *AttrList, tok::ObjCKeywordKind MethodImplKind,
     bool isVariadic, bool MethodDefinition);
 
-   // @mulle-objc@ parameters: additional method SetMulleObjCParam
+   // @mulle-objc@ MetaABI: additional method SetMulleObjCParam
    // Why do I have to specify the size of the vector when passing ??
     void   SetMulleObjCParam( ObjCMethodDecl *ObjCMethod,
                               Selector Sel,
@@ -7433,7 +7433,7 @@ public:
                                           ObjCMethodDecl *Method,
                                           MultiExprArg Args);
 
-   // @mulle-objc@ additional method CheckMulleObjCFunctionDefined
+   // @mulle-objc@ compiler: additional method CheckMulleObjCFunctionDefined
   bool  CheckMulleObjCFunctionDefined( Scope *S,
                                        SourceLocation Loc,
                                        StringRef Name);

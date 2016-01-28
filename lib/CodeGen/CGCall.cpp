@@ -305,7 +305,7 @@ CodeGenTypes::arrangeObjCMessageSendSignature(const ObjCMethodDecl *MD,
   argTys.push_back(Context.getCanonicalParamType(receiverType));
   argTys.push_back(Context.getCanonicalParamType(Context.getObjCSelType()));
 
-   // @mulle-objc@ MetaABI call: Hack ObjCMessageSendSignature 
+   // @mulle-objc@ MetaABI: Hack ObjCMessageSendSignature 
    if( Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
    {
       RecordDecl *RD = MD->getParamRecord();
@@ -325,7 +325,7 @@ CodeGenTypes::arrangeObjCMessageSendSignature(const ObjCMethodDecl *MD,
       // with which mulle_objc_object_inline_call was declared
       callConv = Context.getDefaultCallingConvention( false, false);
       
-      // @mulle-objc@ method signature: fix returnType to void * (Part I)
+      // @mulle-objc@ MetaABI: fix returnType to void * (Part I)
       if( MD->getReturnType()->isVoidType())
          returnType = Context.VoidTy;
       else
@@ -344,10 +344,9 @@ CodeGenTypes::arrangeObjCMessageSendSignature(const ObjCMethodDecl *MD,
 
   FunctionType::ExtInfo einfo;
   
-  // @mulle-objc@ message signature: fix call convention
+  // @mulle-objc@ MetaABI: message signature: fix call convention
   einfo = einfo.withCallingConv( callConv);
 
-  // @mulle-objc@ message signature: probably need to fix or skip this
   if (getContext().getLangOpts().ObjCAutoRefCount &&
       MD->hasAttr<NSReturnsRetainedAttr>())
     einfo = einfo.withProducesResult(true);
@@ -355,7 +354,7 @@ CodeGenTypes::arrangeObjCMessageSendSignature(const ObjCMethodDecl *MD,
   RequiredArgs required =
     (MD->isVariadic() ? RequiredArgs(argTys.size()) : RequiredArgs::All);
 
-  // @mulle-objc@ method signature: fix returnType to void * (Part II)
+  // @mulle-objc@ MetaABI: fix returnType to void * (Part II)
   return arrangeLLVMFunctionInfo(
       returnType, /*instanceMethod=*/false,
       /*chainCall=*/false, argTys, einfo, required);
@@ -1934,7 +1933,7 @@ void CodeGenFunction::EmitFunctionProlog(const CGFunctionInfo &FI,
         auto AI = FnArgs[FirstIRArg];
         llvm::Value *V = AI;
 
-        // @mulle-objc@ make `self nullable in llvm if so desired 
+        // @mulle-objc@ language: make self nonnullable in llvm if so desired
         if (const ImplicitParamDecl *IPD = dyn_cast<ImplicitParamDecl>(Arg)) {
           if (IPD->getAttr<NonNullAttr>())
             AI->addAttr(llvm::AttributeSet::get(getLLVMContext(),
@@ -2029,7 +2028,7 @@ void CodeGenFunction::EmitFunctionProlog(const CGFunctionInfo &FI,
         llvm::Type *LTy = ConvertType(Arg->getType());
         if (V->getType() != LTy)
         {
-         // @mulle-objc@ function argument _param, cast from void pointer to uintptr_t (methods only)
+         // @mulle-objc@ MetaABI: function argument _param, cast from void pointer to uintptr_t (methods only)
             if( CGM.getLangOpts().ObjCRuntime.hasMulleMetaABI())
             {
                if( dyn_cast_or_null<ObjCMethodDecl>(CurCodeDecl))
@@ -3342,7 +3341,7 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
         else
           V = Builder.CreateLoad(RV.getAggregateAddr());
 
-         // @mulle-objc@ function call argument, cast into void *, if dst is objc method
+         // @mulle-objc@ MetaABI: function call argument, cast into void *, if dst is objc method
 	if( ArgNo == 2 && CGM.getLangOpts().ObjCRuntime.hasMulleMetaABI())
 	{
             const ObjCMethodDecl *MD = dyn_cast_or_null<ObjCMethodDecl>(TargetDecl);

@@ -945,7 +945,7 @@ ObjCMethodFamily ObjCMethodDecl::getMethodFamily() const {
   return family;
 }
 
-// @mulle-objc@ parameters: Lookup a _param FieldDecl by Identifier
+// @mulle-objc@ MetaABI: Lookup a _param FieldDecl by Identifier
 FieldDecl  *ObjCMethodDecl::FindParamRecordField( IdentifierInfo *II)
 {
    IdentifierInfo   *FII;

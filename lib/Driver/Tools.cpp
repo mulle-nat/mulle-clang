@@ -5090,7 +5090,7 @@ ObjCRuntime Clang::AddObjCRuntimeArgs(const ArgList &args,
     bool nonFragileABIIsDefault =
         (rewriteKind == RK_NonFragile ||
          (rewriteKind == RK_None &&
-          // @mulle-objc@ mulle runtime is default and always fragile
+          // @mulle-objc@ compiler: mulle runtime is default and always fragile
           //getToolChain().IsObjCNonFragileABIDefault()));
           false));
     if (args.hasFlag(options::OPT_fobjc_nonfragile_abi,
@@ -5133,7 +5133,7 @@ ObjCRuntime Clang::AddObjCRuntimeArgs(const ArgList &args,
     case RK_None:
       runtime = getToolChain().getDefaultObjCRuntime(isNonFragile);
       break;
-      // @mulle-objc@ if fragile, mulle runtime is default
+      // @mulle-objc@ compiler: if fragile, mulle runtime is default
     case RK_Fragile:
       runtime = ObjCRuntime(ObjCRuntime::Mulle, VersionTuple());
       break;

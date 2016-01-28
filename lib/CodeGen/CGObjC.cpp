@@ -391,7 +391,7 @@ RValue CodeGenFunction::EmitObjCMessageExpr(const ObjCMessageExpr *E,
   QualType ResultType = method ? method->getReturnType() : E->getType();
 
   
-  // @mulle-objc@ call: added a patchpoint for GenerateCallArgs
+  // @mulle-objc@ MetaABI: added a patchpoint in EmitObjCMessageExprfor GenerateCallArgs
   // take arguments, push it into one big struct
   // Emit this argument
   //
@@ -456,7 +456,7 @@ RValue CodeGenFunction::EmitObjCMessageExpr(const ObjCMessageExpr *E,
   }
 
   //
-  // @mulle-objc@ call: tell optimizer the lifetime is done for this alloca
+  // @mulle-objc@ MetaABI: tell optimizer the lifetime is done for this alloca
   // non-mulle runtimes will NULL here
   if( alloca)
   {
@@ -518,8 +518,8 @@ void CodeGenFunction::StartObjCMethod(const ObjCMethodDecl *OMD,
   args.push_back(OMD->getSelfDecl());
   args.push_back(OMD->getCmdDecl());
 
- // @mulle-objc@ MetaABI arguments: Push ParamDecl on args Decl, the _param pointer
- // Ignore others
+   // @mulle-objc@ MetaABI: Push ParamDecl on args Decl, the _param pointer
+   // Ignore others
  
    if( getLangOpts().ObjCRuntime.hasMulleMetaABI() && OMD->getParamDecl())
    {
@@ -533,7 +533,7 @@ void CodeGenFunction::StartObjCMethod(const ObjCMethodDecl *OMD,
   CurGD = OMD;
   CurEHLocation = OMD->getLocEnd();
 
- // @mulle-objc@ MetaABI arguments: Use FI.getReturnType() because it's void *
+ // @mulle-objc@ MetaABI: Use Function FI.getReturnType() because it's void *
 
   StartFunction(OMD, FI.getReturnType(), Fn, FI, args,
                 OMD->getLocation(), StartLoc);
@@ -1279,7 +1279,7 @@ CodeGenFunction::generateObjCSetterBody(const ObjCImplementationDecl *classImpl,
 
   
   //
-  // @mulle-objc@ MetaAPI property: gotta make this access our paramDecl instead
+  // @mulle-objc@ MetaAPI: property setter access paramDecl
   //
   // this code really should be runtime specific
   //
@@ -2379,7 +2379,7 @@ llvm::Value *CodeGenFunction::EmitObjCMRRAutoreleasePoolPush() {
   RValue InitRV =
     Runtime.GenerateMessageSend(*this, ReturnValueSlot(),
                                 getContext().getObjCIdType(),
-                                InitSel, Receiver, Args); 
+                                InitSel, Receiver, Args);
   return InitRV.getScalarVal();
 }
 

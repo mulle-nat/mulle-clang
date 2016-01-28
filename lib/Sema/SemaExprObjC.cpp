@@ -1231,7 +1231,7 @@ ExprResult Sema::ParseObjCProtocolExpression(IdentifierInfo *ProtocolId,
   QualType Ty = Context.getObjCProtoType();
   if (Ty.isNull())
     return true;
-  // @mulle-objc@ protocol: fake up protocol type to be a long
+  // @mulle-objc@ uniqueid: fake up protocol type to be a long
   // should ask runtime to return it
    if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
    {

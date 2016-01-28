@@ -5965,7 +5965,7 @@ TypedefDecl *ASTContext::getObjCIdDecl() const {
 
 TypedefDecl *ASTContext::getObjCSelDecl() const {
   if (!ObjCSelDecl) {
-    // @mulle-objc@ selector: change type to uintptr_t
+    // @mulle-objc@ uniqueid: change type to uintptr_t
     QualType T = getLangOpts().ObjCRuntime.hasMulleMetaABI() ? getUIntPtrType()
                                                              : getPointerType(ObjCBuiltinSelTy);
     ObjCSelDecl = buildImplicitTypedef(T, "SEL");
@@ -5982,10 +5982,9 @@ TypedefDecl *ASTContext::getObjCClassDecl() const {
   return ObjCClassDecl;
 }
 
-/// @mulle-objc@ change type of getObjCProtocolDecl
+/// @mulle-objc@ uniqueid: change type of getObjCProtocolDecl to uintptr_t
 NamedDecl *ASTContext::getObjCProtocolDecl() const {
   if (!ObjCProtocolClassDecl) {
-    // @mulle-objc@ TODO protocol: change type to uintptr_t
     if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
     {
       QualType T = getLangOpts().ObjCRuntime.hasMulleMetaABI() ? getUIntPtrType()

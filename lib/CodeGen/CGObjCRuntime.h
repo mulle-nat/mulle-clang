@@ -159,7 +159,7 @@ public:
                       const ObjCInterfaceDecl *Class = nullptr,
                       const ObjCMethodDecl *Method = nullptr) = 0;
 
-   // @mulle-objc@ header: Callback to generate LLVM method argument list 
+   // @mulle-objc@ MetaABI: Callback to generate LLVM method argument list 
    virtual LValue   *GenerateCallArgs( CallArgList &Args,
                                        CodeGenFunction &CGF,
                                        const ObjCMessageExpr *Expr);

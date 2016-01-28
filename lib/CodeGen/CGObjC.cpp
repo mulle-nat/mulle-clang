@@ -549,6 +549,201 @@ void CodeGenFunction::StartObjCMethod(const ObjCMethodDecl *OMD,
   }
 }
 
+
+// @mulle-objc@ MetaABI: put rval into _param if needed
+void   CodeGenFunction::EmitMetaABIWriteScalarReturnValue( const Decl *FuncDecl, llvm::Value *exprResult, QualType exprType)
+{
+   const ObjCMethodDecl   *MD;
+   RecordDecl             *RD;
+   QualType               recordTy;
+   QualType               recordPtrTy;
+   llvm::Type             *llvmRecType;
+   llvm::Type             *llvmPointerType;
+   llvm::Value            *param;
+   llvm::Value            *paramAddr;
+   unsigned               alignment ;
+   QualType               longType;
+   
+   MD = dyn_cast<ObjCMethodDecl>( FuncDecl);
+         // return value: wrap scalar in aggregate, return pointer if in method
+   if( ! MD)
+   {
+      Builder.CreateStore( exprResult, ReturnValue);
+      return;
+   }
+
+   RD = MD->getRvalRecord();
+   if( ! RD)
+   {
+      if( exprType->isIntegralOrEnumerationType())
+      {
+         longType   = CGM.getContext().LongTy;
+         exprResult = Builder.CreateSExtOrBitCast( exprResult, getTypes().ConvertTypeForMem( longType));
+      }
+      exprResult = Builder.CreateBitOrPointerCast( exprResult, getTypes().ConvertTypeForMem( getContext().VoidPtrTy));
+      Builder.CreateStore( exprResult, ReturnValue);
+      return;
+   }
+   
+   recordTy    = CGM.getContext().getTagDeclType( RD);
+   recordPtrTy = CGM.getContext().getPointerType( recordTy);
+   llvmRecType = CGM.getTypes().ConvertTypeForMem( recordTy);
+   llvmPointerType = llvmRecType->getPointerTo();
+   
+   param = LocalDeclMap[ MD->getParamDecl()];
+   
+   // store ScalarExpr in alloca
+   alignment = CGM.getContext().getTypeAlignInChars( recordPtrTy).getQuantity();
+   paramAddr = Builder.CreateBitCast( Builder.CreateAlignedLoad( param, alignment, "_param.rval"), llvmPointerType);
+   
+   LValue Record = MakeNaturalAlignAddrLValue( paramAddr, recordTy);
+   LValue Field = EmitLValueForField( Record, *RD->field_begin());
+   EmitStoreOfScalar(exprResult, Field);
+   
+   // store pointer in returnValue
+   // OMIT this, it's superflous
+   //llvm::Value *newParam = Builder.CreateBitCast( paramAddr, VoidPtrTy);
+   //Builder.CreateStore( newParam, ReturnValue);
+}
+
+
+void   CodeGenFunction::EmitMetaABIWriteReturnValue( const Decl *FuncDecl, const Expr *RV)
+{
+   const ObjCMethodDecl   *MD;
+   RecordDecl             *RD;
+   QualType               recordTy;
+   QualType               recordPtrTy;
+   llvm::Type             *llvmRecType;
+   llvm::Type             *llvmPointerType;
+   llvm::Value            *param;
+   llvm::Value            *paramAddr;
+   unsigned               alignment;
+   
+   switch( getEvaluationKind( RV->getType()))
+   {
+      case TEK_Scalar:
+      {
+         llvm::Value *exprResult = EmitScalarExpr( RV);
+         
+         EmitMetaABIWriteScalarReturnValue( FuncDecl, exprResult, RV->getType());
+         return;
+      }
+      
+      case TEK_Aggregate:
+      {
+         CharUnits Alignment = getContext().getTypeAlignInChars(RV->getType());
+         
+         RD = nullptr;
+         MD = dyn_cast<ObjCMethodDecl>( FuncDecl);
+         if( MD)
+            RD = MD->getRvalRecord();
+
+         // return value: emit aggregate, return pointer to it
+         if( ! RD)
+         {
+            
+            EmitAggExpr(RV, AggValueSlot::forAddr(ReturnValue, Alignment,
+                                                  Qualifiers(),
+                                                  AggValueSlot::IsDestructed,
+                                                  AggValueSlot::DoesNotNeedGCBarriers,
+                                                  AggValueSlot::IsNotAliased));
+            return;
+         }
+         
+         recordTy    = CGM.getContext().getTagDeclType( RD);
+         recordPtrTy = CGM.getContext().getPointerType( recordTy);
+         llvmRecType = CGM.getTypes().ConvertTypeForMem( recordTy);
+         llvmPointerType = llvmRecType->getPointerTo();
+         
+         // get _param address (known to be big enough)
+         param = LocalDeclMap[ MD->getParamDecl()];
+         
+         // emit aggregate expression
+         // cast paramAddr to return value...
+         alignment = CGM.getContext().getTypeAlignInChars( RV->getType()).getQuantity();
+         paramAddr = Builder.CreateBitCast( Builder.CreateAlignedLoad( param, alignment, "_param.rval"), getTypes().ConvertTypeForMem( RV->getType())->getPointerTo());
+         
+         EmitAggExpr(RV, AggValueSlot::forAddr( paramAddr, Alignment,
+                                               Qualifiers(),
+                                               AggValueSlot::IsDestructed,
+                                               AggValueSlot::DoesNotNeedGCBarriers,
+                                               AggValueSlot::IsNotAliased));
+         
+         // store pointer in returnValue
+         // OMIT this, it's superflous
+         //llvm::Value *newParam = Builder.CreateBitCast( paramAddr, VoidPtrTy);
+         //Builder.CreateStore( newParam, ReturnValue);
+         return;
+      }
+         
+      default :
+         llvm_unreachable( "MulleObjC can only deal with scalars and structs");
+   }
+}
+
+
+CodeGen::RValue   CodeGenFunction::EmitMetaABIReadReturnValue( const ObjCMethodDecl *Method,
+                                                               CodeGen::RValue Rvalue,
+                                                               CodeGen::RValue Param,
+                                                               ReturnValueSlot Return,
+                                                               QualType ResultType)
+{
+   llvm::Value *V;
+   
+   // now cast this to actual return value
+   // figure out, what we get back
+   RecordDecl  *RV = nullptr;
+   if( Method)
+      RV = Method->getRvalRecord();
+
+   // if method returns a pointer to result alloca, than there is a RV
+   if( RV)
+   {
+      //
+      // ignore the return value, and "know" that we are using arg[2] as return
+      // storage. This should have the advantage, that the alloca up there can
+      // be optimized away by the compiler.
+      //
+      V = Param.getScalarVal();
+      if( ResultType->isStructureOrClassType())
+      {
+         // use return value slot, which is an allocaed aggregate of proper type
+         CharUnits Alignment = CGM.getContext().getTypeAlignInChars( ResultType);
+         llvm::Value *Dst = Return.getValue();
+         
+         if( ! Dst)
+            Dst = Builder.CreateAlloca( getTypes().ConvertTypeForMem( ResultType));
+
+         //
+         // memcpy stuff from _param
+         //
+            
+         EmitAggregateCopy( Dst, V,  ResultType, true, Alignment);
+         Rvalue = RValue::getAggregate( Dst); // I hope this works fine...
+      }
+      else
+      {
+        // retrieve from pointer
+         QualType PtrResultType = getContext().getPointerType(ResultType);
+         V = Builder.CreateBitOrPointerCast( V, getTypes().ConvertTypeForMem( PtrResultType));
+         V = Builder.CreateLoad( V);
+         Rvalue = RValue::get(V);
+      }
+   }
+   else
+   {
+      V = Rvalue.getScalarVal();
+      if( V && V->getType() != getTypes().ConvertTypeForMem( ResultType))
+      {
+         V = Builder.CreateBitOrPointerCast(V, getTypes().ConvertTypeForMem( ResultType));
+         Rvalue = RValue::get(V);
+      }
+   }
+   
+   return( Rvalue);
+}
+
+
 static llvm::Value *emitARCRetainLoadOfScalar(CodeGenFunction &CGF,
                                               LValue lvalue, QualType type);
 
@@ -1017,6 +1212,17 @@ CodeGenFunction::generateObjCGetterBody(const ObjCImplementationDecl *classImpl,
             value, ConvertType(GetterMethodDecl->getReturnType()));
       }
       
+      // @mulle-objc@ MetaABI: need proper casting for property return value
+      if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+      {
+         llvm::Value *param = nullptr;
+         
+         // for non-direct returns we need to figure out _param her (e.g. double)
+         if( getterMethod->getRvalRecord())
+            param = Builder.CreateLoad( LocalDeclMap[ getterMethod->getParamDecl()], "param");
+         EmitMetaABIWriteScalarReturnValue( getterMethod, value, propType);
+         return;
+      }
       EmitReturnOfRValue(RValue::get(value), propType);
       return;
     }
@@ -2363,7 +2569,25 @@ void CodeGenFunction::EmitObjCAutoreleasePoolPop(llvm::Value *value) {
 llvm::Value *CodeGenFunction::EmitObjCMRRAutoreleasePoolPush() {
   CGObjCRuntime &Runtime = CGM.getObjCRuntime();
   llvm::Value *Receiver = Runtime.EmitNSAutoreleasePoolClassRef(*this);
-  // [NSAutoreleasePool alloc]
+
+   // [NSAutoreleasePool alloc]
+   // @mulle-objc@ language: use [NSAutoreleasePool new]
+  if( CGM.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+  {
+     // Should just call NSAutoreleasePoolPush()
+     IdentifierInfo *II = &CGM.getContext().Idents.get("new");
+     Selector AllocSel = getContext().Selectors.getSelector(0, &II);
+     CallArgList Args;
+     RValue AllocRV =
+     Runtime.GenerateMessageSend(*this, ReturnValueSlot(),
+                                 getContext().getObjCIdType(),
+                                 AllocSel, Receiver, Args);
+     
+     // [Receiver init]
+     Receiver = AllocRV.getScalarVal();
+     return( Receiver);
+  }
+
   IdentifierInfo *II = &CGM.getContext().Idents.get("alloc");
   Selector AllocSel = getContext().Selectors.getSelector(0, &II);
   CallArgList Args;

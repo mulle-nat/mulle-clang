@@ -44,6 +44,7 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/CallSite.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/InlineAsm.h"
@@ -190,12 +191,14 @@ namespace {
       llvm::Type *CategoryIDTy;
       llvm::Type *IvarIDTy;
       llvm::Type *SelectorIDTy;
+      llvm::Type *PropertyIDTy;
       llvm::Type *ProtocolIDTy;
       
       llvm::Type *ClassIDPtrTy;
       llvm::Type *IvarIDPtrTy;
       llvm::Type *CategoryIDTyPtrTy;
       llvm::Type *SelectorIDTyPtrTy;
+      llvm::Type *PropertyIDTyPtrTy;
       llvm::Type *ProtocolIDPtrTy;
    
       // the structures that get exported
@@ -257,6 +260,7 @@ namespace {
       llvm::Constant *getGetPropertyFn() {
          CodeGen::CodeGenTypes &Types = CGM.getTypes();
          ASTContext &Ctx = CGM.getContext();
+         
          // id objc_getProperty (id, SEL, ptrdiff_t, bool)
          SmallVector<CanQualType,4> Params;
          CanQualType IdType = Ctx.getCanonicalParamType(Ctx.getObjCIdType());
@@ -542,38 +546,40 @@ namespace {
       llvm::Type *Array5ObjectPtrTy;
       
       /// ExceptionDataTy - LLVM type for struct _objc_exception_data.
+      private:
       llvm::Type *ExceptionDataTy;
       
+      public:
       /// ExceptionTryEnterFn - LLVM objc_exception_try_enter function.
       llvm::Constant *getExceptionTryEnterFn() {
-         llvm::Type *params[] = { ExceptionDataTy->getPointerTo() };
+         llvm::Type *params[] = { getExceptionDataTy( CGM)->getPointerTo() };
          return CGM.CreateRuntimeFunction(
                                           llvm::FunctionType::get(CGM.VoidTy, params, false),
-                                          "objc_exception_try_enter");
+                                          "mulle_objc_exception_try_enter");
       }
       
       /// ExceptionTryExitFn - LLVM objc_exception_try_exit function.
       llvm::Constant *getExceptionTryExitFn() {
-         llvm::Type *params[] = { ExceptionDataTy->getPointerTo() };
+         llvm::Type *params[] = { getExceptionDataTy( CGM)->getPointerTo() };
          return CGM.CreateRuntimeFunction(
                                           llvm::FunctionType::get(CGM.VoidTy, params, false),
-                                          "objc_exception_try_exit");
+                                          "mulle_objc_exception_try_exit");
       }
       
       /// ExceptionExtractFn - LLVM objc_exception_extract function.
       llvm::Constant *getExceptionExtractFn() {
-         llvm::Type *params[] = { ExceptionDataTy->getPointerTo() };
+         llvm::Type *params[] = { getExceptionDataTy( CGM)->getPointerTo() };
          return CGM.CreateRuntimeFunction(llvm::FunctionType::get(ObjectPtrTy,
                                                                   params, false),
-                                          "objc_exception_extract");
+                                          "mulle_objc_exception_extract");
       }
       
       /// ExceptionMatchFn - LLVM objc_exception_match function.
       llvm::Constant *getExceptionMatchFn() {
-         llvm::Type *params[] = { ClassPtrTy, ObjectPtrTy };
+         llvm::Type *params[] = { ClassIDTy, ObjectPtrTy };
          return CGM.CreateRuntimeFunction(
                                           llvm::FunctionType::get(CGM.Int32Ty, params, false),
-                                          "objc_exception_match");
+                                          "mulle_objc_exception_match");
          
       }
       
@@ -593,6 +599,9 @@ namespace {
    public:
       ObjCTypesHelper(CodeGen::CodeGenModule &cgm);
       ~ObjCTypesHelper() {}
+      
+      llvm::Type  *getExceptionDataTy( CodeGen::CodeGenModule &cgm);
+      
    };
    
 
@@ -904,6 +913,10 @@ namespace {
       {
          return( _HashConstantForString( sref, 0x0));
       }
+      llvm::Constant *HashPropertyConstantForString( StringRef sref)
+      {
+         return( _HashConstantForString( sref, 0x0));
+      }
       llvm::Constant *HashSelConstantForString( StringRef sref)
       {
          return( _HashConstantForString( sref, 0x0));
@@ -1003,7 +1016,7 @@ namespace {
       llvm::Constant *EmitClassRefFromId(CodeGenFunction &CGF,
                                       IdentifierInfo *II);
       
-      llvm::Constant *EmitNSAutoreleasePoolClassRef(CodeGenFunction &CGF) override;
+      llvm::Value *EmitNSAutoreleasePoolClassRef(CodeGenFunction &CGF) override;
       
       
       /// EmitIvarList - Emit the ivar list for the given
@@ -1128,6 +1141,10 @@ namespace {
       
       llvm::Value *GetClass(CodeGenFunction &CGF,
                             const ObjCInterfaceDecl *ID) override;
+      llvm::Value *GetClass(CodeGenFunction &CGF,
+                            llvm::Value  *classID);
+      llvm::Value *GetClass(CodeGenFunction &CGF,
+                            StringRef className);
       
       llvm::Constant *GetSelector(CodeGenFunction &CGF, Selector Sel,
                                bool lval = false) override;
@@ -1347,21 +1364,43 @@ ObjCTypes(cgm) {
    EmitImageInfo();
 }
 
+
 /// GetClass - Return a reference to the class for the given interface
 /// decl.
 llvm::Value *CGObjCMulleRuntime::GetClass(CodeGenFunction &CGF,
-                                 const ObjCInterfaceDecl *ID)
+                                          llvm::Value  *classID)
 {
    // call mulle_objc_runtime_get_class()
-   llvm::Value  *classID;
    llvm::Value *rval;
    llvm::Value *classPtr;
    
-   classID  = HashClassConstantForString( ID->getName());
    classPtr = CGF.EmitNounwindRuntimeCall(ObjCTypes.getGetRuntimeClassFn(),
-                               classID, "mulle_objc_unfailing_get_class"); // string what for ??
+                                          classID, "mulle_objc_unfailing_get_class"); // string what for ??
    rval     = CGF.Builder.CreateBitCast( classPtr, ObjCTypes.ObjectPtrTy);
    return rval;
+}
+
+/// GetClass - Return a reference to the class for the given interface
+/// decl.
+llvm::Value *CGObjCMulleRuntime::GetClass(CodeGenFunction &CGF,
+                                          StringRef className)
+{
+   llvm::Value  *classID;
+   
+   classID = HashClassConstantForString( className);
+   return( GetClass( CGF, classID));
+}
+
+
+/// GetClass - Return a reference to the class for the given interface
+/// decl.
+llvm::Value *CGObjCMulleRuntime::GetClass(CodeGenFunction &CGF,
+                                          const ObjCInterfaceDecl *ID)
+{
+   llvm::Value  *classID;
+   
+   classID  = HashClassConstantForString( ID->getName());
+   return( GetClass( CGF, classID));
 }
 
 /// GetSelector - Return the pointer to the unique'd string for this selector.
@@ -1566,7 +1605,8 @@ llvm::Constant *CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
 
 #pragma mark -
 #pragma mark message sending
-// @mulle-objc@: CommonFunctionCall, send message to self and super
+
+// @mulle-objc@ MetaABI: CommonFunctionCall, send message to self and super
 CodeGen::RValue   CGObjCMulleRuntime::CommonFunctionCall(CodeGen::CodeGenFunction &CGF,
                                                          llvm::Constant *Fn,
                                                          ReturnValueSlot Return,
@@ -1582,21 +1622,7 @@ CodeGen::RValue   CGObjCMulleRuntime::CommonFunctionCall(CodeGen::CodeGenFunctio
    NullReturnState nullReturn;
    
    if (CGM.ReturnSlotInterferesWithArgs( FI))
-      nullReturn.init(CGF, Arg0);
-   
-   bool requiresnullCheck = false;
-   
-   if (CGM.getLangOpts().ObjCAutoRefCount && Method)
-      for (const auto *ParamDecl : Method->params())
-      {
-         if (ParamDecl->hasAttr<NSConsumedAttr>())
-         {
-            if (!nullReturn.NullBB)
-               nullReturn.init(CGF, Arg0);
-            requiresnullCheck = true;
-            break;
-         }
-      }
+      nullReturn.init( CGF, Arg0);
    
    const CGFunctionInfo &argsInfo =
    CGM.getTypes().arrangeFreeFunctionCall( FnResultType,
@@ -1604,66 +1630,15 @@ CodeGen::RValue   CGObjCMulleRuntime::CommonFunctionCall(CodeGen::CodeGenFunctio
                                            FunctionType::ExtInfo(),
                                            RequiredArgs::All);
    RValue rvalue = CGF.EmitCall( argsInfo, Fn, Return, ActualArgs, Method);
-   llvm::Value *V;
    
-   // now cast this to actual return value
-   // figure out, what we get back
-   RecordDecl  *RV = nullptr;
-   if( Method)
-      RV = Method->getRvalRecord();
-
-   // if method returns a pointer to result alloca, than there is a RV
-   if( RV)
-   {
-      //
-      // ignore the return value, and "know" that we are using arg[2] as return
-      // storage. This should have the advantage, that the alloca up there can
-      // be optimized away by the compiler.
-      //
-      RValue  param = ActualArgs[ 2].RV;
-      
-      V = param.getScalarVal();
-      if( ResultType->isStructureOrClassType())
-      {
-         // use return value slot, which is an allocaed aggregate of proper type
-         CharUnits Alignment = CGM.getContext().getTypeAlignInChars( ResultType);
-         llvm::Value *Dst = Return.getValue();
-         
-         if( ! Dst)
-            Dst = CGF.Builder.CreateAlloca( CGF.getTypes().ConvertTypeForMem( ResultType));
-
-         //
-         // memcpy stuff from _param
-         //
-            
-         CGF.EmitAggregateCopy( Dst, V,  ResultType, true, Alignment);
-         rvalue = RValue::getAggregate( Dst); // I hope this works fine...
-      }
-      else
-      {
-        // retrieve from pointer
-         QualType PtrResultType = CGF.getContext().getPointerType(ResultType);
-         V = CGF.Builder.CreateBitOrPointerCast( V,CGF.getTypes().ConvertTypeForMem( PtrResultType));
-         V = CGF.Builder.CreateLoad( V);
-         rvalue = RValue::get(V);
-      }
-   }
-   else
-   {
-      V = rvalue.getScalarVal();
-      if( V && V->getType() != CGF.getTypes().ConvertTypeForMem( ResultType))
-      {
-         V = CGF.Builder.CreateBitOrPointerCast(V, CGF.getTypes().ConvertTypeForMem( ResultType));
-         rvalue = RValue::get(V);
-      }
-   }
+   RValue param = ActualArgs.size() >= 3 ? ActualArgs[ 2].RV : rvalue; // rvalue is just bogus, wont be used then
    
+   rvalue = CGF.EmitMetaABIReadReturnValue( Method, rvalue, param, Return, ResultType);
    // it would be a good time to end the lifetime of the arg[2] alloca now
    // but this is done elsewhere, as not to disturb the method signatures
    // too much
    
-   return nullReturn.complete(CGF, rvalue, ResultType, CallArgs,
-                              requiresnullCheck ? Method : nullptr);
+   return nullReturn.complete( CGF, rvalue, ResultType, CallArgs, nullptr);
 }
 
 
@@ -1955,7 +1930,6 @@ struct find_info   findNextStatementInBody( Stmt *s, Stmt *body)
    findNextStatementInParent( s, body, &info);
    return( info);
 }
-
 
 
 class MulleStatementVisitor : public RecursiveASTVisitor<MulleStatementVisitor>
@@ -2410,7 +2384,7 @@ RecordDecl  *CGObjCMulleRuntime::CreateVariadicOnTheFlyRecordDecl( CodeGenFuncti
 
 /// Creat the CallArgList
 /// Here we stuff all arguments into a alloca struct
-/// @mulle-objc@ call: stuff values into alloca
+/// @mulle-objc@ MetaABI: stuff values into alloca
 ///
 LValue  *CGObjCMulleRuntime::GenerateCallArgs( CallArgList &Args,
                                                CodeGenFunction &CGF,
@@ -3266,6 +3240,25 @@ llvm::Constant *CGObjCMulleRuntime::GetOrEmitProtocolRef(const ObjCProtocolDecl 
 
 
 /*
+ * in our uniform structs, the hash is always the first
+ * entry in the struct
+ */
+static int constant_uint_comparator( llvm::Constant * const *P1,
+                                     llvm::Constant * const *P2)
+{
+   llvm::APInt   valueA;
+   llvm::APInt   valueB;
+   
+   valueA = (*P1)->getUniqueInteger();
+   valueB = (*P2)->getUniqueInteger();
+   
+   if( valueA == valueB)
+      return 0;
+   return( valueA.ult( valueB) ? -1 : 1);
+}
+
+
+/*
    just a list of protocol IDs,
    which gets stuck on a category or on a class
  */
@@ -3282,6 +3275,9 @@ CGObjCMulleRuntime::EmitProtocolIDList(Twine Name,
    // Just return null for empty protocol lists
    if (ProtocolRefs.empty())
       return llvm::Constant::getNullValue(ObjCTypes.ProtocolIDPtrTy);
+   
+   llvm::array_pod_sort( ProtocolRefs.begin(), ProtocolRefs.end(),
+                         constant_uint_comparator);
    
    // This list is null terminated.
    ProtocolRefs.push_back(llvm::Constant::getNullValue(ObjCTypes.ProtocolIDTy));
@@ -3319,28 +3315,56 @@ PushProtocolProperties(llvm::SmallPtrSet<const IdentifierInfo*,16> &PropertySet,
 }
 
 /*
- struct _objc_property {
- const char * const name;
- const char * const attributes;
- };
- 
- struct _objc_property_list {
- uint32_t entsize; // sizeof (struct _objc_property)
- uint32_t prop_count;
- struct _objc_property[prop_count];
- };
+ * in our uniform structs, the hash is always the first
+ * entry in the struct
  */
+static int uniqueid_comparator( llvm::Constant * const *P1,
+                                llvm::Constant * const *P2)
+{
+   llvm::ConstantStruct   *methodA;
+   llvm::ConstantStruct   *methodB;
+   llvm::ConstantInt      *hashA;
+   llvm::ConstantInt      *hashB;
+   llvm::APInt            valueA;
+   llvm::APInt            valueB;
+   bool                   flag;
+   
+   methodA = (llvm::ConstantStruct *) *P1;
+   methodB = (llvm::ConstantStruct *) *P2;
+
+   hashA = dyn_cast< llvm::ConstantInt>( methodA->getAggregateElement( 0U));
+   hashB = dyn_cast< llvm::ConstantInt>( methodB->getAggregateElement( 0U));
+   
+   valueA = hashA->getUniqueInteger();
+   valueB = hashB->getUniqueInteger();
+   
+   if( valueA == valueB)
+      return 0;
+      
+   flag = valueA.ult( valueB);
+   return( flag ? -1 : +1);
+}
+
+
 llvm::Constant *CGObjCCommonMulleRuntime::EmitPropertyList(Twine Name,
                                                   const Decl *Container,
                                                   const ObjCContainerDecl *OCD,
                                                   const ObjCCommonTypesHelper &ObjCTypes) {
    SmallVector<llvm::Constant *, 16> Properties;
    llvm::SmallPtrSet<const IdentifierInfo*, 16> PropertySet;
-   for (const auto *PD : OCD->properties()) {
+   for (const auto *PD : OCD->properties())
+   {
       PropertySet.insert(PD->getIdentifier());
-      llvm::Constant *Prop[] = {
+      Selector   getter = PD->getGetterName();
+      Selector   setter = PD->getSetterName();
+      
+      llvm::Constant *Prop[] =
+      {
+         HashPropertyConstantForString( PD->getIdentifier()->getNameStart()),
          GetPropertyName(PD->getIdentifier()),
-         GetPropertyTypeString(PD, Container)
+         GetPropertyTypeString(PD, Container),
+         ! getter.isNull() ? HashSelConstantForString( getter.getAsString()) : 0,
+         ! setter.isNull() ? HashSelConstantForString( setter.getAsString()) : 0
       };
       Properties.push_back(llvm::ConstantStruct::get(ObjCTypes.PropertyTy,
                                                      Prop));
@@ -3358,14 +3382,15 @@ llvm::Constant *CGObjCCommonMulleRuntime::EmitPropertyList(Twine Name,
    if (Properties.empty())
       return llvm::Constant::getNullValue(ObjCTypes.PropertyListPtrTy);
    
-   unsigned PropertySize =
-   CGM.getDataLayout().getTypeAllocSize(ObjCTypes.PropertyTy);
-   llvm::Constant *Values[3];
-   Values[0] = llvm::ConstantInt::get(ObjCTypes.IntTy, PropertySize);
-   Values[1] = llvm::ConstantInt::get(ObjCTypes.IntTy, Properties.size());
+   // emit properties sorted by id
+   llvm::array_pod_sort( Properties.begin(), Properties.end(),
+                         uniqueid_comparator);
+   
+   llvm::Constant *Values[2];
+   Values[0] = llvm::ConstantInt::get(ObjCTypes.IntTy, Properties.size());
    llvm::ArrayType *AT = llvm::ArrayType::get(ObjCTypes.PropertyTy,
                                               Properties.size());
-   Values[2] = llvm::ConstantArray::get(AT, Properties);
+   Values[1] = llvm::ConstantArray::get(AT, Properties);
    llvm::Constant *Init = llvm::ConstantStruct::getAnon(Values);
    
    llvm::GlobalVariable *GV =
@@ -3437,6 +3462,7 @@ CGObjCMulleRuntime::EmitMethodDescList(Twine Name, const char *Section,
                                          ObjCTypes.MethodDescriptionListPtrTy);
 }
 
+
 //   struct _mulle_objc_load_category
 //   {
 //      mulle_objc_class_id_t            class_id;
@@ -3466,12 +3492,16 @@ void CGObjCMulleRuntime::GenerateCategory(const ObjCCategoryImplDecl *OCD) {
    for (const auto *I : OCD->instance_methods())
       // Instance methods should always be defined.
       InstanceMethods.push_back(GetMethodConstant(I));
+   llvm::array_pod_sort( InstanceMethods.begin(), InstanceMethods.end(),
+                         uniqueid_comparator);
    
    for (const auto *I : OCD->class_methods())
       // Class methods should always be defined.
       ClassMethods.push_back(GetMethodConstant(I));
+   llvm::array_pod_sort( ClassMethods.begin(), ClassMethods.end(),
+                         uniqueid_comparator);
    
-   llvm::Constant *Values[5];
+   llvm::Constant *Values[6];
    Values[ 0] = HashClassConstantForString( Interface->getName());
    Values[ 1] = GetClassName(Interface->getObjCRuntimeNameAsString());
    LazySymbols.insert(Interface->getIdentifier());
@@ -3489,14 +3519,14 @@ void CGObjCMulleRuntime::GenerateCategory(const ObjCCategoryImplDecl *OCD) {
       Values[4] = llvm::Constant::getNullValue(ObjCTypes.ProtocolListPtrTy);
    }
    
-//   // If there is no category @interface then there can be no properties.
-//   if (Category) {
-//      Values[6] = EmitPropertyList("\01l_OBJC_$_PROP_LIST_" + ExtName.str(),
-//                                   OCD, Category, ObjCTypes);
-//   } else {
-//      Values[6] = llvm::Constant::getNullValue(ObjCTypes.PropertyListPtrTy);
-//   }
-   
+   // If there is no category @interface then there can be no properties.
+   if (Category) {
+      Values[5] = EmitPropertyList("OBJC_CATEGORY_PROP_LIST_" + ExtName.str(),
+                                   OCD, Category, ObjCTypes);
+   } else {
+      Values[5] = llvm::Constant::getNullValue(ObjCTypes.PropertyListPtrTy);
+   }
+ 
    llvm::Constant *Init = llvm::ConstantStruct::get(ObjCTypes.CategoryTy,
                                                     Values);
    
@@ -3559,7 +3589,7 @@ void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
    if (ID->getClassInterface()->getVisibility() == HiddenVisibility)
       Flags |= FragileABI_Class_Hidden;
    
-   SmallVector<llvm::Constant *, 16> InstanceMethods, ClassMethods, InstanceVariables;
+   SmallVector<llvm::Constant *, 16> InstanceMethods, ClassMethods, InstanceVariables, Properties;
 
   const ObjCInterfaceDecl *OID = ID->getClassInterface();
 
@@ -3570,19 +3600,22 @@ void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
       continue;
     InstanceVariables.push_back( GetIvarConstant( OID, IVD));
   }
+   llvm::array_pod_sort( InstanceVariables.begin(), InstanceVariables.end(),
+                         uniqueid_comparator);
 
+   for (const auto *I : ID->class_methods())
+      // Class methods should always be defined.
+      ClassMethods.push_back(GetMethodConstant(I));
+   llvm::array_pod_sort( ClassMethods.begin(), ClassMethods.end(),
+                         uniqueid_comparator);
+   
    for (const auto *I : ID->instance_methods())
       // Instance methods should always be defined.
       InstanceMethods.push_back(GetMethodConstant(I));
    
-   for (const auto *I : ID->class_methods())
-      // Class methods should always be defined.
-      ClassMethods.push_back(GetMethodConstant(I));
-   
    for (const auto *PID : ID->property_impls()) {
       if (PID->getPropertyImplementation() == ObjCPropertyImplDecl::Synthesize) {
          ObjCPropertyDecl *PD = PID->getPropertyDecl();
-         
          if (ObjCMethodDecl *MD = PD->getGetterMethodDecl())
             if (llvm::Constant *C = GetMethodConstant(MD))
                InstanceMethods.push_back(C);
@@ -3591,6 +3624,9 @@ void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
                InstanceMethods.push_back(C);
       }
    }
+  
+   llvm::array_pod_sort( InstanceMethods.begin(), InstanceMethods.end(),
+                         uniqueid_comparator);
    
   
    //   struct _mulle_objc_load_class
@@ -3605,11 +3641,12 @@ void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
    //
    //      struct _mulle_objc_method_list   *class_methods;
    //      struct _mulle_objc_method_list   *instance_methods;
+   //      struct _mulle_objc_property_list *properties;
    //
    //      mulle_objc_protocol_id_t         *protocol_unique_ids;
    //   };
    
-   llvm::Constant *Values[9];
+   llvm::Constant *Values[10];
    
    ObjCInterfaceDecl *Super = Interface->getSuperClass();
 
@@ -3635,7 +3672,9 @@ void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
                                  "_DATA,__cls_meth,regular,no_dead_strip", ClassMethods);
    Values[ 7] = EmitMethodList("OBJC_CLASS_METHODS_" + ID->getNameAsString(),
                                "_DATA,__inst_meth,regular,no_dead_strip", InstanceMethods);
-   Values[ 8] = Protocols;
+   Values[ 8] = EmitPropertyList("OBJC_CLASS_METHODS_" + ID->getNameAsString(),
+                               ID, OID, ObjCTypes);
+   Values[ 9] = Protocols;
 
    llvm::Constant *Init = llvm::ConstantStruct::get(ObjCTypes.ClassTy,
                                                     Values);
@@ -3718,15 +3757,13 @@ llvm::Constant *CGObjCMulleRuntime::EmitIvarList(const ObjCImplementationDecl *I
 }
 
 
-/// GetMethodConstant - Return a struct objc_method constant for the
-/// given method if it has been defined. The result is null if the
-/// method has not been defined. The return value has type MethodPtrTy.
+
 llvm::Constant *CGObjCMulleRuntime::GetIvarConstant( const ObjCInterfaceDecl *OID,
                                                      const ObjCIvarDecl *IVD)
 {
    llvm::Constant *Ivar[] = {
       llvm::ConstantExpr::getBitCast( HashIvarConstantForString( IVD->getNameAsString()),
-                                       ObjCTypes.SelectorIDTy),
+                                      ObjCTypes.SelectorIDTy),
       GetIvarName( IVD),
       GetIvarType(IVD),
       llvm::ConstantInt::get(ObjCTypes.IntTy,
@@ -3778,7 +3815,7 @@ llvm::Constant *CGObjCMulleRuntime::EmitMethodList(Twine Name,
    // Return null for empty list.
    if (Methods.empty())
       return llvm::Constant::getNullValue(ObjCTypes.MethodListPtrTy);
-
+   
    llvm::Constant *Values[2];
    Values[0] = llvm::ConstantInt::get(ObjCTypes.IntTy, Methods.size());
    llvm::ArrayType *AT = llvm::ArrayType::get(ObjCTypes.MethodTy,
@@ -3873,19 +3910,22 @@ llvm::Constant *CGObjCMulleRuntime::EmitLoadInfoList(Twine Name,
                                           llvm::Constant *ClassList,
                                           llvm::Constant *CategoryList)
 {
+   llvm::Constant *Values[5];
    
-   llvm::Constant *Values[3];
-   
-   Values[0] = llvm::ConstantInt::get(ObjCTypes.IntTy, 0);  // version
-   Values[1] = ClassList;
-   Values[2] = CategoryList;
+   //
+   // should get these values from the header
+   //
+   Values[0] = llvm::ConstantInt::get(ObjCTypes.IntTy, (0 << 20) | (1 << 8) | 0);  // major, minor, patch version
+   Values[1] = llvm::ConstantInt::get(ObjCTypes.IntTy, 1848);  // foundation
+   Values[2] = ClassList;
+   Values[3] = CategoryList;
+   Values[4] = llvm::ConstantInt::get(ObjCTypes.IntTy, 1);     // bits, 1 == sorted
 
    llvm::Constant *Init = llvm::ConstantStruct::getAnon(Values);
    
    llvm::GlobalVariable *GV = CreateMetadataVar( Name, Init, Section, 4, true);
    return llvm::ConstantExpr::getBitCast(GV, llvm::PointerType::getUnqual( ObjCTypes.LoadInfoTy));
 }
-
 
 
 llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
@@ -3915,7 +3955,6 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
       expr = llvm::ConstantExpr::getBitCast( I, llvm::PointerType::getUnqual( ObjCTypes.CategoryTy));
       LoadCategories.push_back( expr);
    }
-   
   llvm::Constant *ClassList = EmitClassList( "OBJC_CLASS_LOADS", "__DATA,_objc_load_info", LoadClasses);
   llvm::Constant *CategoryList = EmitCategoryList( "OBJC_CATEGORY_LOADS", "__DATA,_objc_load_info", LoadCategories);
 
@@ -4342,7 +4381,7 @@ void CGObjCMulleRuntime::EmitTryOrSynchronizedStmt(CodeGen::CodeGenFunction &CGF
    
    // Allocate memory for the setjmp buffer.  This needs to be kept
    // live throughout the try and catch blocks.
-   llvm::Value *ExceptionData = CGF.CreateTempAlloca(ObjCTypes.ExceptionDataTy,
+   llvm::Value *ExceptionData = CGF.CreateTempAlloca(ObjCTypes.getExceptionDataTy( CGM),
                                                      "exceptiondata.ptr");
    
    // Create the fragile hazards.  Note that this will not capture any
@@ -4946,9 +4985,9 @@ llvm::Constant *CGObjCMulleRuntime::EmitClassRef(CodeGenFunction &CGF,
    return EmitClassRefFromId(CGF, ID->getIdentifier());
 }
 
-llvm::Constant *CGObjCMulleRuntime::EmitNSAutoreleasePoolClassRef(CodeGenFunction &CGF) {
-   IdentifierInfo *II = &CGM.getContext().Idents.get("NSAutoreleasePool");
-   return EmitClassRefFromId(CGF, II);
+llvm::Value *CGObjCMulleRuntime::EmitNSAutoreleasePoolClassRef(CodeGenFunction &CGF) {
+   // we need to actually get the class here, though
+   return( GetClass( CGF, "NSAutoreleasePool"));
 }
 
 llvm::Constant *CGObjCCommonMulleRuntime::_HashConstantForString( StringRef sref, uint64_t first_valid)
@@ -4987,12 +5026,12 @@ llvm::Constant *CGObjCCommonMulleRuntime::_HashConstantForString( StringRef sref
    if (WordSizeInBytes == 8)
    {
       const llvm::APInt SelConstant(64, value);
-      return llvm::Constant::getIntegerValue(CGM.Int64Ty, SelConstant);
+      return llvm::ConstantInt::getIntegerValue(CGM.Int64Ty, SelConstant);
    }
    else
    {
       const llvm::APInt SelConstant(32, value);
-      return llvm::Constant::getIntegerValue(CGM.Int32Ty, SelConstant);
+      return llvm::ConstantInt::getIntegerValue(CGM.Int32Ty, SelConstant);
    }
 }
 
@@ -5589,15 +5628,17 @@ ObjCCommonTypesHelper::ObjCCommonTypesHelper(CodeGen::CodeGenModule &cgm)
    Int8PtrTy = CGM.Int8PtrTy;
    Int8PtrPtrTy = CGM.Int8PtrPtrTy;
 
-   ClassIDTy    = Types.ConvertType(Ctx.LongTy);
-   CategoryIDTy = Types.ConvertType(Ctx.LongTy);
-   SelectorIDTy = Types.ConvertType(Ctx.LongTy);
-   IvarIDTy     = Types.ConvertType(Ctx.LongTy);
-   ProtocolIDTy = Types.ConvertType(Ctx.LongTy);
+   ClassIDTy    = Types.ConvertType(Ctx.getUIntPtrType());
+   CategoryIDTy = Types.ConvertType(Ctx.getUIntPtrType());
+   SelectorIDTy = Types.ConvertType(Ctx.getUIntPtrType());
+   PropertyIDTy = Types.ConvertType(Ctx.getUIntPtrType());
+   IvarIDTy     = Types.ConvertType(Ctx.getUIntPtrType());
+   ProtocolIDTy = Types.ConvertType(Ctx.getUIntPtrType());
    
    ClassIDPtrTy      = llvm::PointerType::getUnqual(ClassIDTy);
    CategoryIDTyPtrTy = llvm::PointerType::getUnqual(CategoryIDTy);
    SelectorIDTyPtrTy = llvm::PointerType::getUnqual(SelectorIDTy);
+   PropertyIDTyPtrTy = llvm::PointerType::getUnqual(PropertyIDTy);
    IvarIDPtrTy       = llvm::PointerType::getUnqual(IvarIDTy);
    ProtocolIDPtrTy   = llvm::PointerType::getUnqual(ProtocolIDTy);
 
@@ -5621,36 +5662,45 @@ ObjCCommonTypesHelper::ObjCCommonTypesHelper(CodeGen::CodeGenModule &cgm)
    // FIXME: Merge with rewriter code?
    
   
-   // struct _prop_t {
-   //   char *name;
-   //   char *attributes;
-   // }
-   PropertyTy = llvm::StructType::create("struct._prop_t",
-                                         Int8PtrTy, Int8PtrTy, nullptr);
+   //struct _mulle_objc_property
+   //{
+   //   mulle_objc_propertyid_t    propertyid;
+   //   char                       *name;
+   //   char                       *signature;  // hmmm...
+   //   mulle_objc_methodid_t      getter;
+   //   mulle_objc_methodid_t      setter;
+   //}
+   PropertyTy = llvm::StructType::create("struct._mulle_objc_property",
+                                         PropertyIDTy,
+                                         Int8PtrTy,
+                                         Int8PtrTy,
+                                         SelectorIDTy,
+                                         SelectorIDTy,
+                                         nullptr);
    
-   // struct _prop_list_t {
-   //   uint32_t entsize;      // sizeof(struct _prop_t)
-   //   uint32_t count_of_properties;
-   //   struct _prop_t prop_list[count_of_properties];
-   // }
+   //struct _mulle_objc_propertylist
+   //{
+   //   unsigned int                 n_properties;
+   //   struct _mulle_objc_property  properties[ 1];
+   //};
    PropertyListTy =
-   llvm::StructType::create("struct._prop_list_t", IntTy, IntTy,
+   llvm::StructType::create("struct._mulle_objc_propertylist", IntTy,
                             llvm::ArrayType::get(PropertyTy, 0), nullptr);
    // struct _prop_list_t *
    PropertyListPtrTy = llvm::PointerType::getUnqual(PropertyListTy);
    
-//struct _mulle_objc_method_descriptor
-//{
-//   mulle_objc_method_id_t   method_id;
-//   char                     *name;
-//   char                     *signature;
-//   unsigned int             bits;  
-//};
-//struct _mulle_objc_method
-//{
-//   struct _mulle_objc_method_descriptor  descriptor;
-//   mulle_objc_method_implementation_t    implementation;
-//};
+   //struct _mulle_objc_method_descriptor
+   //{
+   //   mulle_objc_method_id_t   method_id;
+   //   char                     *name;
+   //   char                     *signature;
+   //   unsigned int             bits;
+   //};
+   //struct _mulle_objc_method
+   //{
+   //   struct _mulle_objc_method_descriptor  descriptor;
+   //   mulle_objc_method_implementation_t    implementation;
+   //};
 
     MethodTy = llvm::StructType::create("struct._mulle_objc_method",
                                        SelectorIDTy, Int8PtrTy, Int8PtrTy, IntTy, Int8PtrTy,
@@ -5757,7 +5807,7 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
    MethodListTy =
    llvm::StructType::create(VMContext, "struct._mulle_objc_method_list");
    MethodListPtrTy = llvm::PointerType::getUnqual(MethodListTy);
-   
+
    // struct _objc_class_extension *
    ClassExtensionTy =
    llvm::StructType::create("struct._objc_class_extension",
@@ -5795,6 +5845,7 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
                     IvarListPtrTy,
                     MethodListPtrTy,   // class_methods
                     MethodListPtrTy,   // instance_methods
+                    PropertyListPtrTy, // properties
                     
                     ProtocolIDPtrTy,
                     nullptr);
@@ -5809,14 +5860,17 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
 //      
 //      struct _mulle_objc_method_list   *class_methods;
 //      struct _mulle_objc_method_list   *instance_methods;
-//      
+//      struct _mulle_objc_property_list *properties:
+//
 //      mulle_objc_protocol_id_t         *protocol_unique_ids;
+//
 //   };
 
    CategoryTy =
    llvm::StructType::create("struct._mulle_objc_load_category",
                             ClassIDTy, Int8PtrTy, MethodListPtrTy,
-                            MethodListPtrTy, ProtocolIDPtrTy, nullptr);
+                            MethodListPtrTy, PropertyListPtrTy,
+                            ProtocolIDPtrTy, nullptr);
    
    // Global metadata structures
    
@@ -5844,18 +5898,6 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
                             LongTy, LongTy, Int8PtrTy, SymtabPtrTy, nullptr);
    
    
-   // FIXME: This is the size of the setjmp buffer and should be target
-   // specific. 18 is what's used on 32-bit X86.
-   uint64_t SetJmpBufferSize = 18;   // TODO: OBVIOUSLY NEED TO FIX!!!
-   
-   // Exceptions
-   llvm::Type *StackPtrTy = llvm::ArrayType::get(CGM.Int8PtrTy, 4);
-   
-   ExceptionDataTy =
-   llvm::StructType::create("struct._objc_exception_data",
-                            llvm::ArrayType::get(CGM.Int32Ty,SetJmpBufferSize),
-                            StackPtrTy, nullptr);
-
    //
    // some stuff we only use to emit the structure as input to load
    //
@@ -5872,6 +5914,34 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
 }
 
 
+ llvm::Type  *ObjCTypesHelper::getExceptionDataTy( CodeGen::CodeGenModule &cgm)
+ {
+
+   if( ExceptionDataTy)
+      return( ExceptionDataTy);
+    
+   QualType   jmpbuf_type;
+   
+   // this type is only available if <setjmp.h> has been included already
+   
+   jmpbuf_type = cgm.getContext().getjmp_bufType();
+   if( jmpbuf_type == QualType())
+      llvm_unreachable( "include <setjmp.h> before using Mulle ObjC exceptions");
+    
+   uint64_t SetJmpBufferSize = cgm.getContext().getTypeSizeInChars( jmpbuf_type).getQuantity();
+   
+   SetJmpBufferSize /= CGM.Int32Ty->getBitWidth() / 8;
+   
+   // Exceptions (4 void *) ???
+   llvm::Type *StackPtrTy = llvm::ArrayType::get(CGM.Int8PtrTy, 4);
+   
+   ExceptionDataTy =
+   llvm::StructType::create("struct._mulle_objc_exception_data",
+                            llvm::ArrayType::get(CGM.Int32Ty,SetJmpBufferSize),
+                            StackPtrTy,
+                            nullptr);
+   return( ExceptionDataTy);
+}
 
 CGObjCRuntime *clang::CodeGen::CreateMulleObjCRuntime(CodeGenModule &CGM) 
 {

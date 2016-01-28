@@ -1206,6 +1206,18 @@ public:
   bool IndirectObjCSetterArg(const CGFunctionInfo &FI);
   bool IvarTypeWithAggrGCObjects(QualType Ty);
 
+  // @mulle-objc@ MetaABI: write/read return values
+  void             EmitMetaABIWriteScalarReturnValue( const Decl *FuncDecl, 
+                                                      llvm::Value *exprResult,
+                                                      QualType exprType);
+  void             EmitMetaABIWriteReturnValue( const Decl *FuncDecl, const Expr *RV);
+  CodeGen::RValue  EmitMetaABIReadReturnValue( const ObjCMethodDecl *Method,
+                                            CodeGen::RValue rvalue,
+                                            CodeGen::RValue  param,
+                                            ReturnValueSlot Return,
+                                            QualType ResultType);
+   
+
   //===--------------------------------------------------------------------===//
   //                                  Block Bits
   //===--------------------------------------------------------------------===//

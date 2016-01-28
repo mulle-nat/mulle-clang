@@ -1070,104 +1070,30 @@ void CodeGenFunction::EmitReturnStmt(const ReturnStmt &S) {
     RValue Result = EmitReferenceBindingToExpr(RV);
     Builder.CreateStore(Result.getScalarVal(), ReturnValue);
   } else {
-    // @mulle-objc@ return value: put rval into _param if needed
-     const ObjCMethodDecl   *MD = dyn_cast<ObjCMethodDecl>( CurFuncDecl);
-     RecordDecl             *RD = nullptr;
-     QualType     recordTy;
-     QualType     recordPtrTy;
-     llvm::Type  *llvmRecType;
-     llvm::Type  *llvmPointerType;
-     llvm::Value *param;
-     llvm::Value *paramAddr;
-     unsigned alignment = 0;
-     
-     if( MD)
+    // @mulle-objc@ MetaABI: put rval into _param if needed
+     if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
      {
-        RD = MD->getRvalRecord();
-        if( RD)
-        {
-           recordTy    = CGM.getContext().getTagDeclType( RD);
-           recordPtrTy = CGM.getContext().getPointerType( recordTy);
-           llvmRecType = CGM.getTypes().ConvertTypeForMem( recordTy);
-           llvmPointerType = llvmRecType->getPointerTo();
-           
-         // get _param address (known to be big enough)
-            param = LocalDeclMap[MD->getParamDecl()];
+         EmitMetaABIWriteReturnValue( CurFuncDecl, RV);
+     }
+     else
+     switch (getEvaluationKind(RV->getType())) {
+        case TEK_Scalar:
+           Builder.CreateStore(EmitScalarExpr(RV), ReturnValue);
+           break;
+        case TEK_Complex:
+           EmitComplexExprIntoLValue(RV,
+                                     MakeNaturalAlignAddrLValue(ReturnValue, RV->getType()),
+                                     /*isInit*/ true);
+           break;
+        case TEK_Aggregate: {
+           CharUnits Alignment = getContext().getTypeAlignInChars(RV->getType());
+           EmitAggExpr(RV, AggValueSlot::forAddr(ReturnValue, Alignment,
+                                                 Qualifiers(),
+                                                 AggValueSlot::IsDestructed,
+                                                 AggValueSlot::DoesNotNeedGCBarriers,
+                                                 AggValueSlot::IsNotAliased));
+           break;
         }
-      }
-     
-    switch (getEvaluationKind(RV->getType())) {
-    case TEK_Scalar:
-      // @mulle-objc@ return value: wrap scalar in aggregate, return pointer if in method
-      if( ! MD)
-      {
-         Builder.CreateStore(EmitScalarExpr(RV), ReturnValue);
-         break;
-      }
-      {
-         llvm::Value *exprResult = EmitScalarExpr(RV);
-            
-         if( RD)
-         {
-            // store ScalarExpr in alloca
-            alignment = CGM.getContext().getTypeAlignInChars( recordPtrTy).getQuantity();
-            paramAddr = Builder.CreateBitCast( Builder.CreateAlignedLoad( param, alignment, "_param.rval"), llvmPointerType);
-            
-            LValue Record = MakeNaturalAlignAddrLValue( paramAddr, recordTy);
-            LValue Field = EmitLValueForField( Record, *RD->field_begin());
-            EmitStoreOfScalar(exprResult, Field);
-            
-            // store pointer in returnValue
-            // OMIT this, it's superflous
-            //llvm::Value *newParam = Builder.CreateBitCast( paramAddr, VoidPtrTy);
-            //Builder.CreateStore( newParam, ReturnValue);
-            break;
-         }
-         QualType  longType;
-         
-         if( RV->getType()->isIntegralOrEnumerationType())
-         {
-            longType   = CGM.getContext().LongTy;
-            exprResult = Builder.CreateSExtOrBitCast( exprResult, getTypes().ConvertTypeForMem( longType));
-         }
-         exprResult = Builder.CreateBitOrPointerCast( exprResult, getTypes().ConvertTypeForMem( getContext().VoidPtrTy));
-         Builder.CreateStore( exprResult, ReturnValue);
-         break;
-      }
-    case TEK_Complex:
-      EmitComplexExprIntoLValue(RV,
-                     MakeNaturalAlignAddrLValue(ReturnValue, RV->getType()),
-                                /*isInit*/ true);
-      break;
-    case TEK_Aggregate: {
-      CharUnits Alignment = getContext().getTypeAlignInChars(RV->getType());
-      // @mulle-objc@ return value: emit aggregate, return pointer to it
-      if( RD)
-      {
-         // emit aggregate expression
-         // cast paramAddr to return value...
-         alignment = CGM.getContext().getTypeAlignInChars( RV->getType()).getQuantity();
-         paramAddr = Builder.CreateBitCast( Builder.CreateAlignedLoad( param, alignment, "_param.rval"), getTypes().ConvertTypeForMem( RV->getType())->getPointerTo());
-         
-         EmitAggExpr(RV, AggValueSlot::forAddr( paramAddr, Alignment,
-                                                Qualifiers(),
-                                                AggValueSlot::IsDestructed,
-                                                AggValueSlot::DoesNotNeedGCBarriers,
-                                                AggValueSlot::IsNotAliased));
-         
-         // store pointer in returnValue
-         // OMIT this, it's superflous
-         //llvm::Value *newParam = Builder.CreateBitCast( paramAddr, VoidPtrTy);
-         //Builder.CreateStore( newParam, ReturnValue);
-         break;
-      }
-      EmitAggExpr(RV, AggValueSlot::forAddr(ReturnValue, Alignment,
-                                            Qualifiers(),
-                                            AggValueSlot::IsDestructed,
-                                            AggValueSlot::DoesNotNeedGCBarriers,
-                                            AggValueSlot::IsNotAliased));
-      break;
-    }
     }
   }
 

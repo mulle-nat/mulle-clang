@@ -588,8 +588,20 @@ ObjCPropertyDecl *Sema::CreatePropertyDecl(Scope *S,
   // selector names in anticipation of declaration of setter/getter methods.
   PDecl->setGetterName(GetterSel);
   PDecl->setSetterName(SetterSel);
+  
+  unsigned int   tmp;
+   
+  tmp = AttributesAsWritten;
+   
+  // @mulle-objc@ language: make nonatomic the property default, this creates less warnings
+  if( LangOpts.ObjCRuntime.hasMulleMetaABI())
+  {
+     if( ! (tmp & (ObjCPropertyDecl::OBJC_PR_nonatomic | ObjCPropertyDecl::OBJC_PR_atomic)))
+        tmp |= ObjCPropertyDecl::OBJC_PR_nonatomic;
+  }
+
   PDecl->setPropertyAttributesAsWritten(
-                          makePropertyAttributesAsWritten(AttributesAsWritten));
+                          makePropertyAttributesAsWritten(tmp));
 
   if (Attributes & ObjCDeclSpec::DQ_PR_readonly)
     PDecl->setPropertyAttributes(ObjCPropertyDecl::OBJC_PR_readonly);
@@ -621,6 +633,15 @@ ObjCPropertyDecl *Sema::CreatePropertyDecl(Scope *S,
   if (isAssign)
     PDecl->setPropertyAttributes(ObjCPropertyDecl::OBJC_PR_assign);
 
+  // @mulle-objc@ language: make nonatomic the default for properties, this creates less warnings
+  if( LangOpts.ObjCRuntime.hasMulleMetaABI())
+  {
+     if( Attributes & ObjCDeclSpec::DQ_PR_atomic)
+        PDecl->setPropertyAttributes(ObjCPropertyDecl::OBJC_PR_atomic);
+     else
+        PDecl->setPropertyAttributes(ObjCPropertyDecl::OBJC_PR_nonatomic);
+  }
+  else
   // In the semantic attributes, one of nonatomic or atomic is always set.
   if (Attributes & ObjCDeclSpec::DQ_PR_nonatomic)
     PDecl->setPropertyAttributes(ObjCPropertyDecl::OBJC_PR_nonatomic);
@@ -1033,11 +1054,16 @@ Decl *Sema::ActOnPropertyImplDecl(Scope *S,
         Diag(PropertyDiagLoc, diag::error_synthesize_weak_non_arc_or_gc);
         Diag(property->getLocation(), diag::note_property_declare);
       }
-
+      
+      ObjCIvarDecl::AccessControl  protection = ObjCIvarDecl::Private;
+      // @mulle-objc@ language: make synthesized ivars default "protected"
+      if( LangOpts.ObjCRuntime.hasMulleMetaABI())
+         protection = ObjCIvarDecl::Protected;
+         
       Ivar = ObjCIvarDecl::Create(Context, ClassImpDecl,
                                   PropertyIvarLoc,PropertyIvarLoc, PropertyIvar,
                                   PropertyIvarType, /*Dinfo=*/nullptr,
-                                  ObjCIvarDecl::Private,
+                                  protection,
                                   (Expr *)nullptr, true);
       if (RequireNonAbstractType(PropertyIvarLoc,
                                  PropertyIvarType,
@@ -1050,6 +1076,8 @@ Decl *Sema::ActOnPropertyImplDecl(Scope *S,
       ClassImpDecl->addDecl(Ivar);
       IDecl->makeDeclVisibleInContext(Ivar);
 
+      // @mulle-objc@ language: ignore synthesis warning for fragile
+      if( ! LangOpts.ObjCRuntime.hasMulleMetaABI())
       if (getLangOpts().ObjCRuntime.isFragile())
         Diag(PropertyDiagLoc, diag::error_missing_property_ivar_decl)
             << PropertyId;
@@ -1619,7 +1647,8 @@ void Sema::DefaultSynthesizeProperties(Scope *S, ObjCImplDecl* IMPDecl,
 }
 
 void Sema::DefaultSynthesizeProperties(Scope *S, Decl *D) {
-  if (!LangOpts.ObjCDefaultSynthProperties || LangOpts.ObjCRuntime.isFragile())
+  // @mulle-objc@ language: enable default synthesis of properties
+  if (!LangOpts.ObjCDefaultSynthProperties || (LangOpts.ObjCRuntime.isFragile() && ! LangOpts.ObjCRuntime.hasMulleMetaABI()))
     return;
   ObjCImplementationDecl *IC=dyn_cast_or_null<ObjCImplementationDecl>(D);
   if (!IC)
@@ -2123,7 +2152,7 @@ void Sema::ProcessPropertyDecl(ObjCPropertyDecl *property,
                                                   nullptr);
       SetterMethod->setMethodParams(Context, Argument, None);
 
-      // @mulle-objc@ property: fix up setter description for mulle-objc calling convention
+      // @mulle-objc@ MetaABI: fix up setter parameter
       //
       if( Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
       {
@@ -2133,6 +2162,10 @@ void Sema::ProcessPropertyDecl(ObjCPropertyDecl *property,
             Params.push_back(Argument);
             
             SetMulleObjCParam( SetterMethod, property->getSetterName(), &Params, property->getType(), 0x2, Loc);
+         }
+         else
+         {
+            SetterMethod->setMetaABIVoidPointerParam( true);
          }
       }
 

@@ -1058,14 +1058,18 @@ Decl *Sema::ActOnPropertyImplDecl(Scope *S,
       
       ObjCIvarDecl::AccessControl  protection = ObjCIvarDecl::Private;
       IdentifierInfo               *IvarIdentifier = PropertyIvar;
+       
       // @mulle-objc@ language: make synthesized ivars default "protected" and prepend underscore
       if( LangOpts.ObjCRuntime.hasMulleMetaABI())
       {
          std::string   underscored;
          
          protection = ObjCIvarDecl::Protected;
-         underscored = "_" + std::string( PropertyIvar->getNameStart());
+         underscored = "_" + std::string( PropertyId->getNameStart());
          IvarIdentifier = &Context.Idents.get( underscored);
+         
+         if( PropertyIvar != PropertyId && IvarIdentifier != PropertyIvar)
+            Diag(PropertyDiagLoc, diag::err_mulle_objc_property_synthesize_wrong_name);
       }
       Ivar = ObjCIvarDecl::Create(Context, ClassImpDecl,
                                   PropertyIvarLoc,PropertyIvarLoc, IvarIdentifier,
@@ -1098,6 +1102,19 @@ Decl *Sema::ActOnPropertyImplDecl(Scope *S,
       Diag(Ivar->getLocation(), diag::note_previous_access_declaration)
       << Ivar << Ivar->getName();
       // Note! I deliberately want it to fall thru so more errors are caught.
+    }
+     
+    // @mulle-objc@ language: check that ivar name fits property
+    if( LangOpts.ObjCRuntime.hasMulleMetaABI())
+    {
+       std::string      underscored;
+       IdentifierInfo   *expected;
+        
+       underscored = "_" + std::string( property->getIdentifier()->getNameStart());
+       expected    = &Context.Idents.get( underscored);
+           
+       if( Ivar->getIdentifier() != expected)
+          Diag(PropertyDiagLoc, diag::err_mulle_objc_property_synthesize_wrong_name);
     }
     property->setPropertyIvarDecl(Ivar);
 

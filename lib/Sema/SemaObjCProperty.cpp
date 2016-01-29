@@ -947,7 +947,8 @@ Decl *Sema::ActOnPropertyImplDecl(Scope *S,
   bool CompleteTypeErr = false;
   bool compat = true;
   // Check that we have a valid, previously declared ivar for @synthesize
-  if (Synthesize) {
+  // @mulle-objc@ language: always create an ivar, regardless of dynamic
+  if (Synthesize || getLangOpts().ObjCRuntime.hasMulleMetaABI()) {
     // @synthesize
     if (!PropertyIvar)
       PropertyIvar = PropertyId;
@@ -1056,12 +1057,18 @@ Decl *Sema::ActOnPropertyImplDecl(Scope *S,
       }
       
       ObjCIvarDecl::AccessControl  protection = ObjCIvarDecl::Private;
-      // @mulle-objc@ language: make synthesized ivars default "protected"
+      IdentifierInfo               *IvarIdentifier = PropertyIvar;
+      // @mulle-objc@ language: make synthesized ivars default "protected" and prepend underscore
       if( LangOpts.ObjCRuntime.hasMulleMetaABI())
-         protection = ObjCIvarDecl::Protected;
+      {
+         std::string   underscored;
          
+         protection = ObjCIvarDecl::Protected;
+         underscored = "_" + std::string( PropertyIvar->getNameStart());
+         IvarIdentifier = &Context.Idents.get( underscored);
+      }
       Ivar = ObjCIvarDecl::Create(Context, ClassImpDecl,
-                                  PropertyIvarLoc,PropertyIvarLoc, PropertyIvar,
+                                  PropertyIvarLoc,PropertyIvarLoc, IvarIdentifier,
                                   PropertyIvarType, /*Dinfo=*/nullptr,
                                   protection,
                                   (Expr *)nullptr, true);

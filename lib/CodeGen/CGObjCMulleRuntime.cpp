@@ -150,22 +150,22 @@ namespace {
                                           "mulle_objc_object_zone");
       }
       
-      /// id mulle_objc_object_call_class_id (id, SEL, void *, CLASSID)
+      /// id mulle_objc_object_call_classid (id, SEL, void *, CLASSID)
       ///
       /// The messenger used for super calls
       ///
       llvm::Constant *getMessageSendSuperFn() const {
-         llvm::Type *params[] = { ObjectPtrTy, ClassIDTy, SelectorIDTy, ParamsPtrTy  };
+         llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy, ParamsPtrTy, ClassIDTy  };
          return CGM.CreateRuntimeFunction(llvm::FunctionType::get(ObjectPtrTy,
                                                                   params, false),
-                                          "mulle_objc_object_call_class_id");
+                                          "mulle_objc_object_call_classid");
       }
 
       llvm::Constant *getMessageSendMetaSuperFn() const {
-         llvm::Type *params[] = { ObjectPtrTy, ClassIDTy, SelectorIDTy, ParamsPtrTy  };
+         llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy, ParamsPtrTy, ClassIDTy };
          return CGM.CreateRuntimeFunction(llvm::FunctionType::get(ObjectPtrTy,
                                                                   params, false),
-                                          "mulle_objc_class_call_class_id");
+                                          "mulle_objc_object_call_classid");
       }
       
       
@@ -1660,8 +1660,6 @@ CodeGen::RValue CGObjCMulleRuntime::CommonMessageSend(CodeGen::CodeGenFunction &
       assert(CGM.getContext().getCanonicalType(Method->getReturnType()) ==
              CGM.getContext().getCanonicalType(ResultType) &&
              "Result type mismatch!");
-   
-   
    //
    // this runs through patched code, to produce what we need
    //
@@ -1818,6 +1816,7 @@ CGObjCMulleRuntime::GenerateMessageSendSuper(CodeGen::CodeGenFunction &CGF,
                                     const ObjCMethodDecl *Method)
 {
    llvm::Value   *Arg0;
+   llvm::Value   *Arg2;
    CallArgList   ActualArgs;
    llvm::Value   *selID;
    llvm::Value   *classID;
@@ -1826,14 +1825,27 @@ CGObjCMulleRuntime::GenerateMessageSendSuper(CodeGen::CodeGenFunction &CGF,
    Arg0 = CGF.Builder.CreateBitCast(Receiver, ObjCTypes.ObjectPtrTy);
    ActualArgs.add(RValue::get( Arg0), CGF.getContext().getObjCInstanceType());
 
-   classID = EmitClassID( CGF, Class->getSuperClass());
-   ActualArgs.add(RValue::get( classID), CGF.getContext().LongTy);
-
    selID   = EmitSelector(CGF, Sel);
    ActualArgs.add(RValue::get( selID), CGF.getContext().getObjCSelType());
 
-   ActualArgs.addFrom( CallArgs);
+   switch( CallArgs.size())
+   {
+   case 0 :
+      Arg2 = CGF.Builder.CreateBitCast(Receiver, CGF.ConvertType( CGF.getContext().VoidPtrTy));
+      ActualArgs.add( RValue::get( Arg2), CGF.getContext().VoidPtrTy);
+      break;
+         
+   case 1 :
+      ActualArgs.addFrom( CallArgs);
+      break;
+         
+   default :
+      llvm_unreachable( "metabi lossage, too many args");
+   }
+   classID = EmitClassID( CGF, Class->getSuperClass());
+   ActualArgs.add(RValue::get( classID), CGF.getContext().LongTy);
    
+
    // add classID
    // a class is not really an ObjCSelType but soo similiar, good enough
    
@@ -1843,7 +1855,7 @@ CGObjCMulleRuntime::GenerateMessageSendSuper(CodeGen::CodeGenFunction &CGF,
    llvm::Constant *Fn;
    
    Fn = IsClassMessage ? ObjCTypes.getMessageSendMetaSuperFn() : ObjCTypes.getMessageSendSuperFn();
-   return( CommonMessageSend( CGF, Fn, Return, ResultType, Receiver, CallArgs, ActualArgs, Arg0, Method, true));
+   return( CommonMessageSend( CGF, Fn, Return, ResultType, Receiver, CallArgs, ActualArgs, Arg0, Method, false));
 }
 
 

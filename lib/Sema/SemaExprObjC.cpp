@@ -1773,6 +1773,13 @@ HandleExprPropertyRefExpr(const ObjCObjectPointerType *OPT,
   const ObjCInterfaceType *IFaceT = OPT->getInterfaceType();
   ObjCInterfaceDecl *IFace = IFaceT->getDecl();
 
+  // @mulle-objc@ language: turn off property . calls
+  if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+  {
+    Diag(MemberLoc, diag::err_mulle_objc_no_property_dot_expression);
+    return ExprError();
+  }
+  
   if (!MemberName.isIdentifier()) {
     Diag(MemberLoc, diag::err_invalid_property_name)
       << MemberName << QualType(OPT, 0);

@@ -4130,7 +4130,8 @@ Sema::CreateBuiltinArraySubscriptExpr(Expr *Base, SourceLocation LLoc,
 
     // Use custom logic if this should be the pseudo-object subscript
     // expression.
-    if (!LangOpts.isSubscriptPointerArithmetic())
+    // @mulle-objc@ language: turn off array subscripting
+    if (!LangOpts.isSubscriptPointerArithmetic() && ! LangOptions().ObjCRuntime.hasMulleMetaABI())
       return BuildObjCSubscriptExpression(RLoc, BaseExpr, IndexExpr, nullptr,
                                           nullptr);
 

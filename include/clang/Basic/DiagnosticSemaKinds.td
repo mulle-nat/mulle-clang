@@ -5364,6 +5364,8 @@ def err_function_mulle_objc_missing : Error<
 "the mulle-objc runtime function %0 has not been declared yet">;
 def err_mulle_objc_property_synthesize_wrong_name : Error<
 "the mulle-objc runtime synthesized instance variable name must be the name of the property, prefixed by an underscrore.">;
+def err_mulle_objc_no_property_dot_expression : Error<
+"the mulle-objc runtime does not support . expressions with properties, use regular method calls">;
 
 def warn_setter_getter_impl_required : Warning<
   "property %0 requires method %1 to be defined - "

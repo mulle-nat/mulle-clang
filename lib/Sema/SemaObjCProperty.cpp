@@ -1620,6 +1620,9 @@ void Sema::DefaultSynthesizeProperties(Scope *S, ObjCImplDecl* IMPDecl,
       continue;
     }
     ObjCPropertyDecl *PropInSuperClass = SuperPropMap[Prop->getIdentifier()];
+     
+    // @mulle-objc@ language: experimentally allow auto-synthesis of @protocol properties, I don't see the drawback (yet)
+    if( ! LangOpts.ObjCRuntime.hasMulleMetaABI())
     if (ObjCProtocolDecl *Proto =
           dyn_cast<ObjCProtocolDecl>(Prop->getDeclContext())) {
       // We won't auto-synthesize properties declared in protocols.

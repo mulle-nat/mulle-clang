@@ -447,6 +447,11 @@ ObjCTypeParamList *Parser::parseObjCTypeParamListOrProtocolRefs(
   SmallVector<Decl *, 4> typeParams;
   auto makeProtocolIdentsIntoTypeParameters = [&]() {
     unsigned index = 0;
+
+    // @mulle-objc@ language: turn off generics
+    if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+      Diag(Tok, diag::err_mulle_objc_no_cpp_generics);
+    else
     for (const auto &pair : protocolIdents) {
       DeclResult typeParam = Actions.actOnObjCTypeParam(
                                getCurScope(),
@@ -472,6 +477,7 @@ ObjCTypeParamList *Parser::parseObjCTypeParamListOrProtocolRefs(
     // Parse the variance, if any.
     SourceLocation varianceLoc;
     ObjCTypeParamVariance variance = ObjCTypeParamVariance::Invariant;
+    
     if (Tok.is(tok::kw___covariant) || Tok.is(tok::kw___contravariant)) {
       variance = Tok.is(tok::kw___covariant)
                    ? ObjCTypeParamVariance::Covariant
@@ -515,6 +521,7 @@ ObjCTypeParamList *Parser::parseObjCTypeParamListOrProtocolRefs(
     if (TryConsumeToken(tok::colon, colonLoc)) {
       // Once we've seen a bound, we know this is not a list of protocol
       // references.
+      
       if (mayBeProtocolList) {
         // Up until now, we have been queuing up parameters because they
         // might be protocol references. Turn them into parameters now.

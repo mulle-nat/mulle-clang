@@ -982,6 +982,13 @@ void CodeGenModule::AddDependentLib(StringRef Lib) {
   LinkerOptionsMetadata.push_back(llvm::MDNode::get(getLLVMContext(), MDOpts));
 }
 
+
+void CodeGenModule::ParserDidFinish( Parser *P) {
+   if( ObjCRuntime)
+      ObjCRuntime->ParserDidFinish( P);
+}
+
+
 /// \brief Add link options implied by the given module, including modules
 /// it depends on, using a postorder walk.
 static void addLinkOptionsPostorder(CodeGenModule &CGM, Module *Mod,

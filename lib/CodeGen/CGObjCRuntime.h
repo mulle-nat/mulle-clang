@@ -32,6 +32,7 @@ namespace llvm {
 }
 
 namespace clang {
+  class Parser;
 namespace CodeGen {
   class CodeGenFunction;
 }
@@ -164,7 +165,9 @@ public:
                                        CodeGenFunction &CGF,
                                        const ObjCMessageExpr *Expr);
 
-  
+  /// @mulle-objc@ compiler: pass through Parser to ObjCRuntime when finished
+  virtual void      ParserDidFinish( clang::Parser *P) {};
+   
   /// Generate an Objective-C message send operation to the super
   /// class initiated in a method for Class and with the given Self
   /// object.

@@ -39,6 +39,9 @@
 #include "clang/Basic/LangOptions.h"
 #include "clang/CodeGen/CGFunctionInfo.h"
 #include "clang/Frontend/CodeGenOptions.h"
+#include "clang/Lex/LiteralSupport.h"
+#include "clang/Lex/Preprocessor.h"
+#include "clang/Parse/Parser.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SetVector.h"
@@ -707,6 +710,10 @@ namespace {
       llvm::LLVMContext &VMContext;
       // FIXME! May not be needing this after all.
       unsigned ObjCABI;
+
+      int64_t   foundation_version;
+      int64_t   runtime_version;
+      int64_t   user_version;
       
       // gc ivar layout bitmap calculation helper caches.
       SmallVector<GC_IVAR, 16> SkipIvars;
@@ -872,6 +879,10 @@ namespace {
       /// ivar layout bitmap.
       llvm::Constant *GetIvarLayoutName(IdentifierInfo *Ident,
                                         const ObjCCommonTypesHelper &ObjCTypes);
+      
+      void  SetPropertyInfoToEmit( const ObjCPropertyDecl *PD,
+                                   const Decl *Container,
+                                   llvm::Constant *Prop[ 5]);
       
       /// EmitPropertyList - Emit the given property list. The return
       /// value has type PropertyListPtrTy.
@@ -1099,6 +1110,11 @@ namespace {
       
       llvm::Function *ModuleInitFunction() override;
       
+      void  ParserDidFinish( clang::Parser *P) override;
+      
+      int  GetMacroDefinitionUnsignedIntegerValue( clang::Preprocessor *PP,
+                                           StringRef name,
+                                           uint64_t *value);
 
       CodeGen::RValue CommonFunctionCall(CodeGen::CodeGenFunction &CGF,
                                          llvm::Constant *Fn,
@@ -1361,7 +1377,83 @@ static llvm::Constant *getConstantGEP(llvm::LLVMContext &VMContext,
 CGObjCMulleRuntime::CGObjCMulleRuntime(CodeGen::CodeGenModule &cgm) : CGObjCCommonMulleRuntime(cgm),
 ObjCTypes(cgm) {
    ObjCABI = 1;
+
+   foundation_version = 1848;   // default for testing
+   runtime_version    = 0;      // MUST be set by header, if we emit loadinfo
+   user_version       = 0;
    EmitImageInfo();
+}
+
+int  CGObjCMulleRuntime::GetMacroDefinitionUnsignedIntegerValue( clang::Preprocessor *PP,
+                                                                 StringRef name,
+                                                                 uint64_t *value)
+{
+   IdentifierInfo    *identifier;
+   MacroDefinition   definition;
+   MacroInfo         *info;
+   const Token       *token;
+   SmallString<128>  SpellingBuffer;
+   llvm::APInt       tmp;
+   
+   identifier = &CGM.getContext().Idents.get( name);
+   definition = PP->getMacroDefinition( identifier);
+   if( ! definition)
+      return( -1);
+   
+   info = definition.getMacroInfo();
+   if( ! info->getNumTokens())
+      return( -2);
+   
+   token = &info->getReplacementToken( 0);
+   if( token->getKind() != tok::numeric_constant)
+      return( -3);
+   
+   bool Invalid = false;
+   StringRef TokSpelling = PP->getSpelling( *token, SpellingBuffer, &Invalid);
+   if (Invalid)
+      return( -4);
+      
+   NumericLiteralParser  Literal( TokSpelling, token->getLocation(), *PP);
+   if( Literal.hadError)
+      return( -5);
+      
+   Literal.GetIntegerValue( tmp);
+   *value = tmp.getZExtValue();
+   return( 0);
+}
+
+
+void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
+{
+   clang::Preprocessor  *PP;
+   uint64_t  major;
+   uint64_t  minor;
+   uint64_t  patch;
+   
+   // it's cool if version isn't defined, when just compiling C stuff
+   PP = &P->getPreprocessor();
+   if( ! GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_RUNTIME_VERSION_MAJOR", &major) &&
+       ! GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_RUNTIME_VERSION_MINOR", &minor) &&
+       ! GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_RUNTIME_VERSION_PATCH", &patch))
+   {
+      runtime_version = major << 20 | minor << 8 | patch;
+   }
+
+   // optional anyway
+   if( ! GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_FOUNDATION_VERSION_MAJOR", &major) &&
+       ! GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_FOUNDATION_VERSION_MINOR", &minor) &&
+       ! GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_FOUNDATION_VERSION_PATCH", &patch))
+   {
+      foundation_version = major << 20 | minor << 8 | patch;
+   }
+
+   // optional anyway
+   if( ! GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_USER_VERSION_MAJOR", &major) &&
+       ! GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_USER_VERSION_MINOR", &minor) &&
+       ! GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_USER_VERSION_PATCH", &patch))
+   {
+      user_version = major << 20 | minor << 8 | patch;
+   }
 }
 
 
@@ -3318,10 +3410,10 @@ PushProtocolProperties(llvm::SmallPtrSet<const IdentifierInfo*,16> &PropertySet,
    for (const auto *PD : Proto->properties()) {
       if (!PropertySet.insert(PD->getIdentifier()).second)
          continue;
-      llvm::Constant *Prop[] = {
-         GetPropertyName(PD->getIdentifier()),
-         GetPropertyTypeString(PD, Container)
-      };
+      
+      llvm::Constant *Prop[5];
+      SetPropertyInfoToEmit( PD, Container, Prop);
+
       Properties.push_back(llvm::ConstantStruct::get(ObjCTypes.PropertyTy, Prop));
    }
 }
@@ -3358,6 +3450,21 @@ static int uniqueid_comparator( llvm::Constant * const *P1,
 }
 
 
+void  CGObjCCommonMulleRuntime::SetPropertyInfoToEmit( const ObjCPropertyDecl *PD,
+                                                       const Decl *Container,
+                                                       llvm::Constant *Prop[ 5])
+{
+   Selector   getter = PD->getGetterName();
+   Selector   setter = PD->getSetterName();
+   
+   Prop[ 0] = HashPropertyConstantForString( PD->getIdentifier()->getNameStart());
+   Prop[ 1] = GetPropertyName(PD->getIdentifier());
+   Prop[ 2] = GetPropertyTypeString(PD, Container);
+   Prop[ 3] = ! getter.isNull() ? HashSelConstantForString( getter.getAsString()) : 0;
+   Prop[ 4] = ! setter.isNull() ? HashSelConstantForString( setter.getAsString()) : 0;
+}
+
+
 llvm::Constant *CGObjCCommonMulleRuntime::EmitPropertyList(Twine Name,
                                                   const Decl *Container,
                                                   const ObjCContainerDecl *OCD,
@@ -3366,18 +3473,11 @@ llvm::Constant *CGObjCCommonMulleRuntime::EmitPropertyList(Twine Name,
    llvm::SmallPtrSet<const IdentifierInfo*, 16> PropertySet;
    for (const auto *PD : OCD->properties())
    {
+      llvm::Constant *Prop[5];
+
       PropertySet.insert(PD->getIdentifier());
-      Selector   getter = PD->getGetterName();
-      Selector   setter = PD->getSetterName();
       
-      llvm::Constant *Prop[] =
-      {
-         HashPropertyConstantForString( PD->getIdentifier()->getNameStart()),
-         GetPropertyName(PD->getIdentifier()),
-         GetPropertyTypeString(PD, Container),
-         ! getter.isNull() ? HashSelConstantForString( getter.getAsString()) : 0,
-         ! setter.isNull() ? HashSelConstantForString( setter.getAsString()) : 0
-      };
+      SetPropertyInfoToEmit( PD, Container, Prop);
       Properties.push_back(llvm::ConstantStruct::get(ObjCTypes.PropertyTy,
                                                      Prop));
    }
@@ -3922,16 +4022,20 @@ llvm::Constant *CGObjCMulleRuntime::EmitLoadInfoList(Twine Name,
                                           llvm::Constant *ClassList,
                                           llvm::Constant *CategoryList)
 {
-   llvm::Constant *Values[5];
+   llvm::Constant   *Values[6];
+
+   if( ! runtime_version)
+      llvm_unreachable( "Missing runtime header in compilation, can not emit loadinfo");
    
    //
    // should get these values from the header
    //
-   Values[0] = llvm::ConstantInt::get(ObjCTypes.IntTy, (0 << 20) | (1 << 8) | 0);  // major, minor, patch version
-   Values[1] = llvm::ConstantInt::get(ObjCTypes.IntTy, 1848);  // foundation
-   Values[2] = ClassList;
-   Values[3] = CategoryList;
-   Values[4] = llvm::ConstantInt::get(ObjCTypes.IntTy, 1);     // bits, 1 == sorted
+   Values[0] = llvm::ConstantInt::get(ObjCTypes.IntTy, runtime_version);        // major, minor, patch version
+   Values[1] = llvm::ConstantInt::get(ObjCTypes.IntTy, foundation_version);  // foundation
+   Values[2] = llvm::ConstantInt::get(ObjCTypes.IntTy, user_version);  // foundation
+   Values[3] = llvm::ConstantInt::get(ObjCTypes.IntTy, 1);     // bits, 1 == sorted
+   Values[4] = ClassList;
+   Values[5] = CategoryList;
 
    llvm::Constant *Init = llvm::ConstantStruct::getAnon(Values);
    

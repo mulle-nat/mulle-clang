@@ -219,6 +219,10 @@ namespace clang {
     void HandleDependentLibrary(llvm::StringRef Opts) override {
       Gen->HandleDependentLibrary(Opts);
     }
+    
+    void ParserDidFinish( clang::Parser *P) override {
+      Gen->ParserDidFinish( P);
+    }
 
     static void InlineAsmDiagHandler(const llvm::SMDiagnostic &SM,void *Context,
                                      unsigned LocCookie) {

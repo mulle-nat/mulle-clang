@@ -76,6 +76,7 @@ class AnnotateAttr;
 class CXXDestructorDecl;
 class Module;
 class CoverageSourceInfo;
+class Parser;
 
 namespace CodeGen {
 
@@ -1033,6 +1034,9 @@ public:
   void setFunctionLinkage(GlobalDecl GD, llvm::Function *F) {
     F->setLinkage(getFunctionLinkage(GD));
   }
+
+  /// @mulle-objc@ compiler: pass through Parser to ObjCRuntime when finished
+  void ParserDidFinish( clang::Parser *P);
 
   /// Set the DLL storage class on F.
   void setFunctionDLLStorageClass(GlobalDecl GD, llvm::Function *F);

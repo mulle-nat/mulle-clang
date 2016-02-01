@@ -89,8 +89,8 @@ namespace {
          // be called a lot.
          switch( optLevel)
          {
-         default : name = "mulle_objc_object_inline_call"; break;
-         case  1 : name = "mulle_objc_object_call"; break;
+         case 3  : name = "mulle_objc_object_inline_call"; break;
+         default : name = "mulle_objc_object_call"; break;
          case -1 :
          case 0  : name = "mulle_objc_object_no_inline_call"; break;
          }
@@ -204,9 +204,14 @@ namespace {
       llvm::Type *PropertyIDTyPtrTy;
       llvm::Type *ProtocolIDPtrTy;
    
+      llvm::StructType *StaticStringTy;
+      llvm::StructType *HashNameTy;
+      
       // the structures that get exported
       llvm::Type *ClassListTy;
       llvm::Type *CategoryListTy;
+      llvm::Type *StaticStringListTy;
+      llvm::Type *HashNameListTy;
       llvm::Type *LoadInfoTy;
       
       llvm::Type *Array5ObjectPtrTy;
@@ -1099,10 +1104,19 @@ namespace {
       llvm::Constant *EmitCategoryList(Twine Name,
                                        const char *Section,
                                        ArrayRef<llvm::Constant*> Categories);
+      llvm::Constant *EmitStaticStringList(Twine Name,
+                                           const char *Section,
+                                           ArrayRef<llvm::Constant*> StaticStrings);
+      llvm::Constant *EmitHashNameList(Twine Name,
+                                       const char *Section,
+                                       ArrayRef<llvm::Constant*> HashNames);
+      
       llvm::Constant *EmitLoadInfoList(Twine Name,
                                           const char *Section,
                                           llvm::Constant *ClassList,
-                                          llvm::Constant *CategoryList);
+                                          llvm::Constant *CategoryList,
+                                          llvm::Constant *StringList,
+                                          llvm::Constant *HashNameList);
 
      
    public:
@@ -4017,12 +4031,55 @@ llvm::Constant *CGObjCMulleRuntime::EmitCategoryList(Twine Name,
 }
 
 
-llvm::Constant *CGObjCMulleRuntime::EmitLoadInfoList(Twine Name,
-                                          const char *Section,
-                                          llvm::Constant *ClassList,
-                                          llvm::Constant *CategoryList)
+llvm::Constant *CGObjCMulleRuntime::EmitStaticStringList(Twine Name,
+                                                        const char *Section,
+                                                        ArrayRef<llvm::Constant*> StaticStrings)
 {
-   llvm::Constant   *Values[6];
+   // Return null for empty list.
+   if (StaticStrings.empty())
+      return llvm::Constant::getNullValue( llvm::PointerType::getUnqual( ObjCTypes.StaticStringListTy));
+   
+   llvm::Constant *Values[2];
+   Values[0] = llvm::ConstantInt::get(ObjCTypes.IntTy, StaticStrings.size());
+   llvm::ArrayType *AT = llvm::ArrayType::get( llvm::PointerType::getUnqual( ObjCTypes.StaticStringTy),
+                                              StaticStrings.size());
+   Values[1] = llvm::ConstantArray::get(AT, StaticStrings);
+   llvm::Constant *Init = llvm::ConstantStruct::getAnon(Values);
+   
+   llvm::GlobalVariable *GV = CreateMetadataVar( Name, Init, Section, 4, true);
+   return llvm::ConstantExpr::getBitCast(GV, llvm::PointerType::getUnqual( ObjCTypes.StaticStringListTy));
+}
+
+
+llvm::Constant *CGObjCMulleRuntime::EmitHashNameList(Twine Name,
+                                                     const char *Section,
+                                                     ArrayRef<llvm::Constant*> HashNames)
+{
+   // Return null for empty list.
+   if (HashNames.empty())
+      return llvm::Constant::getNullValue( llvm::PointerType::getUnqual( ObjCTypes.HashNameListTy));
+   
+   llvm::Constant *Values[2];
+   Values[0] = llvm::ConstantInt::get(ObjCTypes.IntTy, HashNames.size());
+   llvm::ArrayType *AT = llvm::ArrayType::get( llvm::PointerType::getUnqual( ObjCTypes.HashNameTy),
+                                              HashNames.size());
+   Values[1] = llvm::ConstantArray::get(AT, HashNames);
+   llvm::Constant *Init = llvm::ConstantStruct::getAnon(Values);
+   
+   llvm::GlobalVariable *GV = CreateMetadataVar( Name, Init, Section, 4, true);
+   return llvm::ConstantExpr::getBitCast(GV, llvm::PointerType::getUnqual( ObjCTypes.HashNameListTy));
+}
+
+
+
+llvm::Constant *CGObjCMulleRuntime::EmitLoadInfoList(Twine Name,
+                                                     const char *Section,
+                                                     llvm::Constant *ClassList,
+                                                     llvm::Constant *CategoryList,
+                                                     llvm::Constant *StringList,
+                                                     llvm::Constant *HashNameList)
+{
+   llvm::Constant   *Values[8];
 
    if( ! runtime_version)
       llvm_unreachable( "Missing runtime header in compilation, can not emit loadinfo");
@@ -4036,6 +4093,8 @@ llvm::Constant *CGObjCMulleRuntime::EmitLoadInfoList(Twine Name,
    Values[3] = llvm::ConstantInt::get(ObjCTypes.IntTy, 1);     // bits, 1 == sorted
    Values[4] = ClassList;
    Values[5] = CategoryList;
+   Values[6] = StringList;
+   Values[7] = HashNameList;
 
    llvm::Constant *Init = llvm::ConstantStruct::getAnon(Values);
    
@@ -4057,7 +4116,7 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
    // build up the necessary info structure now and emit it
    llvm::Constant  *expr;
    
-   SmallVector<llvm::Constant *, 16> LoadClasses, LoadCategories;
+   SmallVector<llvm::Constant *, 16> LoadClasses, LoadCategories, StaticStrings, HashNames;
    for (auto *I : DefinedClasses)
    {
       // Instance methods should always be defined.
@@ -4073,8 +4132,11 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
    }
   llvm::Constant *ClassList = EmitClassList( "OBJC_CLASS_LOADS", "__DATA,_objc_load_info", LoadClasses);
   llvm::Constant *CategoryList = EmitCategoryList( "OBJC_CATEGORY_LOADS", "__DATA,_objc_load_info", LoadCategories);
+  llvm::Constant *StringList = EmitStaticStringList( "OBJC_STATICSTRING_LOADS", "__DATA,_objc_load_info", StaticStrings);
+  llvm::Constant *HashNameList = EmitHashNameList( "OBJC_HASHNAME_LOADS", "__DATA,_objc_load_info", HashNames);
 
-  llvm::Constant *LoadInfo = EmitLoadInfoList( "OBJC_LOAD_INFO", "__DATA,_objc_load_info", ClassList, CategoryList);
+  llvm::Constant *LoadInfo = EmitLoadInfoList( "OBJC_LOAD_INFO", "__DATA,_objc_load_info", ClassList, CategoryList, StringList, HashNameList);
+
 
   
    // take collected initializers and create a __attribute__(constructor)
@@ -5823,7 +5885,7 @@ ObjCCommonTypesHelper::ObjCCommonTypesHelper(CodeGen::CodeGenModule &cgm)
                                        nullptr);
    
    // struct _objc_cache *
-   CacheTy = llvm::StructType::create(VMContext, "struct._objc_cache");
+   CacheTy = llvm::StructType::create(VMContext, "struct._mulle_objc_cache");
    CachePtrTy = llvm::PointerType::getUnqual(CacheTy);
    
 }
@@ -5836,7 +5898,7 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
    //   char *types;
    // }
    MethodDescriptionTy =
-   llvm::StructType::create("struct._objc_method_description",
+   llvm::StructType::create("struct._mulle_objc_methoddescriptor",
                             SelectorIDTy, Int8PtrTy, nullptr);
    
    // struct _objc_method_description_list {
@@ -5844,7 +5906,7 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
    //   struct _objc_method_description[1];
    // }
    MethodDescriptionListTy = llvm::StructType::create(
-                                                      "struct._objc_method_description_list", IntTy,
+                                                      "struct._mulle_objc_methoddescriptorlist", IntTy,
                                                       llvm::ArrayType::get(MethodDescriptionTy, 0), nullptr);
    
    // struct _objc_method_description_list *
@@ -5861,7 +5923,7 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
    //   const char ** extendedMethodTypes;
    // }
    ProtocolExtensionTy =
-   llvm::StructType::create("struct._objc_protocol_extension",
+   llvm::StructType::create("struct._mulle_objc_protocolextension",
                             IntTy, MethodDescriptionListPtrTy,
                             MethodDescriptionListPtrTy, PropertyListPtrTy,
                             Int8PtrPtrTy, nullptr);
@@ -5872,10 +5934,10 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
    // Handle recursive construction of Protocol and ProtocolList types
    
    ProtocolTy =
-   llvm::StructType::create(VMContext, "struct._objc_protocol");
+   llvm::StructType::create(VMContext, "struct._mulle_objc_protocol");
    
    ProtocolListTy =
-   llvm::StructType::create(VMContext, "struct._objc_protocol_list");
+   llvm::StructType::create(VMContext, "struct._mulle_objc_protocollist");
    ProtocolListTy->setBody(llvm::PointerType::getUnqual(ProtocolListTy),
                            LongTy,
                            llvm::ArrayType::get(ProtocolTy, 0),
@@ -5906,7 +5968,7 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
    //   char *ivar_type;
    //   int  ivar_offset;
    // }
-   IvarTy = llvm::StructType::create(VMContext, "struct._objc_ivar");
+   IvarTy = llvm::StructType::create(VMContext, "struct._mulle_objc_ivar");
    IvarTy->setBody(
                     IvarIDTy,    // ivar_id
                     Int8PtrTy,   // name
@@ -5916,21 +5978,21 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
    
    // struct _objc_ivar_list *
    IvarListTy =
-   llvm::StructType::create(VMContext, "struct._objc_ivar_list");
+   llvm::StructType::create(VMContext, "struct._mulle_objc_ivarlist");
    IvarListPtrTy = llvm::PointerType::getUnqual(IvarListTy);
    
    // struct _objc_method_list *
    MethodListTy =
-   llvm::StructType::create(VMContext, "struct._mulle_objc_method_list");
+   llvm::StructType::create(VMContext, "struct._mulle_objc_methodlist");
    MethodListPtrTy = llvm::PointerType::getUnqual(MethodListTy);
 
    // struct _objc_class_extension *
    ClassExtensionTy =
-   llvm::StructType::create("struct._objc_class_extension",
+   llvm::StructType::create("struct._objc_classextension",
                             IntTy, Int8PtrTy, PropertyListPtrTy, nullptr);
    ClassExtensionPtrTy = llvm::PointerType::getUnqual(ClassExtensionTy);
    
-   ClassTy = llvm::StructType::create(VMContext, "struct._mulle_objc_load_class");
+   ClassTy = llvm::StructType::create(VMContext, "struct._mulle_objc_loadclass");
    
   
 //   struct _mulle_objc_load_class
@@ -5983,11 +6045,30 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
 //   };
 
    CategoryTy =
-   llvm::StructType::create("struct._mulle_objc_load_category",
+   llvm::StructType::create("struct._mulle_objc_loadcategory",
                             ClassIDTy, Int8PtrTy, MethodListPtrTy,
                             MethodListPtrTy, PropertyListPtrTy,
                             ProtocolIDPtrTy, nullptr);
-   
+
+   //   struct _mulle_objc_loadstaticstring
+   //   {
+   //      struct _mulle_objc_objectheader *address;  //
+   //   };
+
+   StaticStringTy =
+   llvm::StructType::create("struct._mulle_objc_loadstaticstring",
+                            Int8PtrTy, nullptr);
+
+   //   struct _mulle_objc_loadhashname
+   //   {
+   //      mulle_objc_uniqueid_t   uniqueid;
+   //      char                    *name;
+   //   };
+
+   HashNameTy =
+   llvm::StructType::create("struct._mulle_objc_loadhashname",
+                            ClassIDTy, Int8PtrTy, nullptr);
+
    // Global metadata structures
    
    // struct _objc_symtab {
@@ -6017,13 +6098,17 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
    //
    // some stuff we only use to emit the structure as input to load
    //
-   ClassListTy = llvm::StructType::create("struct._mulle_objc_load_class_list",
+   ClassListTy = llvm::StructType::create("struct._mulle_objc_loadclasslist",
                             IntTy, llvm::PointerType::getUnqual( ClassPtrTy), nullptr);
 
-   CategoryListTy = llvm::StructType::create("struct._mulle_objc_load_category_list",
+   CategoryListTy = llvm::StructType::create("struct._mulle_objc_loadcategorylist",
                             IntTy, llvm::PointerType::getUnqual( llvm::PointerType::getUnqual( CategoryTy)), nullptr);
+   StaticStringListTy = llvm::StructType::create("struct._mulle_objc_loadcategorylist",
+                                             IntTy, llvm::PointerType::getUnqual( llvm::PointerType::getUnqual( StaticStringTy)), nullptr);
+   HashNameListTy = llvm::StructType::create("struct._mulle_objc_loadhashnamelist",
+                                             IntTy, llvm::PointerType::getUnqual( llvm::PointerType::getUnqual( HashNameTy)), nullptr);
 
-   LoadInfoTy = llvm::StructType::create("struct._mulle_objc_load_category_list",
+   LoadInfoTy = llvm::StructType::create("struct._mulle_objc_loadinfo",
                             llvm::PointerType::getUnqual( ClassListTy),
                             llvm::PointerType::getUnqual( CategoryListTy),
                             nullptr);

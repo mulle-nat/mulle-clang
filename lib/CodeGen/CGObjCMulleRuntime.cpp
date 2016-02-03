@@ -83,6 +83,7 @@ namespace {
       /// The messenger, used for all message sends, except super calls
       /// might need another one, when params is null..
       ///
+      
       llvm::Constant *getMessageSendFn( int optLevel) const {
          StringRef    name;
          // Add the non-lazy-bind attribute, since objc_msgSend is likely to
@@ -104,12 +105,37 @@ namespace {
                                          llvm::AttributeSet::get(CGM.getLLVMContext(),
                                                                  llvm::AttributeSet::FunctionIndex,
                                                                  llvm::Attribute::NonLazyBind));
-         // HACK
-         //if (auto *F = dyn_cast<llvm::Function>(C))
-         //   F->setCallingConv( llvm::CallingConv::Fast);
-           return( C);
+         return( C);
       }
       
+      // just the same but differently typed for llvm
+      llvm::Constant *getMessageSendNoParamFn( int optLevel) const {
+         StringRef    name;
+         // Add the non-lazy-bind attribute, since objc_msgSend is likely to
+         // be called a lot.
+         switch( optLevel)
+         {
+         case 3  : name = "mulle_objc_object_inline_call"; break;
+         default : name = "mulle_objc_object_call"; break;
+         case -1 :
+         case 0  : name = "mulle_objc_object_no_inline_call"; break;
+         }
+
+         llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy };
+         llvm::Constant *C;
+         
+         C  =  CGM.CreateRuntimeFunction(llvm::FunctionType::get(ObjectPtrTy,
+                                                              params, false),
+                                         name,
+                                         llvm::AttributeSet::get(CGM.getLLVMContext(),
+                                                                 llvm::AttributeSet::FunctionIndex,
+                                                                 llvm::Attribute::NonLazyBind));
+
+         return( C);
+      }
+      
+      
+
       llvm::Constant *getMessageSendAllocFn() const {
          llvm::Type *params[] = { ObjectPtrTy };
          return CGM.CreateRuntimeFunction(llvm::FunctionType::get( ObjectPtrTy,
@@ -719,6 +745,8 @@ namespace {
       int64_t   foundation_version;
       int64_t   runtime_version;
       int64_t   user_version;
+      int64_t   fastclassids[ 32];
+      bool      fastclassids_defined;
       
       // gc ivar layout bitmap calculation helper caches.
       SmallVector<GC_IVAR, 16> SkipIvars;
@@ -739,7 +767,10 @@ namespace {
       
       /// ClassNames - uniqued class names.
       llvm::StringMap<llvm::GlobalVariable*> ClassNames;
-      
+
+      /// HashNames - uniqued hashes for debugging.
+      llvm::StringMap<llvm::ConstantInt*> DefinedHashes;
+
       /// MethodVarNames - uniqued method variable names.
       llvm::DenseMap<Selector, llvm::GlobalVariable*> MethodVarNames;
       
@@ -832,7 +863,7 @@ namespace {
       
       llvm::Function *GetMethodDefinition(const ObjCMethodDecl *MD);
       
-      // dup from COdeGenModule, but easier here
+      // dup from CodeGenModule, but easier here
       llvm::StructType *NSConstantStringType;
       llvm::StringMap<llvm::GlobalVariable *> NSConstantStringMap;
 
@@ -916,28 +947,29 @@ namespace {
       llvm::Constant *GetProtocolRef(const ObjCProtocolDecl *PD);
       
       // common helper function, turning names into abbreviated MD5 hashes
-      llvm::Constant *_HashConstantForString( StringRef sref, uint64_t first_valid);
-      llvm::Constant *HashClassConstantForString( StringRef sref)
+      llvm::ConstantInt *__HashConstantForString( StringRef sref, uint64_t first_valid);
+      llvm::ConstantInt *_HashConstantForString( StringRef sref, uint64_t first_valid);
+      llvm::ConstantInt *HashClassConstantForString( StringRef sref)
       {
-         return( _HashConstantForString( sref, 0x20));
+         return( _HashConstantForString( sref, 0x1));
       }
-      llvm::Constant *HashProtocolConstantForString( StringRef sref)
+      llvm::ConstantInt *HashProtocolConstantForString( StringRef sref)
       {
          return( HashClassConstantForString( sref));
       }
-      llvm::Constant *HashCategoryConstantForString( StringRef sref)
+      llvm::ConstantInt *HashCategoryConstantForString( StringRef sref)
       {
-         return( _HashConstantForString( sref, 0x0));
+         return( _HashConstantForString( sref, 0x1));
       }
-      llvm::Constant *HashPropertyConstantForString( StringRef sref)
+      llvm::ConstantInt *HashPropertyConstantForString( StringRef sref)
       {
-         return( _HashConstantForString( sref, 0x0));
+         return( _HashConstantForString( sref, 0x1));
       }
-      llvm::Constant *HashSelConstantForString( StringRef sref)
+      llvm::ConstantInt *HashSelConstantForString( StringRef sref)
       {
-         return( _HashConstantForString( sref, 0x0));
+         return( _HashConstantForString( sref, 0x1));
       }
-      llvm::Constant *HashIvarConstantForString( StringRef sref)
+      llvm::ConstantInt *HashIvarConstantForString( StringRef sref)
       {
          return( HashSelConstantForString( sref));
       }
@@ -1126,9 +1158,9 @@ namespace {
       
       void  ParserDidFinish( clang::Parser *P) override;
       
-      int  GetMacroDefinitionUnsignedIntegerValue( clang::Preprocessor *PP,
-                                           StringRef name,
-                                           uint64_t *value);
+      bool  GetMacroDefinitionUnsignedIntegerValue( clang::Preprocessor *PP,
+                                                    StringRef name,
+                                                    uint64_t *value);
 
       CodeGen::RValue CommonFunctionCall(CodeGen::CodeGenFunction &CGF,
                                          llvm::Constant *Fn,
@@ -1395,45 +1427,54 @@ ObjCTypes(cgm) {
    foundation_version = 1848;   // default for testing
    runtime_version    = 0;      // MUST be set by header, if we emit loadinfo
    user_version       = 0;
+
+   memset( fastclassids, 0, sizeof( fastclassids));
+   fastclassids_defined = false;
+   
    EmitImageInfo();
 }
 
-int  CGObjCMulleRuntime::GetMacroDefinitionUnsignedIntegerValue( clang::Preprocessor *PP,
-                                                                 StringRef name,
-                                                                 uint64_t *value)
+
+bool  CGObjCMulleRuntime::GetMacroDefinitionUnsignedIntegerValue( clang::Preprocessor *PP,
+                                                                  StringRef name,
+                                                                  uint64_t *value)
 {
    IdentifierInfo    *identifier;
    MacroDefinition   definition;
    MacroInfo         *info;
    const Token       *token;
    SmallString<128>  SpellingBuffer;
-   llvm::APInt       tmp;
+   llvm::APInt       tmp(64, 0);
    
    identifier = &CGM.getContext().Idents.get( name);
    definition = PP->getMacroDefinition( identifier);
    if( ! definition)
-      return( -1);
+      return( 0);
    
    info = definition.getMacroInfo();
    if( ! info->getNumTokens())
-      return( -2);
+      return( 0);
    
    token = &info->getReplacementToken( 0);
    if( token->getKind() != tok::numeric_constant)
-      return( -3);
+   {
+      llvm_unreachable( "mulle_objc: preprocessor directives for the compiler must be integers only");
+      return( 0);
+   }
    
+   // How can this be even possibly fail ? It's impossible. More is more!
    bool Invalid = false;
    StringRef TokSpelling = PP->getSpelling( *token, SpellingBuffer, &Invalid);
    if (Invalid)
-      return( -4);
-      
+      return( 0);
+   
    NumericLiteralParser  Literal( TokSpelling, token->getLocation(), *PP);
    if( Literal.hadError)
-      return( -5);
+      return( 0);
       
    Literal.GetIntegerValue( tmp);
    *value = tmp.getZExtValue();
-   return( 0);
+   return( 1);
 }
 
 
@@ -1443,30 +1484,58 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
    uint64_t  major;
    uint64_t  minor;
    uint64_t  patch;
+   uint64_t  value;
    
    // it's cool if version isn't defined, when just compiling C stuff
    PP = &P->getPreprocessor();
-   if( ! GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_RUNTIME_VERSION_MAJOR", &major) &&
-       ! GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_RUNTIME_VERSION_MINOR", &minor) &&
-       ! GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_RUNTIME_VERSION_PATCH", &patch))
+   if( ! runtime_version)
    {
-      runtime_version = major << 20 | minor << 8 | patch;
+      if( GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_RUNTIME_VERSION_MAJOR", &major) &&
+          GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_RUNTIME_VERSION_MINOR", &minor) &&
+          GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_RUNTIME_VERSION_PATCH", &patch))
+      {
+         runtime_version = major << 20 | minor << 8 | patch;
+      }
+   }
+   
+   if( ! foundation_version)
+   {
+      // optional anyway
+      if( GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_FOUNDATION_VERSION_MAJOR", &major) &&
+          GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_FOUNDATION_VERSION_MINOR", &minor) &&
+          GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_FOUNDATION_VERSION_PATCH", &patch))
+      {
+         foundation_version = major << 20 | minor << 8 | patch;
+      }
+   }
+   
+   // optional anyway
+   if( ! user_version)
+   {
+      if( GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_USER_VERSION_MAJOR", &major) &&
+          GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_USER_VERSION_MINOR", &minor) &&
+          GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_USER_VERSION_PATCH", &patch))
+      {
+         user_version = major << 20 | minor << 8 | patch;
+      }
    }
 
-   // optional anyway
-   if( ! GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_FOUNDATION_VERSION_MAJOR", &major) &&
-       ! GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_FOUNDATION_VERSION_MINOR", &minor) &&
-       ! GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_FOUNDATION_VERSION_PATCH", &patch))
+   /* this runs for every top level declaration.(layme)
+      Fastclass must always be compiled regardless of optimization level
+    */
+   if( ! fastclassids_defined)
    {
-      foundation_version = major << 20 | minor << 8 | patch;
-   }
+      char   buf[ 64];
 
-   // optional anyway
-   if( ! GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_USER_VERSION_MAJOR", &major) &&
-       ! GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_USER_VERSION_MINOR", &minor) &&
-       ! GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_USER_VERSION_PATCH", &patch))
-   {
-      user_version = major << 20 | minor << 8 | patch;
+      for( int i = 0; i < 32; i++)
+      {
+         sprintf( buf, "MULLE_OBJC_FASTCLASSID_%d", i);
+         if( GetMacroDefinitionUnsignedIntegerValue( PP, buf, &value))
+         {
+            fastclassids[ i]     = value;
+            fastclassids_defined = true;
+         }
+      }
    }
 }
 
@@ -1772,18 +1841,23 @@ CodeGen::RValue CGObjCMulleRuntime::CommonMessageSend(CodeGen::CodeGenFunction &
    if( ! Fn)
    {
       int optLevel = CGM.getLangOpts().OptimizeSize ? -1 : CGM.getCodeGenOpts().OptimizationLevel;
-      Fn = ObjCTypes.getMessageSendFn( optLevel); // : ObjCTypes.getMessageSendFn0();
+      if( ! CallArgs.size())
+         Fn = ObjCTypes.getMessageSendNoParamFn( optLevel); // : ObjCTypes.getMessageSendFn0();
+      else
+         Fn = ObjCTypes.getMessageSendFn( optLevel); // : ObjCTypes.getMessageSendFn0();
       isDispatchFn = true;
    }
    
    if( isDispatchFn && ! CallArgs.size())
    {
+      /*
       llvm::Value   *Arg2;
       // pushing a bogus Arg0 again is probably cheaper than nulling
       // but then maybe not
       // we need this for _params
       Arg2 = CGF.Builder.CreateBitCast( Receiver, ObjCTypes.ParamsPtrTy);
       ActualArgs.add( RValue::get( Arg2), CGF.getContext().VoidPtrTy);
+      */
    }
 
    MessageSendInfo MSI = getMessageSendInfo( Method, ResultType, ActualArgs);
@@ -3627,30 +3701,38 @@ void CGObjCMulleRuntime::GenerateCategory(const ObjCCategoryImplDecl *OCD) {
    llvm::array_pod_sort( ClassMethods.begin(), ClassMethods.end(),
                          uniqueid_comparator);
    
-   llvm::Constant *Values[6];
-   Values[ 0] = HashClassConstantForString( Interface->getName());
-   Values[ 1] = GetClassName(Interface->getObjCRuntimeNameAsString());
+   llvm::Constant *Values[8];
+   
+   // category name emitted below
+   
+   Values[ 1] = HashClassConstantForString( Interface->getName());
+   Values[ 2] = GetClassName(Interface->getObjCRuntimeNameAsString());
    LazySymbols.insert(Interface->getIdentifier());
-   Values[2] = EmitMethodList("OBJC_CATEGORY_CLASS_METHODS_" + ExtName.str(),
+
+   Values[ 3] = llvm::ConstantExpr::getBitCast( _HashConstantForString( Interface->getIvarHashString( CGM.getContext()), 0), ObjCTypes.ClassIDTy);;
+   
+   Values[ 4] = EmitMethodList("OBJC_CATEGORY_CLASS_METHODS_" + ExtName.str(),
                               "__DATA,__cat_cls_meth,regular,no_dead_strip",
                               ClassMethods);
-   Values[3] = EmitMethodList("OBJC_CATEGORY_INSTANCE_METHODS_" + ExtName.str(),
+   Values[ 5] = EmitMethodList("OBJC_CATEGORY_INSTANCE_METHODS_" + ExtName.str(),
                               "__DATA,__cat_inst_meth,regular,no_dead_strip",
                               InstanceMethods);
    if (Category) {
-      Values[4] =
+      Values[ 6] =
       EmitProtocolIDList("OBJC_CATEGORY_PROTOCOLS_" + ExtName.str(),
                           Category->protocol_begin(), Category->protocol_end());
    } else {
-      Values[4] = llvm::Constant::getNullValue(ObjCTypes.ProtocolListPtrTy);
+      Values[ 6] = llvm::Constant::getNullValue(ObjCTypes.ProtocolListPtrTy);
    }
    
    // If there is no category @interface then there can be no properties.
    if (Category) {
-      Values[5] = EmitPropertyList("OBJC_CATEGORY_PROP_LIST_" + ExtName.str(),
+      Values[ 0] = GetClassName(Category->getName());
+      Values[ 7] = EmitPropertyList("OBJC_CATEGORY_PROP_LIST_" + ExtName.str(),
                                    OCD, Category, ObjCTypes);
    } else {
-      Values[5] = llvm::Constant::getNullValue(ObjCTypes.PropertyListPtrTy);
+      Values[ 0] = llvm::Constant::getNullValue(ObjCTypes.Int8PtrTy);
+      Values[ 7] = llvm::Constant::getNullValue(ObjCTypes.PropertyListPtrTy);
    }
  
    llvm::Constant *Init = llvm::ConstantStruct::get(ObjCTypes.CategoryTy,
@@ -3678,22 +3760,6 @@ enum FragileClassFlags {
 };
 
 
-/*
- //   struct _mulle_objc_load_class
- //   {
- //      mulle_objc_class_id_t            class_id;
- //      char                             *class_name;
- //      size_t                           instance_size;
- //
- //      mulle_objc_class_id_t            superclass_unique_id;
- //      char                             *superclass_name;
- //
- //      struct _mulle_objc_method_list   *class_methods;
- //      struct _mulle_objc_method_list   *instance_methods;
- //
- //      mulle_objc_protocol_id_t         *protocol_unique_ids;
- //   };
- */
 void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
    DefinedSymbols.insert(ID->getIdentifier());
    
@@ -3763,44 +3829,69 @@ void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
    //      mulle_objc_class_id_t            superclass_unique_id;
    //      char                             *superclass_name;
    //
-   //      size_t                           instance_size;
+   //      int                              fastclassindex;
+   //      int                              instance_size;
    //
-   //      struct _mulle_objc_method_list   *class_methods;
-   //      struct _mulle_objc_method_list   *instance_methods;
-   //      struct _mulle_objc_property_list *properties;
+   //      struct _mulle_objc_methodlist   *class_methods;
+   //      struct _mulle_objc_methodlist   *instance_methods;
+   //      struct _mulle_objc_propertylist *properties;
    //
    //      mulle_objc_protocol_id_t         *protocol_unique_ids;
    //   };
    
-   llvm::Constant *Values[10];
+   llvm::Constant *Values[13];
+   int   i = 0;
    
    ObjCInterfaceDecl *Super = Interface->getSuperClass();
+   llvm::ConstantInt *ClassID = HashClassConstantForString( ID->getObjCRuntimeNameAsString());
 
-   Values[ 0] =  llvm::ConstantExpr::getBitCast( HashClassConstantForString( ID->getObjCRuntimeNameAsString()), ObjCTypes.ClassIDTy);
-   Values[ 1] = GetClassName(ID->getObjCRuntimeNameAsString());
+   Values[ i++] = llvm::ConstantExpr::getBitCast( ClassID, ObjCTypes.ClassIDTy);
+   Values[ i++] = GetClassName(ID->getObjCRuntimeNameAsString());
+   Values[ i++] = llvm::ConstantExpr::getBitCast( _HashConstantForString( OID->getIvarHashString( CGM.getContext()), 0), ObjCTypes.ClassIDTy);;
 
+   llvm::ConstantInt   *SuperClassID = nullptr;
    if( Super)
    {
-      Values[ 2] = llvm::ConstantExpr::getBitCast( HashClassConstantForString( Super->getObjCRuntimeNameAsString()), ObjCTypes.ClassIDTy);
-      Values[ 3] = GetClassName( Super->getObjCRuntimeNameAsString());
+      SuperClassID = HashClassConstantForString( Super->getObjCRuntimeNameAsString());
+      Values[ i++] = llvm::ConstantExpr::getBitCast( SuperClassID, ObjCTypes.ClassIDTy);
+      Values[ i++] = GetClassName( Super->getObjCRuntimeNameAsString());
+      Values[ i++] = llvm::ConstantExpr::getBitCast( _HashConstantForString( Super->getIvarHashString( CGM.getContext()), 0), ObjCTypes.ClassIDTy);;
    }
    else
    {
-      Values[ 2] = llvm::Constant::getNullValue(ObjCTypes.ClassIDTy);
-      Values[ 3] = llvm::Constant::getNullValue(ObjCTypes.Int8PtrTy);
+      Values[ i++] = llvm::Constant::getNullValue(ObjCTypes.ClassIDTy);
+      Values[ i++] = llvm::Constant::getNullValue(ObjCTypes.Int8PtrTy);
+      Values[ i++] = llvm::Constant::getNullValue(ObjCTypes.ClassIDTy);
    }
-   
-   Values[ 4] = llvm::ConstantInt::get(ObjCTypes.LongTy, Size);
 
-   Values[ 5] = EmitIvarList( ID, InstanceVariables, false);
+   // determine fastclass index
+   if( fastclassids_defined)
+   {
+      int          j;
+      llvm::APInt  APVal    = ClassID->getValue();
+      int64_t      uniqueid = APVal.getZExtValue();
+      
+      for( j = 31; j >= 0; j--)
+      {
+         if( fastclassids[ j] == uniqueid)
+            break;
+      }
+      Values[ i++] = llvm::ConstantInt::get(ObjCTypes.IntTy, j);
+   }
+   else
+      Values[ i++] = llvm::ConstantInt::get(ObjCTypes.IntTy, -1);
    
-   Values[ 6] = EmitMethodList("OBJC_CLASS_METHODS_" + ID->getNameAsString(),
+   Values[ i++] = llvm::ConstantInt::get(ObjCTypes.IntTy, Size);
+
+   Values[ i++] = EmitIvarList( ID, InstanceVariables, false);
+   
+   Values[ i++] = EmitMethodList("OBJC_CLASS_METHODS_" + ID->getNameAsString(),
                                  "_DATA,__cls_meth,regular,no_dead_strip", ClassMethods);
-   Values[ 7] = EmitMethodList("OBJC_CLASS_METHODS_" + ID->getNameAsString(),
+   Values[ i++] = EmitMethodList("OBJC_CLASS_METHODS_" + ID->getNameAsString(),
                                "_DATA,__inst_meth,regular,no_dead_strip", InstanceMethods);
-   Values[ 8] = EmitPropertyList("OBJC_CLASS_METHODS_" + ID->getNameAsString(),
+   Values[ i++] = EmitPropertyList("OBJC_CLASS_METHODS_" + ID->getNameAsString(),
                                ID, OID, ObjCTypes);
-   Values[ 9] = Protocols;
+   Values[ i++] = Protocols;
 
    llvm::Constant *Init = llvm::ConstantStruct::get(ObjCTypes.ClassTy,
                                                     Values);
@@ -3929,6 +4020,7 @@ llvm::Constant *CGObjCMulleRuntime::GetMethodConstant(const ObjCMethodDecl *MD) 
                                      ObjCTypes.Int8PtrTy),
       GetMethodVarType(MD),
       llvm::ConstantInt::get(ObjCTypes.IntTy, 0),
+      
       llvm::ConstantExpr::getBitCast(Fn, ObjCTypes.Int8PtrTy)
    };
    return llvm::ConstantStruct::get(ObjCTypes.MethodTy, Method);
@@ -4061,7 +4153,7 @@ llvm::Constant *CGObjCMulleRuntime::EmitHashNameList(Twine Name,
    
    llvm::Constant *Values[2];
    Values[0] = llvm::ConstantInt::get(ObjCTypes.IntTy, HashNames.size());
-   llvm::ArrayType *AT = llvm::ArrayType::get( llvm::PointerType::getUnqual( ObjCTypes.HashNameTy),
+   llvm::ArrayType *AT = llvm::ArrayType::get( ObjCTypes.HashNameTy,
                                               HashNames.size());
    Values[1] = llvm::ConstantArray::get(AT, HashNames);
    llvm::Constant *Init = llvm::ConstantStruct::getAnon(Values);
@@ -4090,7 +4182,16 @@ llvm::Constant *CGObjCMulleRuntime::EmitLoadInfoList(Twine Name,
    Values[0] = llvm::ConstantInt::get(ObjCTypes.IntTy, runtime_version);        // major, minor, patch version
    Values[1] = llvm::ConstantInt::get(ObjCTypes.IntTy, foundation_version);  // foundation
    Values[2] = llvm::ConstantInt::get(ObjCTypes.IntTy, user_version);  // foundation
-   Values[3] = llvm::ConstantInt::get(ObjCTypes.IntTy, 1);     // bits, 1 == sorted
+ 
+   unsigned int   optLevel;
+   
+   optLevel  = CGM.getLangOpts().OptimizeSize ? -1 : CGM.getCodeGenOpts().OptimizationLevel;
+   optLevel &= 0x7;
+   
+   //
+   // memorize optLevel too, might come in useful
+   //
+   Values[3] = llvm::ConstantInt::get(ObjCTypes.IntTy, (optLevel << 2) | 1);     // bits, 1 == sorted
    Values[4] = ClassList;
    Values[5] = CategoryList;
    Values[6] = StringList;
@@ -4110,13 +4211,10 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
    // late ?)
    FinishModule();
    
-  if( DefinedClasses.empty() && DefinedCategories.empty())
-    return nullptr;
-   
    // build up the necessary info structure now and emit it
    llvm::Constant  *expr;
    
-   SmallVector<llvm::Constant *, 16> LoadClasses, LoadCategories, StaticStrings, HashNames;
+   SmallVector<llvm::Constant *, 16> LoadClasses, LoadCategories, StaticStrings, EmitHashes;
    for (auto *I : DefinedClasses)
    {
       // Instance methods should always be defined.
@@ -4130,14 +4228,39 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
       expr = llvm::ConstantExpr::getBitCast( I, llvm::PointerType::getUnqual( ObjCTypes.CategoryTy));
       LoadCategories.push_back( expr);
    }
+
+   if( CGM.getCodeGenOpts().getDebugInfo() >= CodeGenOptions::LimitedDebugInfo)
+   {
+      for (llvm::StringMap<llvm::ConstantInt *>::const_iterator
+           I = DefinedHashes.begin(), E = DefinedHashes.end();
+           I != E; ++I)
+      {
+         llvm::Constant   *Values[2];
+         
+         Values[0] = llvm::ConstantExpr::getBitCast( I->getValue(), ObjCTypes.ClassIDTy);
+         Values[1] = GetClassName( I->getKey());  // hack to unique strings moar
+         
+         llvm::Constant *expr = llvm::ConstantStruct::get( ObjCTypes.HashNameTy, Values);
+         
+         EmitHashes.push_back( expr);
+      }
+      llvm::array_pod_sort( EmitHashes.begin(), EmitHashes.end(),
+                            uniqueid_comparator);
+   }
+   
+   // dont't emit if there is nothing to do
+   if( ! LoadClasses.size() && ! LoadCategories.size() && \
+       ! StaticStrings.size() && ! EmitHashes.size())
+   {
+       return( nullptr);
+   }
+   
   llvm::Constant *ClassList = EmitClassList( "OBJC_CLASS_LOADS", "__DATA,_objc_load_info", LoadClasses);
   llvm::Constant *CategoryList = EmitCategoryList( "OBJC_CATEGORY_LOADS", "__DATA,_objc_load_info", LoadCategories);
   llvm::Constant *StringList = EmitStaticStringList( "OBJC_STATICSTRING_LOADS", "__DATA,_objc_load_info", StaticStrings);
-  llvm::Constant *HashNameList = EmitHashNameList( "OBJC_HASHNAME_LOADS", "__DATA,_objc_load_info", HashNames);
+  llvm::Constant *HashNameList = EmitHashNameList( "OBJC_HASHNAME_LOADS", "__DATA,_objc_load_info", EmitHashes);
 
   llvm::Constant *LoadInfo = EmitLoadInfoList( "OBJC_LOAD_INFO", "__DATA,_objc_load_info", ClassList, CategoryList, StringList, HashNameList);
-
-
   
    // take collected initializers and create a __attribute__(constructor)
    // static void   __load() function
@@ -5168,7 +5291,7 @@ llvm::Value *CGObjCMulleRuntime::EmitNSAutoreleasePoolClassRef(CodeGenFunction &
    return( GetClass( CGF, "NSAutoreleasePool"));
 }
 
-llvm::Constant *CGObjCCommonMulleRuntime::_HashConstantForString( StringRef sref, uint64_t first_valid)
+llvm::ConstantInt *CGObjCCommonMulleRuntime::__HashConstantForString( StringRef sref, uint64_t first_valid)
 {
    unsigned WordSizeInBits = CGM.getTarget().getPointerWidth(0);
    unsigned ByteSizeInBits = CGM.getTarget().getCharWidth();
@@ -5190,7 +5313,7 @@ llvm::Constant *CGObjCCommonMulleRuntime::_HashConstantForString( StringRef sref
       value  |= hash[ i];
    }
    
-   if( value < first_valid || value == (uint64_t) -1)
+   if( value < first_valid || (first_valid && value == (uint64_t) -1))
    {
       // FAIL! FIX
       std::string  fail;
@@ -5204,14 +5327,24 @@ llvm::Constant *CGObjCCommonMulleRuntime::_HashConstantForString( StringRef sref
    if (WordSizeInBytes == 8)
    {
       const llvm::APInt SelConstant(64, value);
-      return llvm::ConstantInt::getIntegerValue(CGM.Int64Ty, SelConstant);
+      return (llvm::ConstantInt *) llvm::ConstantInt::getIntegerValue(CGM.Int64Ty, SelConstant);
    }
    else
    {
       const llvm::APInt SelConstant(32, value);
-      return llvm::ConstantInt::getIntegerValue(CGM.Int32Ty, SelConstant);
+      return  (llvm::ConstantInt *) llvm::ConstantInt::getIntegerValue(CGM.Int32Ty, SelConstant);
    }
 }
+
+llvm::ConstantInt *CGObjCCommonMulleRuntime::_HashConstantForString( StringRef sref, uint64_t first_valid)
+{
+   llvm::ConstantInt *&Entry = DefinedHashes[ sref];  // how does this work ???
+   
+   if( ! Entry)
+      Entry = __HashConstantForString( sref, first_valid);
+   return( Entry);
+}
+
 
 llvm::Constant *CGObjCMulleRuntime::EmitSelector(CodeGenFunction &CGF, Selector Sel,
                                      bool lvalue)
@@ -5683,7 +5816,7 @@ llvm::Constant *CGObjCCommonMulleRuntime::GetMethodVarType(const FieldDecl *Fiel
 }
 
 llvm::Constant *CGObjCCommonMulleRuntime::GetMethodVarType(const ObjCMethodDecl *D,
-                                                  bool Extended) {
+                                                           bool Extended) {
    std::string TypeStr;
    if (CGM.getContext().getObjCEncodingForMethodDecl(D, TypeStr, Extended))
       return nullptr;
@@ -5997,13 +6130,15 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
   
 //   struct _mulle_objc_load_class
 //   {
-//      mulle_objc_class_id_t            class_id;
+//      mulle_objc_class_id_t            classid;
 //      char                             *class_name;
+//      uintptr_t                        ivarhash;
 //
-//      mulle_objc_class_id_t            superclass_unique_id;
+//      mulle_objc_class_id_t            superclass_classid;
 //      char                             *superclass_name;
 //      
-//      size_t                           instance_size;
+//      int                              instance_size;
+//      int                              fastclassindex;
 //
 //      struct _mulle_objc_method_list   *class_methods;
 //      struct _mulle_objc_method_list   *instance_methods;
@@ -6012,14 +6147,17 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
 //   };
 
    ClassTy->setBody(
-                    ClassIDTy,   // class_id
-                    Int8PtrTy,   // class_name
+                    ClassIDTy,         // classid
+                    Int8PtrTy,         // class_name
+                    ClassIDTy,         // ivarhash
                     
-                    ClassIDTy,   // superclass_unique_id
-                    Int8PtrTy,   // superclass_name,
+                    ClassIDTy,         // superclass_classid
+                    Int8PtrTy,         // superclass_name,
+                    ClassIDTy,         // superclass_ivarhash
                     
-                    LongTy,      // instance_size
-
+                    IntTy,             // instance_size
+                    IntTy,             // fastclassindex
+                    
                     IvarListPtrTy,
                     MethodListPtrTy,   // class_methods
                     MethodListPtrTy,   // instance_methods

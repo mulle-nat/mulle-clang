@@ -1413,6 +1413,7 @@ ObjCImplementationDecl::getObjCRuntimeNameAsString() const {
   return getName();
 }
 
+
 ObjCImplementationDecl *ObjCInterfaceDecl::getImplementation() const {
   if (const ObjCInterfaceDecl *Def = getDefinition()) {
     if (data().ExternallyCompleted)
@@ -1519,6 +1520,39 @@ ObjCIvarDecl *ObjCInterfaceDecl::all_declared_ivar_begin() {
   }
   return data().IvarList;
 }
+
+
+//
+// @mulle-objc@ codegen: make an ivar hash string for fragility fix
+// could cache this value
+StringRef
+ObjCInterfaceDecl::getIvarHashString( ASTContext &C) const
+{
+  std::string   concat;
+  
+  for (const ObjCIvarDecl *Ivar = all_declared_ivar_begin(); Ivar;
+       Ivar = Ivar->getNextIvar())
+  {
+      std::string TypeStr;
+      QualType PType = Ivar->getType();
+   
+      C.getObjCEncodingForTypeImpl( PType, TypeStr, true, true, nullptr,
+                              true     /*OutermostType*/,
+                              false    /*EncodingProperty*/,
+                              false    /*StructField*/,
+                              false    /*EncodeBlockParameters*/,
+                              false    /*EncodeClassNames*/);
+      /* superflous, but make look nicey */
+      if( concat.size())
+         concat = concat + ',';
+      concat = concat + Ivar->getNameAsString();
+      concat = concat + ":";
+      concat = concat + TypeStr;
+  }
+  
+  return StringRef( concat);
+}
+
 
 /// FindCategoryDeclaration - Finds category declaration in the list of
 /// categories for this class and returns it. Name of the category is passed

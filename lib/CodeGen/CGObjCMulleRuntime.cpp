@@ -18,6 +18,7 @@
 //
 // Most of the code isn't really used. Whenever this reaches
 // a state of usefulness, unused stuff should get thrown out eventually.
+// It's also certainly not my preferred coding style.
 //
 // @mulle-objc@ Memo: code places, that I modified, should be marked with this
 //              followed by a comment, what to see there
@@ -865,9 +866,9 @@ namespace {
       
       // dup from CodeGenModule, but easier here
       llvm::StructType *NSConstantStringType;
-      llvm::StringMap<llvm::GlobalVariable *> NSConstantStringMap;
+      llvm::StringMap<llvm::GlobalAlias *> NSConstantStringMap;
 
-      llvm::StringMapEntry<llvm::GlobalVariable *> &GetNSConstantStringMapEntry( const StringLiteral *Literal, unsigned &StringLength);
+      llvm::StringMapEntry<llvm::GlobalAlias *> &GetNSConstantStringMapEntry( const StringLiteral *Literal, unsigned &StringLength);
    
       llvm::Constant *GenerateConstantString(const StringLiteral *SL) override;
       
@@ -1605,10 +1606,13 @@ llvm::Constant *CGObjCMulleRuntime::GetEHType(QualType T) {
    llvm_unreachable("asking for catch type for ObjC type in fragile runtime");
 }
 
+#pragma mark -
+#pragma mark ConstantString
+
 ///  Generate a constant NSString object.
 //
-// { LONG_MAX, <isa>, "VfL Bochum 1848", 15 };
-//               ^--magic needed
+// { INTPTR_MAX, NULL, "VfL Bochum 1848", 15 };
+//
 llvm::StructType *CGObjCCommonMulleRuntime::CreateNSConstantStringType( void)
 {
    ASTContext   &Context = CGM.getContext();
@@ -1673,38 +1677,22 @@ llvm::ConstantStruct *CGObjCMulleRuntime::CreateNSConstantStringStruct( StringRe
    // drop LONG_MAX
    llvm::Type *Ty = CGM.getTypes().ConvertType(CGM.getContext().LongTy);
    Fields[0] = llvm::ConstantInt::get(Ty, LONG_MAX);
+
+   // this is filled in by the runtime later
    
-   std::string SymbolName = "NSConstantString";
-   llvm::GlobalVariable *Symbol = CGM.getModule().getGlobalVariable(SymbolName);
-   
-   //
-   // this is a pointer to a struct _mulle_objc_class, but we don't have this
-   // struct here, so we fake it with a "load" class type, and noone would
-   // notice, except because I am writing it here and because someone probably
-   // implements typesafe linking in the future, just to be a pain in the ass
-   //
-   if (! Symbol)
-      Symbol = new llvm::GlobalVariable( CGM.getModule(), ObjCTypes.ClassTy, false,
-                                        llvm::GlobalValue::ExternalLinkage,
-                                        nullptr, SymbolName);
-   Fields[1] = llvm::ConstantExpr::getBitCast( Symbol,
-                                               CGM.VoidPtrTy);
-   //MakeAddrLValue( Symbol, CGM.VoidPtrTy);
-   // String pointer.
-   llvm::Constant *C =
-   llvm::ConstantDataArray::getString(VMContext, S);
-   
-   llvm::GlobalValue::LinkageTypes Linkage;
-   bool isConstant;
-   Linkage = llvm::GlobalValue::PrivateLinkage;
-   isConstant = ! CGM.getLangOpts().WritableStrings;
+   Fields[1] = llvm::Constant::getNullValue( CGM.VoidPtrTy);
+
+   llvm::GlobalValue::LinkageTypes Linkage = llvm::GlobalValue::PrivateLinkage;
+   bool isConstant                         = ! CGM.getLangOpts().WritableStrings;
+   llvm::Constant *C                       = llvm::ConstantDataArray::getString(VMContext, S);
    
    auto *GV = new llvm::GlobalVariable( CGM.getModule(), C->getType(), isConstant,
                                        Linkage, C, ".str");
-   GV->setUnnamedAddr(true);
+   GV->setUnnamedAddr( true);
    
    // Don't enforce the target's minimum global alignment, since the only use
    // of the string is via this class initializer.
+
    CharUnits Align = CGM.getContext().getTypeAlignInChars(CGM.getContext().CharTy);
    GV->setAlignment(Align.getQuantity());
    Fields[2] = getConstantGEP( VMContext, GV, 0, 0);
@@ -1713,17 +1701,13 @@ llvm::ConstantStruct *CGObjCMulleRuntime::CreateNSConstantStringStruct( StringRe
    Ty = CGM.getTypes().ConvertType(CGM.getContext().UnsignedIntTy);
    Fields[3] = llvm::ConstantInt::get(Ty, StringLength);
    
-   llvm::StructType *StructType;
-   
-   StructType = GetOrCreateNSConstantStringType();
-   // The struct.
-   
+   llvm::StructType *StructType = GetOrCreateNSConstantStringType();
    return( (llvm::ConstantStruct *) llvm::ConstantStruct::get( StructType, Fields));
 }
 
 
-static llvm::StringMapEntry<llvm::GlobalVariable *> &
-GetConstantStringEntry(llvm::StringMap<llvm::GlobalVariable *> &Map,
+static llvm::StringMapEntry<llvm::GlobalAlias *> &
+GetConstantStringEntry(llvm::StringMap<llvm::GlobalAlias *> &Map,
                        const StringLiteral *Literal, unsigned &StringLength)
 {
   StringRef String = Literal->getString();
@@ -1732,7 +1716,7 @@ GetConstantStringEntry(llvm::StringMap<llvm::GlobalVariable *> &Map,
 }
 
 
-llvm::StringMapEntry<llvm::GlobalVariable *> &
+llvm::StringMapEntry<llvm::GlobalAlias *> &
 CGObjCCommonMulleRuntime::GetNSConstantStringMapEntry( const StringLiteral *Literal, unsigned &StringLength) {
    return( GetConstantStringEntry( NSConstantStringMap, Literal, StringLength));
 }
@@ -1741,8 +1725,7 @@ CGObjCCommonMulleRuntime::GetNSConstantStringMapEntry( const StringLiteral *Lite
 llvm::Constant *CGObjCCommonMulleRuntime::GenerateConstantString( const StringLiteral *SL)
 {
    unsigned StringLength = 0;
-   llvm::StringMapEntry<llvm::GlobalVariable *> &Entry =
-   GetNSConstantStringMapEntry( SL, StringLength);
+   llvm::StringMapEntry<llvm::GlobalAlias *> &Entry = GetNSConstantStringMapEntry( SL, StringLength);
    
    if (auto *C = Entry.second)
       return C;
@@ -1750,30 +1733,19 @@ llvm::Constant *CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
    llvm::GlobalVariable   *GV;
    llvm::ConstantStruct   *NSStringHeader = CreateNSConstantStringStruct( Entry.first(), StringLength);
    
-   GV = new llvm::GlobalVariable(CGM.getModule(), NSStringHeader->getType(), true,
+   GV = new llvm::GlobalVariable( CGM.getModule(), NSStringHeader->getType(), true,
                                  llvm::GlobalVariable::PrivateLinkage, NSStringHeader,
                                  "_unnamed_nsstring_header");
    // FIXME. Fix section.
    GV->setSection( "__DATA,__objc_stringobj,regular,no_dead_strip");
-   Entry.second = GV;
    
-   // skip header, index "object"
-   //   C = NSStringHeader->getAggregateElement(2);
-
-   llvm::Constant *C;
-   
-   // The vtable address point is 2.
-   //   C = NSStringHeader->getAggregateElement( 1);
-   C = getConstantGEP( VMContext, GV, 0, 2);
-   C = llvm::ConstantExpr::getBitCast( C, CGM.VoidPtrTy);
-   
-   llvm::GlobalAlias  *GA;
-   GA = llvm::GlobalAlias::create( CGM.VoidPtrTy,
-                                  llvm::GlobalVariable::WeakAnyLinkage,
-                                  Twine( "_unnamed_nsstring_"),
-                                  C,
-                                  &CGM.getModule());
-   // FIXME. Fix section.
+   llvm::Constant     *C = llvm::ConstantExpr::getBitCast( getConstantGEP( VMContext, GV, 0, 2), CGM.VoidPtrTy);
+   llvm::GlobalAlias  *GA = llvm::GlobalAlias::create( CGM.VoidPtrTy,
+                                                      llvm::GlobalVariable::WeakAnyLinkage,
+                                                      Twine( "_unnamed_nsstring_"),
+                                                      C,
+                                                      &CGM.getModule());
+   Entry.second = GA;
    return( GA);
 }
 
@@ -1887,13 +1859,13 @@ CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction
                                                const ObjCInterfaceDecl *Class,
                                                const ObjCMethodDecl *Method)
 {
-   llvm::Value   *Arg0;
-   CallArgList   ActualArgs;
-   llvm::Value   *selID;
-   llvm::Constant *Fn;
-   std::string  selName;
-   int          nArgs;
-   QualType     TmpResultType;
+   CallArgList     ActualArgs;
+   QualType        TmpResultType;
+   int             nArgs;
+   llvm::Constant  *Fn;
+   llvm::Value     *Arg0;
+   llvm::Value     *selID;
+   std::string     selName;
    
    selName = Sel.getAsString();
    Fn      = nullptr;
@@ -4133,8 +4105,8 @@ llvm::Constant *CGObjCMulleRuntime::EmitStaticStringList(Twine Name,
    
    llvm::Constant *Values[2];
    Values[0] = llvm::ConstantInt::get(ObjCTypes.IntTy, StaticStrings.size());
-   llvm::ArrayType *AT = llvm::ArrayType::get( llvm::PointerType::getUnqual( ObjCTypes.StaticStringTy),
-                                              StaticStrings.size());
+   llvm::ArrayType *AT = llvm::ArrayType::get( CGM.VoidPtrTy,
+                                               StaticStrings.size());
    Values[1] = llvm::ConstantArray::get(AT, StaticStrings);
    llvm::Constant *Init = llvm::ConstantStruct::getAnon(Values);
    
@@ -4214,7 +4186,7 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
    // build up the necessary info structure now and emit it
    llvm::Constant  *expr;
    
-   SmallVector<llvm::Constant *, 16> LoadClasses, LoadCategories, StaticStrings, EmitHashes;
+   SmallVector<llvm::Constant *, 16> LoadClasses, LoadCategories, LoadStrings, EmitHashes;
    for (auto *I : DefinedClasses)
    {
       // Instance methods should always be defined.
@@ -4227,6 +4199,14 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
       // Instance methods should always be defined.
       expr = llvm::ConstantExpr::getBitCast( I, llvm::PointerType::getUnqual( ObjCTypes.CategoryTy));
       LoadCategories.push_back( expr);
+   }
+
+   for( llvm::StringMap<llvm::GlobalAlias *>::const_iterator
+        I = NSConstantStringMap.begin(), E = NSConstantStringMap.end();
+        I != E; ++I)
+   {
+      expr = llvm::ConstantExpr::getBitCast( I->getValue(), CGM.VoidPtrTy);
+      LoadStrings.push_back(  expr);
    }
 
    if( CGM.getCodeGenOpts().getDebugInfo() >= CodeGenOptions::LimitedDebugInfo)
@@ -4250,14 +4230,14 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
    
    // dont't emit if there is nothing to do
    if( ! LoadClasses.size() && ! LoadCategories.size() && \
-       ! StaticStrings.size() && ! EmitHashes.size())
+       ! LoadStrings.size() && ! EmitHashes.size())
    {
        return( nullptr);
    }
    
   llvm::Constant *ClassList = EmitClassList( "OBJC_CLASS_LOADS", "__DATA,_objc_load_info", LoadClasses);
   llvm::Constant *CategoryList = EmitCategoryList( "OBJC_CATEGORY_LOADS", "__DATA,_objc_load_info", LoadCategories);
-  llvm::Constant *StringList = EmitStaticStringList( "OBJC_STATICSTRING_LOADS", "__DATA,_objc_load_info", StaticStrings);
+  llvm::Constant *StringList = EmitStaticStringList( "OBJC_STATICSTRING_LOADS", "__DATA,_objc_load_info", LoadStrings);
   llvm::Constant *HashNameList = EmitHashNameList( "OBJC_HASHNAME_LOADS", "__DATA,_objc_load_info", EmitHashes);
 
   llvm::Constant *LoadInfo = EmitLoadInfoList( "OBJC_LOAD_INFO", "__DATA,_objc_load_info", ClassList, CategoryList, StringList, HashNameList);
@@ -6190,7 +6170,7 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
 
    //   struct _mulle_objc_loadstaticstring
    //   {
-   //      struct _mulle_objc_objectheader *address;  //
+   //      struct _mulle_objc_object *address;  //
    //   };
 
    StaticStringTy =

@@ -3407,8 +3407,8 @@ llvm::Constant *CGObjCMulleRuntime::GetOrEmitProtocolRef(const ObjCProtocolDecl 
  * in our uniform structs, the hash is always the first
  * entry in the struct
  */
-static int constant_uint_comparator( llvm::Constant * const *P1,
-                                     llvm::Constant * const *P2)
+static int constant_uintptr_comparator( llvm::Constant * const *P1,
+                                       llvm::Constant * const *P2)
 {
    llvm::APInt   valueA;
    llvm::APInt   valueB;
@@ -3441,7 +3441,7 @@ CGObjCMulleRuntime::EmitProtocolIDList(Twine Name,
       return llvm::Constant::getNullValue(ObjCTypes.ProtocolIDPtrTy);
    
    llvm::array_pod_sort( ProtocolRefs.begin(), ProtocolRefs.end(),
-                         constant_uint_comparator);
+                         constant_uintptr_comparator);
    
    // This list is null terminated.
    ProtocolRefs.push_back(llvm::Constant::getNullValue(ObjCTypes.ProtocolIDTy));
@@ -3637,13 +3637,16 @@ CGObjCMulleRuntime::EmitMethodDescList(Twine Name, const char *Section,
 
 //   struct _mulle_objc_load_category
 //   {
+//      char                             *category_name;
 //      mulle_objc_class_id_t            class_id;
 //      char                             *class_name;         // useful ??
-//      
+//      uintptr_t                        class_ivarhash;
+//
 //      struct _mulle_objc_method_list   *class_methods;
 //      struct _mulle_objc_method_list   *instance_methods;
-//      
-//      mulle_objc_protocol_id_t         *protocol_unique_ids;
+//      struct _mulle_objc_propertylist  *properties;
+//
+//      mulle_objc_protocol_id_t         *protocol_uniqueids;
 //   };
 void CGObjCMulleRuntime::GenerateCategory(const ObjCCategoryImplDecl *OCD) {
 //   unsigned Size = CGM.getDataLayout().getTypeAllocSize(ObjCTypes.CategoryTy);
@@ -3689,22 +3692,22 @@ void CGObjCMulleRuntime::GenerateCategory(const ObjCCategoryImplDecl *OCD) {
    Values[ 5] = EmitMethodList("OBJC_CATEGORY_INSTANCE_METHODS_" + ExtName.str(),
                               "__DATA,__cat_inst_meth,regular,no_dead_strip",
                               InstanceMethods);
-   if (Category) {
-      Values[ 6] =
-      EmitProtocolIDList("OBJC_CATEGORY_PROTOCOLS_" + ExtName.str(),
-                          Category->protocol_begin(), Category->protocol_end());
-   } else {
-      Values[ 6] = llvm::Constant::getNullValue(ObjCTypes.ProtocolListPtrTy);
-   }
    
    // If there is no category @interface then there can be no properties.
-   if (Category) {
+   if (Category)
+   {
       Values[ 0] = GetClassName(Category->getName());
-      Values[ 7] = EmitPropertyList("OBJC_CATEGORY_PROP_LIST_" + ExtName.str(),
+      Values[ 6] = EmitPropertyList("OBJC_CATEGORY_PROP_LIST_" + ExtName.str(),
                                    OCD, Category, ObjCTypes);
-   } else {
+      Values[ 7] =
+      EmitProtocolIDList("OBJC_CATEGORY_PROTOCOLS_" + ExtName.str(),
+                         Category->protocol_begin(), Category->protocol_end());
+   }
+   else
+   {
       Values[ 0] = llvm::Constant::getNullValue(ObjCTypes.Int8PtrTy);
-      Values[ 7] = llvm::Constant::getNullValue(ObjCTypes.PropertyListPtrTy);
+      Values[ 6] = llvm::Constant::getNullValue(ObjCTypes.PropertyListPtrTy);
+      Values[ 7] = llvm::Constant::getNullValue(ObjCTypes.ProtocolListPtrTy);
    }
  
    llvm::Constant *Init = llvm::ConstantStruct::get(ObjCTypes.CategoryTy,
@@ -6149,22 +6152,24 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
    ClassPtrTy = llvm::PointerType::getUnqual(ClassTy);
    
    
-//   struct _mulle_objc_load_category
+//   struct _mulle_objc_loadcategory
 //   {
-//      mulle_objc_class_id_t            class_id;
-//      char                             *class_name;         // useful ??
+//      char                              *category_name;
 //      
-//      struct _mulle_objc_method_list   *class_methods;
-//      struct _mulle_objc_method_list   *instance_methods;
-//      struct _mulle_objc_property_list *properties:
-//
-//      mulle_objc_protocol_id_t         *protocol_unique_ids;
-//
+//      mulle_objc_classid_t              classid;
+//      char                              *class_name;         // useful ??
+//      uintptr_t                         class_ivarhash;
+//      
+//      struct _mulle_objc_methodlist     *class_methods;
+//      struct _mulle_objc_methodlist     *instance_methods;
+//      struct _mulle_objc_propertylist   *properties;
+//      
+//      mulle_objc_protocolid_t           *protocol_uniqueids;
 //   };
 
    CategoryTy =
    llvm::StructType::create("struct._mulle_objc_loadcategory",
-                            ClassIDTy, Int8PtrTy, MethodListPtrTy,
+                            Int8PtrTy, ClassIDTy, Int8PtrTy, ClassIDTy, MethodListPtrTy,
                             MethodListPtrTy, PropertyListPtrTy,
                             ProtocolIDPtrTy, nullptr);
 

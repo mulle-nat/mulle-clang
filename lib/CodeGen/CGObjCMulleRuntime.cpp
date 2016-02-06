@@ -2047,16 +2047,19 @@ struct find_info
 };
 
 
-bool   findNextStatementInParent( Stmt *s, Stmt *parent, struct find_info *info)
+bool   findNextStatementInParent( Stmt *stmt, Stmt *parent, struct find_info *info)
 {
    bool   found;
    
    found = false;
    
-   for (Stmt::child_iterator
+   for( Stmt::child_iterator
         I = parent->child_begin(), E = parent->child_end(); I != E; ++I)
    {
       Stmt *child = *I;
+      
+      if( ! child)  /* this is a <<<NULL>>> apparently harmless ? */
+         continue;
       
       if( found)
       {
@@ -2064,10 +2067,10 @@ bool   findNextStatementInParent( Stmt *s, Stmt *parent, struct find_info *info)
          break;
       }
       
-      if( child == s)
+      if( child == stmt)
          found = true;
       else
-         found = findNextStatementInParent( s, child, info);
+         found = findNextStatementInParent( stmt, child, info);
    }
    
    if( found)

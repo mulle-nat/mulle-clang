@@ -1874,57 +1874,62 @@ CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction
    llvm::Value     *selID;
    std::string     selName;
    
-   selName = Sel.getAsString();
-   Fn      = nullptr;
+   Arg0 = CGF.Builder.CreateBitCast(Receiver, ObjCTypes.ObjectPtrTy);
+   ActualArgs.add(RValue::get(Arg0), CGF.getContext().getObjCInstanceType());
    
    // figure out where to send the message
    // layme.. should probably use a map for this
+
+   Fn            = nullptr;
+   TmpResultType = ResultType;
+   selName       = Sel.getAsString();
+   
    nArgs = CallArgs.size();
    switch( nArgs)
    {
    case 0 :  //
+#if 0
       if( selName == "alloc")
       {
-         Fn         = ObjCTypes.getMessageSendAllocFn();
-         ResultType = CGF.getContext().getObjCInstanceType();
+         Fn            = ObjCTypes.getMessageSendAllocFn();
+         TmpResultType = CGF.getContext().getObjCInstanceType();
          break;
       }
       if( selName == "new")
       {
-         Fn         = ObjCTypes.getMessageSendNewFn();
-         ResultType = CGF.getContext().getObjCInstanceType();
+         Fn            = ObjCTypes.getMessageSendNewFn();
+         TmpResultType = CGF.getContext().getObjCInstanceType();
          break;
       }
+#endif      
       if( selName == "autorelease")
       {
-         Fn         = ObjCTypes.getMessageSendAutoreleaseFn();
-         ResultType = CGF.getContext().getObjCInstanceType();
+         Fn            = ObjCTypes.getMessageSendAutoreleaseFn();
+         TmpResultType = CGF.getContext().getObjCInstanceType();
          break;
       }
       if( selName == "release")
       {
-         Fn         = ObjCTypes.getMessageSendReleaseFn();
-         ResultType = CGF.getContext().VoidTy;
+         Fn            = ObjCTypes.getMessageSendReleaseFn();
+         TmpResultType = CGF.getContext().VoidTy;
          break;
       }
       if( selName == "retain")
       {
-         Fn         = ObjCTypes.getMessageSendRetainFn();
-         ResultType = CGF.getContext().getObjCInstanceType();
+         Fn            = ObjCTypes.getMessageSendRetainFn();
+         TmpResultType = CGF.getContext().getObjCInstanceType();
          break;
       }
          
       /* could just make this a nullptr */
       if( selName == "zone")
       {
-         Fn = ObjCTypes.getMessageSendZoneFn();
-         ResultType = CGF.getContext().VoidPtrTy;
+         Fn            = ObjCTypes.getMessageSendZoneFn();
+         TmpResultType = CGF.getContext().VoidPtrTy;
          break;
       }
    }
    
-   Arg0 = CGF.Builder.CreateBitCast(Receiver, ObjCTypes.ObjectPtrTy);
-   ActualArgs.add(RValue::get(Arg0), CGF.getContext().getObjCInstanceType());
    if( Fn == nullptr)  // regular method send call
    {
       selID = EmitSelector(CGF, Sel);
@@ -1934,7 +1939,7 @@ CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction
    }
    
    const CGFunctionInfo &argsInfo =
-   CGM.getTypes().arrangeFreeFunctionCall( ResultType,
+   CGM.getTypes().arrangeFreeFunctionCall( TmpResultType,
                                            ActualArgs,
                                            FunctionType::ExtInfo(),
                                            RequiredArgs::All);
@@ -1943,18 +1948,33 @@ CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction
    
    a_size = ActualArgs.size();
    c_size = CallArgs.size();
+
+   /* if the method -release hasn't been declared yet, then
+      we emit a void function call, but the compiler expects id 
+      back. (and crashes) Fake it up with a bogus NULL return.
+   */
+   CodeGen::RValue   rvalue;
+   rvalue  = CommonFunctionCall( CGF,
+                                Fn,
+                                Return,
+                                ResultType,
+                                TmpResultType,
+                                argsInfo,
+                                Receiver,
+                                CallArgs,
+                                ActualArgs,
+                                Arg0,
+                                nullptr);
    
-   return( CommonFunctionCall( CGF,
-                               Fn,
-                               Return,
-                               ResultType,
-                               ResultType,
-                               argsInfo,
-                               Receiver,
-                               CallArgs,
-                               ActualArgs,
-                               Arg0,
-                               nullptr));
+   if( ResultType != TmpResultType)
+   {
+      if( TmpResultType == CGF.getContext().VoidTy)
+      {
+         rvalue = RValue::get( llvm::Constant::getNullValue( ObjCTypes.ObjectPtrTy));
+      }
+   }
+   
+   return( rvalue);
 }
 
 
@@ -5334,14 +5354,14 @@ llvm::ConstantInt *CGObjCCommonMulleRuntime::__HashConstantForString( StringRef 
    
    value = UniqueidHashForString( sref, first_valid, WordSizeInBytes);
    
-   if (WordSizeInBytes == 8)
+   if( WordSizeInBytes == 8)
    {
       const llvm::APInt SelConstant(64, value);
       return (llvm::ConstantInt *) llvm::ConstantInt::getIntegerValue(CGM.Int64Ty, SelConstant);
    }
    
    const llvm::APInt SelConstant(32, value);
-   return  (llvm::ConstantInt *) llvm::ConstantInt::getIntegerValue(CGM.Int32Ty, SelConstant);
+   return (llvm::ConstantInt *) llvm::ConstantInt::getIntegerValue(CGM.Int32Ty, SelConstant);
 }
 
 
@@ -5982,14 +6002,15 @@ ObjCCommonTypesHelper::ObjCCommonTypesHelper(CodeGen::CodeGenModule &cgm)
    // FIXME: Merge with rewriter code?
    
   
-   //struct _mulle_objc_property
-   //{
-   //   mulle_objc_propertyid_t    propertyid;
-   //   char                       *name;
-   //   char                       *signature;  // hmmm...
-   //   mulle_objc_methodid_t      getter;
-   //   mulle_objc_methodid_t      setter;
-   //}
+//   struct _mulle_objc_property
+//   {
+//      mulle_objc_propertyid_t    propertyid;
+//      char                       *name;
+//      char                       *signature;  // hmmm...
+//      mulle_objc_methodid_t      getter;
+//      mulle_objc_methodid_t      setter;
+//   };
+
    PropertyTy = llvm::StructType::create("struct._mulle_objc_property",
                                          PropertyIDTy,
                                          Int8PtrTy,

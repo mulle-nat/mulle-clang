@@ -5965,7 +5965,7 @@ TypedefDecl *ASTContext::getObjCIdDecl() const {
 
 TypedefDecl *ASTContext::getObjCSelDecl() const {
   if (!ObjCSelDecl) {
-    // @mulle-objc@ uniqueid: change type to uintptr_t
+    // @mulle-objc@ uniqueid: change SEL type to uintptr_t
     QualType T = getLangOpts().ObjCRuntime.hasMulleMetaABI() ? getUIntPtrType()
                                                              : getPointerType(ObjCBuiltinSelTy);
     ObjCSelDecl = buildImplicitTypedef(T, "SEL");

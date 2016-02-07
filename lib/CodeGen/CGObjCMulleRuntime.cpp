@@ -746,8 +746,9 @@ namespace {
       int64_t   foundation_version;
       int64_t   runtime_version;
       int64_t   user_version;
-      int64_t   fastclassids[ 32];
+      uint64_t  fastclassids[ 32];
       bool      fastclassids_defined;
+      bool      _trace_fastids;
       
       // gc ivar layout bitmap calculation helper caches.
       SmallVector<GC_IVAR, 16> SkipIvars;
@@ -948,6 +949,7 @@ namespace {
       llvm::Constant *GetProtocolRef(const ObjCProtocolDecl *PD);
       
       // common helper function, turning names into abbreviated MD5 hashes
+      uint64_t          UniqueidHashForString( StringRef sref, uint64_t first_valid, unsigned WordSizeInBytes);
       llvm::ConstantInt *__HashConstantForString( StringRef sref, uint64_t first_valid);
       llvm::ConstantInt *_HashConstantForString( StringRef sref, uint64_t first_valid);
       llvm::ConstantInt *HashClassConstantForString( StringRef sref)
@@ -1431,6 +1433,7 @@ ObjCTypes(cgm) {
 
    memset( fastclassids, 0, sizeof( fastclassids));
    fastclassids_defined = false;
+   _trace_fastids = true;  // need compiler flag
    
    EmitImageInfo();
 }
@@ -1530,11 +1533,15 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
 
       for( int i = 0; i < 32; i++)
       {
+         // these are always 64 bit regardless if compiling to 32 bit
          sprintf( buf, "MULLE_OBJC_FASTCLASSID_%d", i);
          if( GetMacroDefinitionUnsignedIntegerValue( PP, buf, &value))
          {
             fastclassids[ i]     = value;
             fastclassids_defined = true;
+
+            if( _trace_fastids)
+               fprintf( stderr, "fastclassid #%d = 0x%llx\n", i, value);
          }
       }
    }
@@ -3799,23 +3806,27 @@ void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
                          uniqueid_comparator);
    
   
-   //   struct _mulle_objc_load_class
-   //   {
-   //      mulle_objc_class_id_t            class_id;
-   //      char                             *class_name;
-   //
-   //      mulle_objc_class_id_t            superclass_unique_id;
-   //      char                             *superclass_name;
-   //
-   //      int                              fastclassindex;
-   //      int                              instance_size;
-   //
-   //      struct _mulle_objc_methodlist   *class_methods;
-   //      struct _mulle_objc_methodlist   *instance_methods;
-   //      struct _mulle_objc_propertylist *properties;
-   //
-   //      mulle_objc_protocol_id_t         *protocol_unique_ids;
-   //   };
+//   struct _mulle_objc_loadclass
+//   {
+//      mulle_objc_classid_t              classid;
+//      char                              *class_name;
+//      uintptr_t                         class_ivarhash;
+//      
+//      mulle_objc_classid_t              superclass_uniqueid;
+//      char                              *superclass_name;
+//      uintptr_t                         superclass_ivarhash;
+//      
+//      int                               fastclassindex;
+//      int                               instance_size;
+//      
+//      struct _mulle_objc_ivarlist       *instance_variables;
+//      
+//      struct _mulle_objc_methodlist     *class_methods;
+//      struct _mulle_objc_methodlist     *instance_methods;
+//      struct _mulle_objc_propertylist   *properties;
+//      
+//      mulle_objc_protocolid_t           *protocol_uniqueids;
+//   };
    
    llvm::Constant *Values[13];
    int   i = 0;
@@ -3824,7 +3835,7 @@ void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
    llvm::ConstantInt *ClassID = HashClassConstantForString( ID->getObjCRuntimeNameAsString());
 
    Values[ i++] = llvm::ConstantExpr::getBitCast( ClassID, ObjCTypes.ClassIDTy);
-   Values[ i++] = GetClassName(ID->getObjCRuntimeNameAsString());
+   Values[ i++] = GetClassName( ID->getObjCRuntimeNameAsString());
    Values[ i++] = llvm::ConstantExpr::getBitCast( _HashConstantForString( OID->getIvarHashString( CGM.getContext()), 0), ObjCTypes.ClassIDTy);;
 
    llvm::ConstantInt   *SuperClassID = nullptr;
@@ -3845,16 +3856,20 @@ void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
    // determine fastclass index
    if( fastclassids_defined)
    {
-      int          j;
-      llvm::APInt  APVal    = ClassID->getValue();
-      int64_t      uniqueid = APVal.getZExtValue();
+      int        j;
+      uint64_t   uniqueid;
       
+      // the ClassID is possibly 32 bit though, so we have to rehash here
+      uniqueid = UniqueidHashForString(ID->getObjCRuntimeNameAsString(), 1, 8);
       for( j = 31; j >= 0; j--)
       {
          if( fastclassids[ j] == uniqueid)
             break;
       }
       Values[ i++] = llvm::ConstantInt::get(ObjCTypes.IntTy, j);
+      if( _trace_fastids && j >= 0)
+         fprintf( stderr, "%s is a fastclass with id 0x%llx\n",
+               ID->getNameAsString().c_str(), uniqueid);
    }
    else
       Values[ i++] = llvm::ConstantInt::get(ObjCTypes.IntTy, -1);
@@ -5277,12 +5292,8 @@ llvm::Value *CGObjCMulleRuntime::EmitNSAutoreleasePoolClassRef(CodeGenFunction &
    return( GetClass( CGF, "NSAutoreleasePool"));
 }
 
-llvm::ConstantInt *CGObjCCommonMulleRuntime::__HashConstantForString( StringRef sref, uint64_t first_valid)
+uint64_t   CGObjCCommonMulleRuntime::UniqueidHashForString( StringRef sref, uint64_t first_valid, unsigned WordSizeInBytes)
 {
-   unsigned WordSizeInBits = CGM.getTarget().getPointerWidth(0);
-   unsigned ByteSizeInBits = CGM.getTarget().getCharWidth();
-   unsigned WordSizeInBytes = WordSizeInBits/ByteSizeInBits;
-   
    std::string           name;
    llvm::MD5             MD5Ctx;
    llvm::MD5::MD5Result  hash;
@@ -5309,18 +5320,30 @@ llvm::ConstantInt *CGObjCCommonMulleRuntime::__HashConstantForString( StringRef 
       fail.append( "\" hashes badly (rare and precious, please tweet it @mulle_nat, then rename it).");
       llvm_unreachable( fail.c_str());
    }
+
+   return( value);
+}
+
+
+llvm::ConstantInt *CGObjCCommonMulleRuntime::__HashConstantForString( StringRef sref, uint64_t first_valid)
+{
+   unsigned WordSizeInBits = CGM.getTarget().getPointerWidth(0);
+   unsigned ByteSizeInBits = CGM.getTarget().getCharWidth();
+   unsigned WordSizeInBytes = WordSizeInBits/ByteSizeInBits;
+   uint64_t   value;
+   
+   value = UniqueidHashForString( sref, first_valid, WordSizeInBytes);
    
    if (WordSizeInBytes == 8)
    {
       const llvm::APInt SelConstant(64, value);
       return (llvm::ConstantInt *) llvm::ConstantInt::getIntegerValue(CGM.Int64Ty, SelConstant);
    }
-   else
-   {
-      const llvm::APInt SelConstant(32, value);
-      return  (llvm::ConstantInt *) llvm::ConstantInt::getIntegerValue(CGM.Int32Ty, SelConstant);
-   }
+   
+   const llvm::APInt SelConstant(32, value);
+   return  (llvm::ConstantInt *) llvm::ConstantInt::getIntegerValue(CGM.Int32Ty, SelConstant);
 }
+
 
 llvm::ConstantInt *CGObjCCommonMulleRuntime::_HashConstantForString( StringRef sref, uint64_t first_valid)
 {
@@ -6114,22 +6137,26 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
    ClassTy = llvm::StructType::create(VMContext, "struct._mulle_objc_loadclass");
    
   
-//   struct _mulle_objc_load_class
+//   struct _mulle_objc_loadclass
 //   {
-//      mulle_objc_class_id_t            classid;
-//      char                             *class_name;
-//      uintptr_t                        ivarhash;
-//
-//      mulle_objc_class_id_t            superclass_classid;
-//      char                             *superclass_name;
+//      mulle_objc_classid_t              classid;
+//      char                              *class_name;
+//      uintptr_t                         class_ivarhash;
 //      
-//      int                              instance_size;
-//      int                              fastclassindex;
-//
-//      struct _mulle_objc_method_list   *class_methods;
-//      struct _mulle_objc_method_list   *instance_methods;
+//      mulle_objc_classid_t              superclass_uniqueid;
+//      char                              *superclass_name;
+//      uintptr_t                         superclass_ivarhash;
 //      
-//      mulle_objc_protocol_id_t         *protocol_unique_ids;
+//      int                               fastclassindex;
+//      int                               instance_size;
+//      
+//      struct _mulle_objc_ivarlist       *instance_variables;
+//      
+//      struct _mulle_objc_methodlist     *class_methods;
+//      struct _mulle_objc_methodlist     *instance_methods;
+//      struct _mulle_objc_propertylist   *properties;
+//      
+//      mulle_objc_protocolid_t           *protocol_uniqueids;
 //   };
 
    ClassTy->setBody(
@@ -6141,10 +6168,10 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
                     Int8PtrTy,         // superclass_name,
                     ClassIDTy,         // superclass_ivarhash
                     
-                    IntTy,             // instance_size
                     IntTy,             // fastclassindex
+                    IntTy,             // instance_size
                     
-                    IvarListPtrTy,
+                    IvarListPtrTy,     // instance_variables
                     MethodListPtrTy,   // class_methods
                     MethodListPtrTy,   // instance_methods
                     PropertyListPtrTy, // properties

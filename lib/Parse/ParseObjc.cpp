@@ -893,6 +893,7 @@ void Parser::ParseObjCPropertyAttribute(ObjCDeclSpec &DS) {
           II->isStr("assign") ||
           II->isStr("retain") ||
           II->isStr("copy") ||
+          II->isStr("nonatomic") ||
           II->isStr("getter") ||
           II->isStr("setter")))
       {

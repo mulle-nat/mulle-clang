@@ -5228,9 +5228,12 @@ void ASTContext::getObjCEncodingForPropertyDecl(const ObjCPropertyDecl *PD,
       SynthesizePID = PropertyImpDecl;
   }
 
+  // @mulle-objc@ runtime: drop leading 'T' from property signature
+  if( ! getLangOpts().ObjCRuntime.hasMulleMetaABI())
+  {
   // FIXME: This is not very efficient.
   S = "T";
-
+  }
   // Encode result type.
   // GCC has some special rules regarding encoding of properties which
   // closely resembles encoding of ivars.

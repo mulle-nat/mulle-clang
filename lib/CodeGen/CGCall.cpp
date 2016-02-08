@@ -3344,12 +3344,12 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
         else
           V = Builder.CreateLoad(RV.getAggregateAddr());
 
-         // @mulle-objc@ MetaABI: function call argument, cast into void *, if dst is objc method
+         // @mulle-objc@ MetaABI: function call argument, cast into void *, if dst is objc method (or NULL)
 	if( ArgNo == 2 && CGM.getLangOpts().ObjCRuntime.hasMulleMetaABI())
 	{
             const ObjCMethodDecl *MD = dyn_cast_or_null<ObjCMethodDecl>(TargetDecl);
             
-            if( MD && ! MD->getParamDecl())
+            if( ! TargetDecl || (MD && ! MD->getParamDecl()))
 	    {
                // promote all non pointers to long and make them pointers
 	       if( ! V->getType()->isPointerTy())

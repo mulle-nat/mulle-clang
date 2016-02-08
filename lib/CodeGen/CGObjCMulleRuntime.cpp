@@ -195,7 +195,7 @@ namespace {
          llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy, ParamsPtrTy, ClassIDTy };
          return CGM.CreateRuntimeFunction(llvm::FunctionType::get(ObjectPtrTy,
                                                                   params, false),
-                                          "mulle_objc_object_call_classid");
+                                          "_mulle_objc_object_metacall_classid");
       }
       
       
@@ -1814,6 +1814,12 @@ CodeGen::RValue CGObjCMulleRuntime::CommonMessageSend(CodeGen::CodeGenFunction &
       assert(CGM.getContext().getCanonicalType(Method->getReturnType()) ==
              CGM.getContext().getCanonicalType(ResultType) &&
              "Result type mismatch!");
+   else
+   {
+      /* if we have no method, we should construct a default ObjCMethodDecl
+         from the selector with all ids
+       */
+   }
    //
    // this runs through patched code, to produce what we need
    //

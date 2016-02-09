@@ -4262,10 +4262,14 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
            I = DefinedHashes.begin(), E = DefinedHashes.end();
            I != E; ++I)
       {
-         llvm::Constant   *Values[2];
+         llvm::Constant         *Values[2];
+         llvm::GlobalVariable   *String;
          
+         String  = CreateMetadataVar( "OBJC_HASHNAME_" + I->getKey(),
+                                      llvm::ConstantDataArray::getString( VMContext, I->getKey()),
+                                      "__DATA,__module_info,regular,no_dead_strip", 4, false);
          Values[0] = llvm::ConstantExpr::getBitCast( I->getValue(), ObjCTypes.ClassIDTy);
-         Values[1] = GetClassName( I->getKey());  // hack to unique strings moar
+         Values[1] = llvm::ConstantExpr::getBitCast( String, CGM.VoidPtrTy);
          
          llvm::Constant *expr = llvm::ConstantStruct::get( ObjCTypes.HashNameTy, Values);
          
@@ -5373,7 +5377,7 @@ llvm::ConstantInt *CGObjCCommonMulleRuntime::__HashConstantForString( StringRef 
 
 llvm::ConstantInt *CGObjCCommonMulleRuntime::_HashConstantForString( StringRef sref, uint64_t first_valid)
 {
-   llvm::ConstantInt *&Entry = DefinedHashes[ sref];  // how does this work ???
+   llvm::ConstantInt *&Entry = DefinedHashes[ sref.str()];  // how does this work ???
    
    if( ! Entry)
       Entry = __HashConstantForString( sref, first_valid);

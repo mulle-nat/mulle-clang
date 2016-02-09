@@ -1205,7 +1205,7 @@ public:
   StringRef getObjCRuntimeNameAsString() const;
 
 // @mulle-objc@ codegen: make an ivar hash string for fragility fix
-  StringRef getIvarHashString( ASTContext &C) const;
+  std::string  getIvarHashString( ASTContext &C) const;
 
   /// Returns the designated initializers for the interface.
   ///
@@ -2386,7 +2386,7 @@ public:
   }
 
   // @mulle-objc@ codegen: make an ivar hash string for fragility fix
-  StringRef getIvarHashString() const;
+  std::string getIvarHashString() const;
     
   /// Produce a name to be used for class's metadata. It comes either via
   /// class's objc_runtime_name attribute or class name.

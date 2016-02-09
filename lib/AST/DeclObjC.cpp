@@ -1525,7 +1525,7 @@ ObjCIvarDecl *ObjCInterfaceDecl::all_declared_ivar_begin() {
 //
 // @mulle-objc@ codegen: make an ivar hash string for fragility fix
 // could cache this value
-StringRef
+std::string
 ObjCInterfaceDecl::getIvarHashString( ASTContext &C) const
 {
   std::string   concat;
@@ -1550,7 +1550,7 @@ ObjCInterfaceDecl::getIvarHashString( ASTContext &C) const
       concat = concat + TypeStr;
   }
   
-  return StringRef( concat);
+  return concat;
 }
 
 

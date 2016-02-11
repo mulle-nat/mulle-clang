@@ -91,8 +91,8 @@ namespace {
          // be called a lot.
          switch( optLevel)
          {
-         case 3  : name = "mulle_objc_object_inline_call"; break;
-         default : name = "mulle_objc_object_call"; break;
+         default : name = "mulle_objc_object_inline_call"; break;
+         case 1  : name = "mulle_objc_object_call"; break;
          case -1 :
          case 0  : name = "mulle_objc_object_no_inline_call"; break;
          }
@@ -283,10 +283,19 @@ namespace {
       
       llvm::Constant *getGetRuntimeClassFn() {
          llvm::Type *params[] = { ClassIDTy };
-         
-         return CGM.CreateRuntimeFunction(llvm::FunctionType::get( ObjectPtrTy,
+         llvm::Constant *fn;
+         llvm::AttributeSet   attributes = llvm::AttributeSet::get(CGM.getLLVMContext(),
+                                                                  llvm::AttributeSet::FunctionIndex,
+                                                                  llvm::Attribute::ReadNone);
+         attributes.addAttribute(CGM.getLLVMContext(),
+                                                                  llvm::AttributeSet::FunctionIndex,
+                                                                  llvm::Attribute::NoUnwind);
+         fn = CGM.CreateRuntimeFunction(llvm::FunctionType::get( ObjectPtrTy,
+
                                                                   params, false),
-                                          "mulle_objc_unfailing_get_class");
+                                          "mulle_objc_unfailing_get_class",
+                                          attributes);
+         return( fn);
       }
       
       /*
@@ -746,7 +755,8 @@ namespace {
       int64_t   foundation_version;
       int64_t   runtime_version;
       int64_t   user_version;
-      uint64_t  fastclassids[ 32];
+      // @mulle-objc@ uniqueid: make it 32 bit here
+      uint32_t  fastclassids[ 32];
       bool      fastclassids_defined;
       bool      _trace_fastids;
       
@@ -1534,14 +1544,14 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
       for( int i = 0; i < 32; i++)
       {
          // these are always 64 bit regardless if compiling to 32 bit
-         sprintf( buf, "MULLE_OBJC_FASTCLASSID_%d", i);
+         sprintf( buf, "MULLE_OBJC_FASTCLASSHASH_%d", i);
          if( GetMacroDefinitionUnsignedIntegerValue( PP, buf, &value))
          {
-            fastclassids[ i]     = value;
+            fastclassids[ i]     = value >> 32;
             fastclassids_defined = true;
 
             if( _trace_fastids)
-               fprintf( stderr, "fastclassid #%d = 0x%llx\n", i, value);
+               fprintf( stderr, "fastclassid #%d = 0x%llx\n", i, (uint64_t) fastclassids[ i]);
          }
       }
    }
@@ -2027,8 +2037,11 @@ CGObjCMulleRuntime::GenerateMessageSendSuper(CodeGen::CodeGenFunction &CGF,
    default :
       llvm_unreachable( "metabi lossage, too many args");
    }
+   
    classID = EmitClassID( CGF, Class->getSuperClass());
-   ActualArgs.add(RValue::get( classID), CGF.getContext().LongTy);
+   
+   // @mulle-objc@ uniqueid: make it 32 bit here
+   ActualArgs.add(RValue::get( classID), CGF.getContext().getIntTypeForBitwidth( 32, false));
    
 
    // add classID
@@ -3836,11 +3849,11 @@ void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
 //   {
 //      mulle_objc_classid_t              classid;
 //      char                              *class_name;
-//      uintptr_t                         class_ivarhash;
+//      mulle_objc_hash_t                 class_ivarhash;
 //      
 //      mulle_objc_classid_t              superclass_uniqueid;
 //      char                              *superclass_name;
-//      uintptr_t                         superclass_ivarhash;
+//      mulle_objc_hash_t                 superclass_ivarhash;
 //      
 //      int                               fastclassindex;
 //      int                               instance_size;
@@ -3883,10 +3896,11 @@ void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
    if( fastclassids_defined)
    {
       int        j;
-      uint64_t   uniqueid;
+      // @mulle-objc@ uniqueid: make it 32 bit here
+      uint32_t   uniqueid;
       
       // the ClassID is possibly 32 bit though, so we have to rehash here
-      uniqueid = UniqueidHashForString(ID->getObjCRuntimeNameAsString(), 1, 8);
+      uniqueid = UniqueidHashForString(ID->getObjCRuntimeNameAsString(), 1, 4);
       for( j = 31; j >= 0; j--)
       {
          if( fastclassids[ j] == uniqueid)
@@ -3895,7 +3909,7 @@ void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
       Values[ i++] = llvm::ConstantInt::get(ObjCTypes.IntTy, j);
       if( _trace_fastids && j >= 0)
          fprintf( stderr, "%s is a fastclass with id 0x%llx\n",
-               ID->getNameAsString().c_str(), uniqueid);
+               ID->getNameAsString().c_str(), (long long) uniqueid);
    }
    else
       Values[ i++] = llvm::ConstantInt::get(ObjCTypes.IntTy, -1);
@@ -4313,7 +4327,7 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
   llvm::FunctionType *FT =
     llvm::FunctionType::get(Builder.getVoidTy(),
                             llvm::PointerType::getUnqual(ObjCTypes.LoadInfoTy), true);
-  llvm::Value *Register = CGM.CreateRuntimeFunction( FT, "mulle_objc_loadinfo_locked_unfailing_enqueue");
+  llvm::Value *Register = CGM.CreateRuntimeFunction( FT, "mulle_objc_loadinfo_locking_unfailing_enqueue");
   Builder.CreateCall( Register, LoadInfo);
   Builder.CreateRetVoid();
 
@@ -5359,11 +5373,11 @@ llvm::ConstantInt *CGObjCCommonMulleRuntime::__HashConstantForString( StringRef 
 {
    unsigned WordSizeInBits = CGM.getTarget().getPointerWidth(0);
    unsigned ByteSizeInBits = CGM.getTarget().getCharWidth();
-   unsigned WordSizeInBytes = WordSizeInBits/ByteSizeInBits;
+   unsigned WordSizeInBytes = 4; // WordSizeInBits/ByteSizeInBits;
    uint64_t   value;
    
    value = UniqueidHashForString( sref, first_valid, WordSizeInBytes);
-   
+
    if( WordSizeInBytes == 8)
    {
       const llvm::APInt SelConstant(64, value);
@@ -5978,12 +5992,13 @@ ObjCCommonTypesHelper::ObjCCommonTypesHelper(CodeGen::CodeGenModule &cgm)
    Int8PtrTy = CGM.Int8PtrTy;
    Int8PtrPtrTy = CGM.Int8PtrPtrTy;
 
-   ClassIDTy    = Types.ConvertType(Ctx.getUIntPtrType());
-   CategoryIDTy = Types.ConvertType(Ctx.getUIntPtrType());
-   SelectorIDTy = Types.ConvertType(Ctx.getUIntPtrType());
-   PropertyIDTy = Types.ConvertType(Ctx.getUIntPtrType());
-   IvarIDTy     = Types.ConvertType(Ctx.getUIntPtrType());
-   ProtocolIDTy = Types.ConvertType(Ctx.getUIntPtrType());
+   // @mulle-objc@ uniqueid: make it 32 bit here
+   ClassIDTy    =
+   CategoryIDTy =
+   SelectorIDTy =
+   PropertyIDTy =
+   IvarIDTy     =
+   ProtocolIDTy = Types.ConvertType( Ctx.getIntTypeForBitwidth(32, false));
    
    ClassIDPtrTy      = llvm::PointerType::getUnqual(ClassIDTy);
    CategoryIDTyPtrTy = llvm::PointerType::getUnqual(CategoryIDTy);
@@ -6172,11 +6187,11 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
 //   {
 //      mulle_objc_classid_t              classid;
 //      char                              *class_name;
-//      uintptr_t                         class_ivarhash;
+//      mulle_objc_hash_t                 class_ivarhash;
 //      
 //      mulle_objc_classid_t              superclass_uniqueid;
 //      char                              *superclass_name;
-//      uintptr_t                         superclass_ivarhash;
+//      mulle_objc_hash_t                 superclass_ivarhash;
 //      
 //      int                               fastclassindex;
 //      int                               instance_size;
@@ -6219,7 +6234,7 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
 //      
 //      mulle_objc_classid_t              classid;
 //      char                              *class_name;         // useful ??
-//      uintptr_t                         class_ivarhash;
+//      mulle_objc_hash_t                 class_ivarhash;
 //      
 //      struct _mulle_objc_methodlist     *class_methods;
 //      struct _mulle_objc_methodlist     *instance_methods;

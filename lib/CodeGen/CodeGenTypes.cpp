@@ -333,7 +333,7 @@ llvm::Type *CodeGenTypes::ConvertType(QualType T) {
       // @mulle-objc@ uniqueid: id,class,sel: change type to uintptr_t
       if( getContext().getLangOpts().ObjCRuntime.hasMulleMetaABI())
          ResultType = llvm::IntegerType::get(getLLVMContext(),
-                                 static_cast<unsigned>(Context.getTypeSize(Context.getUIntPtrType())));
+                                 static_cast<unsigned>(Context.getTypeSize(Context.getIntTypeForBitwidth(32, false))));
       else
     case BuiltinType::Void:
          ResultType = llvm::Type::getInt8Ty(getLLVMContext());

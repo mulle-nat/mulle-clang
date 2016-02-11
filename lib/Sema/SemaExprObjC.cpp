@@ -1235,7 +1235,7 @@ ExprResult Sema::ParseObjCProtocolExpression(IdentifierInfo *ProtocolId,
   // should ask runtime to return it
    if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
    {
-      Ty = Context.getUIntPtrType();
+      Ty = Context.getIntTypeForBitwidth(32, false);
    }
    else
    {

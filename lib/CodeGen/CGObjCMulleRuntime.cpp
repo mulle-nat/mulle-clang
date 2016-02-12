@@ -959,32 +959,32 @@ namespace {
       llvm::Constant *GetProtocolRef(const ObjCProtocolDecl *PD);
       
       // common helper function, turning names into abbreviated MD5 hashes
-      uint64_t          UniqueidHashForString( StringRef sref, uint64_t first_valid, unsigned WordSizeInBytes);
-      llvm::ConstantInt *__HashConstantForString( StringRef sref, uint64_t first_valid);
-      llvm::ConstantInt *_HashConstantForString( StringRef sref, uint64_t first_valid);
-      llvm::ConstantInt *HashClassConstantForString( StringRef sref)
+      uint64_t          UniqueidHashForString( std::string s, uint64_t first_valid, unsigned WordSizeInBytes);
+      llvm::ConstantInt *__HashConstantForString( std::string s, uint64_t first_valid);
+      llvm::ConstantInt *_HashConstantForString( std::string s, uint64_t first_valid);
+      llvm::ConstantInt *HashClassConstantForString( std::string s)
       {
-         return( _HashConstantForString( sref, 0x1));
+         return( _HashConstantForString( s, 0x1));
       }
-      llvm::ConstantInt *HashProtocolConstantForString( StringRef sref)
+      llvm::ConstantInt *HashProtocolConstantForString( std::string s)
       {
-         return( HashClassConstantForString( sref));
+         return( HashClassConstantForString( s));
       }
-      llvm::ConstantInt *HashCategoryConstantForString( StringRef sref)
+      llvm::ConstantInt *HashCategoryConstantForString( std::string s)
       {
-         return( _HashConstantForString( sref, 0x1));
+         return( _HashConstantForString( s, 0x1));
       }
-      llvm::ConstantInt *HashPropertyConstantForString( StringRef sref)
+      llvm::ConstantInt *HashPropertyConstantForString( std::string s)
       {
-         return( _HashConstantForString( sref, 0x1));
+         return( _HashConstantForString( s, 0x1));
       }
-      llvm::ConstantInt *HashSelConstantForString( StringRef sref)
+      llvm::ConstantInt *HashSelConstantForString( std::string s)
       {
-         return( _HashConstantForString( sref, 0x1));
+         return( _HashConstantForString( s, 0x1));
       }
-      llvm::ConstantInt *HashIvarConstantForString( StringRef sref)
+      llvm::ConstantInt *HashIvarConstantForString( std::string s)
       {
-         return( HashSelConstantForString( sref));
+         return( HashSelConstantForString( s));
       }
       
       /// CreateMetadataVar - Create a global variable with internal
@@ -5336,7 +5336,11 @@ llvm::Value *CGObjCMulleRuntime::EmitNSAutoreleasePoolClassRef(CodeGenFunction &
    return( GetClass( CGF, "NSAutoreleasePool"));
 }
 
-uint64_t   CGObjCCommonMulleRuntime::UniqueidHashForString( StringRef sref, uint64_t first_valid, unsigned WordSizeInBytes)
+
+#pragma mark -
+#pragma mark Hash Selectors, ClassIDs and friends
+
+uint64_t   CGObjCCommonMulleRuntime::UniqueidHashForString( std::string s, uint64_t first_valid, unsigned WordSizeInBytes)
 {
    std::string           name;
    llvm::MD5             MD5Ctx;
@@ -5344,7 +5348,7 @@ uint64_t   CGObjCCommonMulleRuntime::UniqueidHashForString( StringRef sref, uint
    uint64_t              value;
    unsigned int          i;
    
-   MD5Ctx.update( sref);
+   MD5Ctx.update( s);
    MD5Ctx.final( hash);
    
    value = 0;
@@ -5360,7 +5364,7 @@ uint64_t   CGObjCCommonMulleRuntime::UniqueidHashForString( StringRef sref, uint
       std::string  fail;
       
       fail.append("congratulations, your string \"");
-      fail.append( sref.str());
+      fail.append( s);
       fail.append( "\" hashes badly (rare and precious, please tweet it @mulle_nat, then rename it).");
       llvm_unreachable( fail.c_str());
    }
@@ -5369,14 +5373,14 @@ uint64_t   CGObjCCommonMulleRuntime::UniqueidHashForString( StringRef sref, uint
 }
 
 
-llvm::ConstantInt *CGObjCCommonMulleRuntime::__HashConstantForString( StringRef sref, uint64_t first_valid)
+llvm::ConstantInt *CGObjCCommonMulleRuntime::__HashConstantForString( std::string s, uint64_t first_valid)
 {
    unsigned WordSizeInBits = CGM.getTarget().getPointerWidth(0);
    unsigned ByteSizeInBits = CGM.getTarget().getCharWidth();
    unsigned WordSizeInBytes = 4; // WordSizeInBits/ByteSizeInBits;
    uint64_t   value;
    
-   value = UniqueidHashForString( sref, first_valid, WordSizeInBytes);
+   value = UniqueidHashForString( s, first_valid, WordSizeInBytes);
 
    if( WordSizeInBytes == 8)
    {
@@ -5389,12 +5393,12 @@ llvm::ConstantInt *CGObjCCommonMulleRuntime::__HashConstantForString( StringRef 
 }
 
 
-llvm::ConstantInt *CGObjCCommonMulleRuntime::_HashConstantForString( StringRef sref, uint64_t first_valid)
+llvm::ConstantInt *CGObjCCommonMulleRuntime::_HashConstantForString( std::string s, uint64_t first_valid)
 {
-   llvm::ConstantInt *&Entry = DefinedHashes[ sref.str()];  // how does this work ???
+   llvm::ConstantInt *&Entry = DefinedHashes[ s];  // how does this work ???
    
    if( ! Entry)
-      Entry = __HashConstantForString( sref, first_valid);
+      Entry = __HashConstantForString( s, first_valid);
    return( Entry);
 }
 
@@ -5402,18 +5406,16 @@ llvm::ConstantInt *CGObjCCommonMulleRuntime::_HashConstantForString( StringRef s
 llvm::Constant *CGObjCMulleRuntime::EmitSelector(CodeGenFunction &CGF, Selector Sel,
                                      bool lvalue)
 {
-   llvm::StringRef   sref( Sel.getAsString());
-   
-   return( HashSelConstantForString( sref));
+   return( HashSelConstantForString( Sel.getAsString()));
 }
 
 
 llvm::Constant *CGObjCMulleRuntime::EmitClassID(CodeGenFunction &CGF, const ObjCInterfaceDecl *Class)
 {
-   llvm::StringRef   sref( Class->getNameAsString());
-   
-   return( HashClassConstantForString( sref));
+   return( HashClassConstantForString( Class->getNameAsString()));
 }
+
+#pragma mark -
 
 
 llvm::Constant *CGObjCCommonMulleRuntime::GetClassName(StringRef RuntimeName) {

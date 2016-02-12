@@ -3438,17 +3438,13 @@ llvm::Constant *CGObjCCommonMulleRuntime::GetProtocolRef(const ObjCProtocolDecl 
 
 llvm::Constant *CGObjCMulleRuntime::GetOrEmitProtocol(const ObjCProtocolDecl *PD)
 {
-   StringRef    sref( PD->getIdentifier()->getName());
-   
-   return( HashProtocolConstantForString( sref));
+   return( HashProtocolConstantForString( PD->getIdentifier()->getName()));
 }
 
 
 llvm::Constant *CGObjCMulleRuntime::GetOrEmitProtocolRef(const ObjCProtocolDecl *PD)
 {
-   StringRef    sref( PD->getIdentifier()->getName());
-   
-   return( HashProtocolConstantForString( sref));
+   return( HashProtocolConstantForString( PD->getIdentifier()->getName()));
 }
 
 

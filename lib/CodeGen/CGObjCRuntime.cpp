@@ -394,3 +394,21 @@ LValue  *CGObjCRuntime::GenerateCallArgs( CallArgList &Args,
   CGF.EmitCallArgs( Args, Expr->getMethodDecl(), Expr->arg_begin(), Expr->arg_end());
   return( nullptr);
 }
+
+
+CodeGen::RValue  CGObjCRuntime::EmitFastEnumeratorCall( CodeGen::CodeGenFunction &CGF,
+                                                       ReturnValueSlot ReturnSlot,
+                                                       QualType ResultType,
+                                                       Selector Sel,
+                                                       llvm::Value *Receiver,
+                                                       llvm::Value *StatePtr,
+                                                       QualType StateTy,
+                                                       llvm::Value *ItemsPtr,
+                                                       QualType ItemsTy,
+                                                       llvm::Value *Count,
+                                                       QualType CountTy)
+
+{
+   return( RValue::get( Receiver));  // bogus, this code is never used
+}
+

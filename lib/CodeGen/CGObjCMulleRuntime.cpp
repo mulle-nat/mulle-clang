@@ -116,8 +116,8 @@ namespace {
          // be called a lot.
          switch( optLevel)
          {
-         case 3  : name = "mulle_objc_object_inline_call"; break;
-         default : name = "mulle_objc_object_call"; break;
+         default : name = "mulle_objc_object_inline_call"; break;
+         case 1  : name = "mulle_objc_object_call"; break;
          case -1 :
          case 0  : name = "mulle_objc_object_no_inline_call"; break;
          }
@@ -188,14 +188,14 @@ namespace {
          llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy, ParamsPtrTy, ClassIDTy  };
          return CGM.CreateRuntimeFunction(llvm::FunctionType::get(ObjectPtrTy,
                                                                   params, false),
-                                          "mulle_objc_object_call_classid");
+                                          "_mulle_objc_object_call_classid");
       }
 
       llvm::Constant *getMessageSendMetaSuperFn() const {
          llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy, ParamsPtrTy, ClassIDTy };
          return CGM.CreateRuntimeFunction(llvm::FunctionType::get(ObjectPtrTy,
                                                                   params, false),
-                                          "_mulle_objc_object_metacall_classid");
+                                          "_mulle_objc_class_metacall_classid");
       }
       
       
@@ -281,6 +281,7 @@ namespace {
       llvm::Type *CachePtrTy;
       
       
+      // TODO: use different code for different optlevel, like mulle_objc_uninlined_unfailing_get_or_lookup_class
       llvm::Constant *getGetRuntimeClassFn() {
          llvm::Type *params[] = { ClassIDTy };
          llvm::Constant *fn;
@@ -293,7 +294,7 @@ namespace {
          fn = CGM.CreateRuntimeFunction(llvm::FunctionType::get( ObjectPtrTy,
 
                                                                   params, false),
-                                          "mulle_objc_unfailing_get_class",
+                                          "mulle_objc_unfailing_get_or_lookup_class",
                                           attributes);
          return( fn);
       }
@@ -1214,6 +1215,20 @@ namespace {
                                bool IsClassMessage, const CallArgList &CallArgs,
                                const ObjCMethodDecl *Method) override;
       
+      
+      CodeGen::RValue
+      EmitFastEnumeratorCall( CodeGen::CodeGenFunction &CGF,
+                              ReturnValueSlot ReturnSlot,
+                              QualType ResultType,
+                              Selector Sel,
+                              llvm::Value *Receiver,
+                              llvm::Value *StatePtr,
+                              QualType StateTy,
+                              llvm::Value *ItemsPtr,
+                              QualType ItemsTy,
+                              llvm::Value *Count,
+                              QualType CountTy) override;
+      
       llvm::Value *GetClass(CodeGenFunction &CGF,
                             const ObjCInterfaceDecl *ID) override;
       llvm::Value *GetClass(CodeGenFunction &CGF,
@@ -1237,13 +1252,30 @@ namespace {
       
       void RegisterAlias(const ObjCCompatibleAliasDecl *OAD) override {}
       
-      RecordDecl  *CreateOnTheFlyRecordDecl( CodeGenFunction &CGF, const ObjCMessageExpr *Expr);
-      RecordDecl  *CreateVariadicOnTheFlyRecordDecl( CodeGenFunction &CGF, const ObjCMessageExpr *Expr, RecordDecl *RD);
+      RecordDecl  *CreateMetaABIRecordDecl( Selector sel,
+                                            ArrayRef<QualType> Types);
+      
+      RecordDecl  *CreateOnTheFlyRecordDecl( const ObjCMessageExpr *Expr);
+      RecordDecl  *CreateVariadicOnTheFlyRecordDecl( Selector Sel,
+                                                     RecordDecl *RD,
+                                                     llvm::ArrayRef<const Expr*> &Exprs);
       
       virtual LValue  *GenerateCallArgs( CallArgList &Args,
                                         CodeGenFunction &CGF,
                                         const ObjCMessageExpr *Expr) override;
+      QualType   CreateVoid5PtrTy( void);
+      LValue     GenerateAllocaedUnion( CodeGenFunction &CGF,
+                                        RecordDecl *UD);
       
+      RecordDecl   *CreateMetaABIUnionDecl( CodeGenFunction &CGF,
+                                            RecordDecl  *RD,
+                                            RecordDecl  *RV);
+      
+      RecordDecl   *CreateMetaABIUnionDecl( CodeGenFunction &CGF,
+                                            QualType recTy,
+                                            uint64_t recSize,
+                                            QualType  rvalTy,
+                                            bool hasRvalTy);
       
       llvm::Value *GenerateProtocolRef(CodeGenFunction &CGF,
                                        const ObjCProtocolDecl *PD) override;
@@ -1898,52 +1930,40 @@ CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction
 
    Fn            = nullptr;
    TmpResultType = ResultType;
-   selName       = Sel.getAsString();
-   
-   nArgs = CallArgs.size();
-   switch( nArgs)
+   nArgs         = CallArgs.size();
+   if( ! nArgs)
    {
-   case 0 :  //
-#if 0
-      if( selName == "alloc")
+      selName  = Sel.getAsString();
+      do
       {
-         Fn            = ObjCTypes.getMessageSendAllocFn();
-         TmpResultType = CGF.getContext().getObjCInstanceType();
-         break;
-      }
-      if( selName == "new")
-      {
-         Fn            = ObjCTypes.getMessageSendNewFn();
-         TmpResultType = CGF.getContext().getObjCInstanceType();
-         break;
-      }
-#endif      
-      if( selName == "autorelease")
-      {
-         Fn            = ObjCTypes.getMessageSendAutoreleaseFn();
-         TmpResultType = CGF.getContext().getObjCInstanceType();
-         break;
-      }
-      if( selName == "release")
-      {
-         Fn            = ObjCTypes.getMessageSendReleaseFn();
-         TmpResultType = CGF.getContext().VoidTy;
-         break;
-      }
-      if( selName == "retain")
-      {
-         Fn            = ObjCTypes.getMessageSendRetainFn();
-         TmpResultType = CGF.getContext().getObjCInstanceType();
-         break;
-      }
+         if( selName == "autorelease")
+         {
+            Fn            = ObjCTypes.getMessageSendAutoreleaseFn();
+            TmpResultType = CGF.getContext().getObjCInstanceType();
+            break;
+         }
+         if( selName == "release")
+         {
+            Fn            = ObjCTypes.getMessageSendReleaseFn();
+            TmpResultType = CGF.getContext().VoidTy;
+            break;
+         }
+         if( selName == "retain")
+         {
+            Fn            = ObjCTypes.getMessageSendRetainFn();
+            TmpResultType = CGF.getContext().getObjCInstanceType();
+            break;
+         }
          
-      /* could just make this a nullptr */
-      if( selName == "zone")
-      {
-         Fn            = ObjCTypes.getMessageSendZoneFn();
-         TmpResultType = CGF.getContext().VoidPtrTy;
-         break;
+         /* could just make this a nullptr */
+         if( selName == "zone")
+         {
+            Fn            = ObjCTypes.getMessageSendZoneFn();
+            TmpResultType = CGF.getContext().VoidPtrTy;
+            break;
+         }
       }
+      while( 0);
    }
    
    if( Fn == nullptr)  // regular method send call
@@ -2057,10 +2077,99 @@ CGObjCMulleRuntime::GenerateMessageSendSuper(CodeGen::CodeGenFunction &CGF,
 }
 
 
+
+static uint64_t  get_size_of_type( CodeGenModule *CGM, QualType type);
+
+
+CodeGen::RValue
+CGObjCMulleRuntime::EmitFastEnumeratorCall( CodeGen::CodeGenFunction &CGF,
+                              ReturnValueSlot ReturnSlot,
+                              QualType ResultType,
+                              Selector FastEnumSel,
+                              llvm::Value *Receiver,
+                              llvm::Value *StatePtr,
+                              QualType StateTy,
+                              llvm::Value *ItemsPtr,
+                              QualType ItemsTy,
+                              llvm::Value *Count,
+                              QualType CountTy)
+{
+   llvm::Value    *Values[ 3];
+   QualType       Types[ 3];
+   unsigned int   i;
+   QualType       ItemsPtrTy;
+   
+   Values[ 0] = StatePtr;
+   Values[ 1] = ItemsPtr;
+   Values[ 2] = Count;
+
+   Types[ 0] = CGM.getContext().VoidPtrTy;
+   Types[ 1] = CGM.getContext().VoidPtrTy;
+   Types[ 2] = CountTy;
+   
+   
+   RecordDecl  *RD    = CreateMetaABIRecordDecl( FastEnumSel, ArrayRef<QualType>( Types, 3));
+   RecordDecl  *UD    = CreateMetaABIUnionDecl( CGF, RD, nullptr);
+   LValue       Union = GenerateAllocaedUnion( CGF, UD);
+   
+   uint64_t     size = get_size_of_type( &CGM, Union.getType());
+   llvm::Type   *UnionLLVMType = CGF.ConvertTypeForMem( Union.getType());
+   llvm::Value  *emitMarker    = CGF.EmitLifetimeStart( size, Union.getAddress());
+
+   llvm::Value   *RecordAddr        = CGF.Builder.CreateConstGEP2_32( UnionLLVMType, Union.getAddress(), 0, 0);
+   QualType       RDType            = CGM.getContext().getTagDeclType( RD);
+   llvm::Type    *RecordLLVMType    = CGF.ConvertTypeForMem( RDType);
+   llvm::Type    *RecordLLVMPtrType = CGF.ConvertTypeForMem( CGM.getContext().getPointerType( RDType));
+   llvm::Value   *CastedRecordAddr  = CGF.Builder.CreateBitCast( RecordAddr, RecordLLVMPtrType);
+   
+   for( i = 0; i < 3; i++)
+   {
+      CharUnits     Align        = CGM.getContext().getTypeAlignInChars( Types[ i]);
+      llvm::Value   *LoadedValue;
+      
+      switch( i)
+      {
+      case 0 :
+         LoadedValue = CGF.Builder.CreateConstGEP2_32( CGF.ConvertTypeForMem( StateTy), Values[ i], 0, 0);
+         LoadedValue = CGF.Builder.CreateBitCast( LoadedValue, CGF.ConvertTypeForMem( Types[ i]));
+         break;
+   
+      case 1  :
+         LoadedValue = CGF.Builder.CreateConstGEP2_32( CGF.ConvertTypeForMem( ItemsTy), Values[ i], 0, 0);
+         LoadedValue = CGF.Builder.CreateBitCast( LoadedValue, CGF.ConvertTypeForMem( Types[ i]));
+         break;
+            
+      default :
+         LoadedValue = Values[ i];
+         break;
+      }
+      
+      llvm::Value   *ElementAddr = CGF.Builder.CreateConstGEP2_32( RecordLLVMType, CastedRecordAddr, 0, i);
+      CGF.Builder.CreateAlignedStore( LoadedValue, ElementAddr, Align.getQuantity(), false);
+   }
+
+   CallArgList Args;
+   
+   Args.add( RValue::get( Union.getAddress()), CGM.getContext().VoidPtrTy);
+   
+   CodeGen::RValue CountRV =
+   GenerateMessageSend( CGF, ReturnSlot,
+                       ResultType,
+                       FastEnumSel,
+                       Receiver,
+                       Args,
+                       nullptr,
+                       nullptr);
+   if( emitMarker)
+      CGF.EmitLifetimeEnd( emitMarker, Union.getAddress());
+   
+   return( CountRV);
+}
+
 #pragma mark -
 #pragma mark AST analysis for _param reuse
-/* 
- * Analyze AST for parameter usage. 
+/*
+ * Analyze AST for parameter usage.
  */
 
 static   Expr  *unparenthesizedAndUncastedExpr( Expr *expr)
@@ -2376,6 +2485,14 @@ struct struct_info
    size_t      size;
 };
 
+static uint64_t  get_size_of_type( CodeGenModule *CGM, QualType type)
+{
+   llvm::Type  *llvmType;
+   
+   llvmType = CGM->getTypes().ConvertTypeForMem( type);
+   return( CGM->getDataLayout().getTypeAllocSize( llvmType));
+}
+
 
 static void  fill_struct_info_from_recTy( struct struct_info *info, CodeGenModule *CGM)
 {
@@ -2437,8 +2554,67 @@ static RecordDecl   *create_union_type( ASTContext *context, QualType paramType,
 }
 
 
+#pragma mark 
+#pragma mark Argument construction
+RecordDecl  *CGObjCMulleRuntime::CreateMetaABIRecordDecl( Selector sel,
+                                                          ArrayRef< QualType> Types)
+{
+   ASTContext   *Context;
+   StringRef    FieldName;
+   StringRef    RecordName;
+   char         buf[ 32];
+   
+   Context = &CGM.getContext();
+   sprintf( buf, "generic.args_%ld", Types.size());
+   RecordName = buf;
+   
+   IdentifierInfo  *RecordID = &Context->Idents.get( RecordName);
+   
+   ObjCMethodDecl *OnTheFlyDeclContext;
+   
+   TypeSourceInfo *ReturnTInfo = nullptr;
+   OnTheFlyDeclContext =
+      ObjCMethodDecl::Create( *Context,
+                              SourceLocation(), SourceLocation(),
+                              sel,
+                              QualType(),
+                              ReturnTInfo,
+                              Context->getTranslationUnitDecl(),
+                          /*isInstance=*/false, /*isVariadic=*/false,
+                          /*isPropertyAccessor=*/false,
+                          /*isImplicitlyDeclared=*/true,
+                          /*isDefined=*/false, ObjCMethodDecl::Required,
+                          /*HasRelatedResultType=*/false);
+   
+   // (DeclContext *) CGF.CurFuncDecl is a hack
+   RecordDecl  *RD = RecordDecl::Create( *Context, TTK_Struct, OnTheFlyDeclContext, SourceLocation(), SourceLocation(), RecordID);
 
-RecordDecl  *CGObjCMulleRuntime::CreateOnTheFlyRecordDecl( CodeGenFunction &CGF, const ObjCMessageExpr *Expr)
+   for (unsigned i = 0, e = Types.size(); i != e; ++i)
+   {
+      FieldDecl   *FD;
+   
+      sprintf( buf, "param_%d", i);
+      FieldName = buf;
+
+      IdentifierInfo  *FieldID = &Context->Idents.get( FieldName);
+      FD = FieldDecl::Create(  *Context, RD,
+                               SourceLocation(), SourceLocation(),
+                               FieldID,
+                               Types[ i],
+                               Context->CreateTypeSourceInfo( Types[ i], 0),
+                               NULL,
+                               false,  // Mutable... only for C++
+                               ICIS_NoInit);
+      RD->addDecl( FD);
+   }
+   RD->completeDefinition();
+   
+   return( RD);
+}
+
+
+
+RecordDecl  *CGObjCMulleRuntime::CreateOnTheFlyRecordDecl( const ObjCMessageExpr *Expr)
 {
    ASTContext   *Context;
    StringRef    FieldName;
@@ -2497,9 +2673,9 @@ RecordDecl  *CGObjCMulleRuntime::CreateOnTheFlyRecordDecl( CodeGenFunction &CGF,
 /* variadic alloca, could have size of struct block in
  * front, for interpreters / storage (?)
  */
-RecordDecl  *CGObjCMulleRuntime::CreateVariadicOnTheFlyRecordDecl( CodeGenFunction &CGF,
-                                                                   const ObjCMessageExpr *Expr,
-                                                                   RecordDecl *RD)
+RecordDecl  *CGObjCMulleRuntime::CreateVariadicOnTheFlyRecordDecl( Selector Sel,
+                                                                   RecordDecl *RD,
+                                                                   llvm::ArrayRef<const Expr*> &Exprs)
 {
    ASTContext   *Context;
    StringRef    FieldName;
@@ -2519,7 +2695,7 @@ RecordDecl  *CGObjCMulleRuntime::CreateVariadicOnTheFlyRecordDecl( CodeGenFuncti
    OnTheFlyDeclContext =
       ObjCMethodDecl::Create( *Context,
                               SourceLocation(), SourceLocation(),
-                              Expr->getSelector(),
+                              Sel,
                               QualType(),
                               ReturnTInfo,
                               Context->getTranslationUnitDecl(),
@@ -2539,7 +2715,6 @@ RecordDecl  *CGObjCMulleRuntime::CreateVariadicOnTheFlyRecordDecl( CodeGenFuncti
    FieldNo = 0;
    if( RD)
    {
-      
       for (RecordDecl::field_iterator Field = RD->field_begin(),
            FieldEnd = RD->field_end(); Field != FieldEnd; ++Field, ++FieldNo)
       {
@@ -2565,16 +2740,16 @@ RecordDecl  *CGObjCMulleRuntime::CreateVariadicOnTheFlyRecordDecl( CodeGenFuncti
     * Now copy over remaining variadic arguments. Arguments have been
     * already promoted (bummer)
     */
-   for (unsigned i = FieldNo, e = Expr->getNumArgs(); i != e; ++i)
+   for (unsigned i = FieldNo, e = Exprs.size(); i != e; ++i)
    {
-      FieldDecl   *FD;
-      Expr::Expr  *arg;
-      QualType    type;
+      FieldDecl         *FD;
+      const Expr::Expr  *arg;
+      QualType          type;
       
       sprintf( buf, "param_%d", i);
       FieldName = buf;
 
-      arg = const_cast<Expr::Expr *>( Expr->getArg( i));
+      arg  = Exprs[ i];
       type = arg->getType();
       
       IdentifierInfo  *FieldID = &Context->Idents.get( FieldName);
@@ -2595,20 +2770,89 @@ RecordDecl  *CGObjCMulleRuntime::CreateVariadicOnTheFlyRecordDecl( CodeGenFuncti
    return( RD2);
 }
 
-/// Creat the CallArgList
+/// Create the CallArgList
 /// Here we stuff all arguments into a alloca struct
 /// @mulle-objc@ MetaABI: stuff values into alloca
 ///
+
+QualType   CGObjCMulleRuntime::CreateVoid5PtrTy( void)
+{
+   llvm::APInt   units( 32, 5);
+   
+   // construct  void  *[5];
+   return( CGM.getContext().getConstantArrayType( CGM.getContext().VoidPtrTy,
+                                                 units,
+                                                 ArrayType::Normal,
+                                                 0));
+}
+
+
+RecordDecl *CGObjCMulleRuntime::CreateMetaABIUnionDecl( CodeGenFunction &CGF,
+                                                        RecordDecl  *RD,
+                                                        RecordDecl  *RV)
+{
+   struct struct_info   record_info;
+   struct struct_info   rval_info;
+ 
+   fill_struct_info( &record_info, &CGM, RD);
+   if( RV)
+      fill_struct_info( &rval_info, &CGM, RV);
+
+   return( CreateMetaABIUnionDecl( CGF,
+                                  record_info.recTy, record_info.size,
+                                  rval_info.recTy, RV != NULL));
+}
+
+
+RecordDecl   *CGObjCMulleRuntime::CreateMetaABIUnionDecl( CodeGenFunction &CGF,
+                                                          QualType recTy,
+                                                          uint64_t recSize,
+                                                          QualType  rvalTy,
+                                                          bool hasRvalTy)
+{
+   //
+   // at this point, we alloca something and copy all the values
+   // into the alloca, at a later time, we check
+   // if we can't reuse the input _param block, and if yes substitute
+   // values. The allocaed block needs to be big enough to hold the
+   // void *[5] pointer units
+   //
+   // We make a proper union type here (maybe pedantic)
+   //
+   QualType Void5PtrTy = CreateVoid5PtrTy();
+      
+   // determine 'n' in  void  *[5][ n] and construct type
+   llvm::APInt   units2( 32, rounded_type_length( &CGM.getContext(), recTy, Void5PtrTy));
+   QualType array2Type = CGM.getContext().getConstantArrayType( Void5PtrTy,
+                                                                units2,
+                                                                ArrayType::Normal,
+                                                                0);
+
+   // construct union { struct _param v; void  *[5][ n] space; struct _rval rval;  };
+   
+   return( create_union_type( &CGM.getContext(), recTy, array2Type, rvalTy, hasRvalTy));
+}
+
+
+LValue  CGObjCMulleRuntime::GenerateAllocaedUnion( CodeGenFunction &CGF,
+                                                   RecordDecl *UD)
+{
+   QualType     unionTy = CGM.getContext().getTagDeclType( UD);
+   
+   // now alloca the union
+   llvm::AllocaInst  *allocaed = CGF.CreateMemTemp( unionTy, "_args");  // leak ?
+   LValue   Union  = CGF.MakeNaturalAlignAddrLValue( allocaed, unionTy);
+
+   return( Union);
+}
+
+
 LValue  *CGObjCMulleRuntime::GenerateCallArgs( CallArgList &Args,
                                                CodeGenFunction &CGF,
                                                const ObjCMessageExpr *Expr)
 {
-   struct struct_info   record_info;
-   struct struct_info   rval_info;
-   struct struct_info   void_info;
-   bool                 emitEnd;
-   RecordDecl           *RD;
-   RecordDecl           *RV;
+   RecordDecl   *RD;
+   RecordDecl   *RV;
    
    // Initialize the captured struct.
    RD = NULL;
@@ -2620,7 +2864,11 @@ LValue  *CGObjCMulleRuntime::GenerateCallArgs( CallArgList &Args,
       RD = method->getParamRecord();
       RV = method->getRvalRecord();
       if( method->isVariadic())
-         RD = CreateVariadicOnTheFlyRecordDecl( CGF, Expr, RD);
+      {
+         auto Args = llvm::makeArrayRef( Expr->getArgs(), Expr->getNumArgs());
+         
+         RD = CreateVariadicOnTheFlyRecordDecl( method->getSelector(), RD, Args);
+      }
    }
    
    // special case, argument is void * compatible, there is no paramRecord.
@@ -2651,52 +2899,22 @@ LValue  *CGObjCMulleRuntime::GenerateCallArgs( CallArgList &Args,
       return( nullptr);
    }
    
-   fill_struct_info( &record_info, &CGM, RD);
-   if( RV)
-      fill_struct_info( &rval_info, &CGM, RV);
 
-   //
-   // at this point, we alloca something and copy all the values
-   // into the alloca, at a later time, we check
-   // if we can't reuse the input _param block, and if yes substitute
-   // values. The allocaed block needs to be big enough to hold the
-   // void *[5] pointer units
-   //
-   // We make a proper union type here (maybe pedantic)
-   //
-   llvm::APInt   units( 32, 5);
-   
-   // construct  void  *[5];
-   QualType Void5PtrTy = CGM.getContext().getConstantArrayType( CGM.getContext().VoidPtrTy,
-                                                          units,
-                                                          ArrayType::Normal,
-                                                          0);
 
-      
-   // determine 'n' in  void  *[5][ n] and construct type
-   llvm::APInt   units2( 32, rounded_type_length( &CGM.getContext(), record_info.recTy, Void5PtrTy));
-   QualType array2Type = CGM.getContext().getConstantArrayType( Void5PtrTy,
-                                                                units2,
-                                                                ArrayType::Normal,
-                                                                0);
-
-   // construct union { struct _param v; void  *[5][ n] space; struct _rval rval;  };
-   
-   RecordDecl   *UD = create_union_type( &CGM.getContext(), record_info.recTy, array2Type, rval_info.recTy, RV != NULL);
-   QualType     unionTy = CGM.getContext().getTagDeclType( UD);
-   
-   // now alloca the union
-   llvm::AllocaInst  *allocaed = CGF.CreateMemTemp( unionTy, "_args");  // leak ?
-   LValue   Union  = CGF.MakeNaturalAlignAddrLValue( allocaed, unionTy);
+   RecordDecl *UD = CreateMetaABIUnionDecl( CGF,
+                                            RD,
+                                            RV);
+   LValue Union = GenerateAllocaedUnion( CGF, UD);
 
    //
    // specify beginning of life for this alloca
    // do this always, so that the optimizer can get rid of it
    //
-   emitEnd = ! ! CGF.EmitLifetimeStart( record_info.size, Union.getAddress());
+   llvm::Value  *emitMarker = CGF.EmitLifetimeStart( get_size_of_type( &CGM, Union.getType()), Union.getAddress());
 
    // now get record out of union again
    LValue Record = CGF.EmitLValueForField( Union, *UD->field_begin());
+   
    
    //
    // push values into record
@@ -2730,7 +2948,14 @@ LValue  *CGObjCMulleRuntime::GenerateCallArgs( CallArgList &Args,
       if( PRD)
       {
          struct struct_info   parent_info;
-         
+         struct struct_info   record_info;
+         // construct  void  *[5];
+         llvm::APInt   units( 32, 5);
+         QualType Void5PtrTy = CGM.getContext().getConstantArrayType( CGM.getContext().VoidPtrTy,
+                                                                      units,
+                                                                      ArrayType::Normal,
+                                                                      0);
+         fill_struct_info( &record_info, &CGM, RD);
          fill_struct_info( &parent_info, &CGM, PRD);
 
          size_t sizeRecord       = rounded_type_length( &CGM.getContext(), record_info.recTy, Void5PtrTy);
@@ -2776,9 +3001,8 @@ LValue  *CGObjCMulleRuntime::GenerateCallArgs( CallArgList &Args,
                                       false);
                
                // dont need the alloca anymore
-               llvm::Value *SizeV = llvm::ConstantInt::get( CGF.Int64Ty, record_info.size);
-               if( emitEnd)
-                  CGF.EmitLifetimeEnd( SizeV, Union.getAddress());
+               if( emitMarker)
+                  CGF.EmitLifetimeEnd( emitMarker, Union.getAddress());
                
                Args.add( loaded, CGM.getContext().VoidPtrTy);
                return( nullptr);
@@ -2790,7 +3014,7 @@ LValue  *CGObjCMulleRuntime::GenerateCallArgs( CallArgList &Args,
 skip:
    // we are always pushing a void through mulle_objc_calls
    Args.add( RValue::get( Record.getAddress()), CGM.getContext().VoidPtrTy);
-   return( emitEnd ? new LValue( Record) : nullptr);
+   return( emitMarker ? new LValue( Record) : nullptr);
 }
 
 #pragma mark -

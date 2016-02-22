@@ -165,8 +165,22 @@ public:
                                        CodeGenFunction &CGF,
                                        const ObjCMessageExpr *Expr);
 
+  /// @mulle-objc@ MetaABI: callback in special cases to create param decl
+   virtual CodeGen::RValue  EmitFastEnumeratorCall( CodeGen::CodeGenFunction &CGF,
+                                   ReturnValueSlot ReturnSlot,
+                                   QualType ResultType,
+                                   Selector Sel,
+                                   llvm::Value *Receiver,
+                                   llvm::Value *StatePtr,
+                                   QualType StateTy,
+                                   llvm::Value *ItemsPtr,
+                                   QualType ItemsTy,
+                                   llvm::Value *Count,
+                                   QualType CountTy);
+
   /// @mulle-objc@ compiler: pass through Parser to ObjCRuntime when finished
   virtual void      ParserDidFinish( clang::Parser *P) {};
+   
    
   /// Generate an Objective-C message send operation to the super
   /// class initiated in a method for Class and with the given Self

@@ -18,6 +18,7 @@
 #include "TargetInfo.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclObjC.h"
+#include "clang/AST/ExprObjC.h"
 #include "clang/AST/StmtObjC.h"
 #include "clang/Basic/Diagnostic.h"
 #include "clang/CodeGen/CGFunctionInfo.h"
@@ -1781,6 +1782,9 @@ void CodeGenFunction::EmitObjCForCollectionStmt(const ObjCForCollectionStmt &S){
   // collection object.
   JumpDest AfterBody = getJumpDestInCurrentScope("forcoll.next");
 
+  // @mulle-objc@ MetaABI: need to change fastenumeration parameters
+  RValue CountRV;
+
   // Send it our message:
   CallArgList Args;
 
@@ -1795,17 +1799,31 @@ void CodeGenFunction::EmitObjCForCollectionStmt(const ObjCForCollectionStmt &S){
   Args.add(RValue::get(ItemsPtr), getContext().getPointerType(ItemsTy));
 
   // The third argument is the capacity of that temporary array.
+
   llvm::Type *UnsignedLongLTy = ConvertType(getContext().UnsignedLongTy);
   llvm::Constant *Count = llvm::ConstantInt::get(UnsignedLongLTy, NumItems);
   Args.add(RValue::get(Count), getContext().UnsignedLongTy);
 
-  // Start the enumeration.
-  RValue CountRV =
+  if( getContext().getLangOpts().ObjCRuntime.hasMulleMetaABI())
+  {
+     CountRV = CGM.getObjCRuntime().EmitFastEnumeratorCall( *this,
+                                                           ReturnValueSlot(),
+                                                           getContext().UnsignedLongTy,
+                                                           FastEnumSel,
+                                                           Collection,
+                                                           StatePtr, StateTy,
+                                                           ItemsPtr, ItemsTy,
+                                                           Count, getContext().UnsignedLongTy);
+  }
+  else
+  {
+   // Start the enumeration.
+  CountRV =
     CGM.getObjCRuntime().GenerateMessageSend(*this, ReturnValueSlot(),
                                              getContext().UnsignedLongTy,
                                              FastEnumSel,
                                              Collection, Args);
-
+  }
   // The initial number of objects that were returned in the buffer.
   llvm::Value *initialBufferLimit = CountRV.getScalarVal();
 
@@ -1972,7 +1990,19 @@ void CodeGenFunction::EmitObjCForCollectionStmt(const ObjCForCollectionStmt &S){
   // Otherwise, we have to fetch more elements.
   EmitBlock(FetchMoreBB);
 
-  CountRV =
+  if( getContext().getLangOpts().ObjCRuntime.hasMulleMetaABI())
+  {
+     CountRV = CGM.getObjCRuntime().EmitFastEnumeratorCall( *this,
+                                                           ReturnValueSlot(),
+                                                           getContext().UnsignedLongTy,
+                                                           FastEnumSel,
+                                                           Collection,
+                                                           StatePtr, StateTy,
+                                                           ItemsPtr, ItemsTy,
+                                                           Count, getContext().UnsignedLongTy);
+  }
+  else
+    CountRV =
     CGM.getObjCRuntime().GenerateMessageSend(*this, ReturnValueSlot(),
                                              getContext().UnsignedLongTy,
                                              FastEnumSel,
@@ -2629,7 +2659,7 @@ llvm::Value *CodeGenFunction::EmitObjCMRRAutoreleasePoolPush() {
 /// Produce the code to do a primitive release.
 /// [tmp drain];
 void CodeGenFunction::EmitObjCMRRAutoreleasePoolPop(llvm::Value *Arg) {
-  IdentifierInfo *II = &CGM.getContext().Idents.get("drain");
+  IdentifierInfo *II = &CGM.getContext().Idents.get( CGM.getLangOpts().ObjCRuntime.hasMulleMetaABI() ? "release" : "drain");
   Selector DrainSel = getContext().Selectors.getSelector(0, &II);
   CallArgList Args;
   CGM.getObjCRuntime().GenerateMessageSend(*this, ReturnValueSlot(),

@@ -4219,7 +4219,7 @@ void   Sema::SetMulleObjCParam( ObjCMethodDecl *ObjCMethod,
    
    ObjCMethod->setParamRecord( RD);
    
-   // (nat) fake it up, so that ever method looks exactly alike
+   // (nat) fake it up, so that every method looks exactly alike
    //       add our _param implicit decl now.
    //
    // convert record to a QualType

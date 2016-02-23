@@ -1538,6 +1538,15 @@ public:
     return lookupInstanceVariable(IVarName, ClassDeclared);
   }
 
+// @mulle-objc@ language: compatible lookup of instance variable for property
+  ObjCIvarDecl *lookupInstanceVariableOfProperty( ASTContext &C, IdentifierInfo *PropertyName,
+                                       ObjCInterfaceDecl *&ClassDeclared);
+  ObjCIvarDecl *lookupInstanceVariableOfProperty( ASTContext &C, IdentifierInfo *PropertyName) {
+    ObjCInterfaceDecl *ClassDeclared;
+    return lookupInstanceVariableOfProperty( C, PropertyName, ClassDeclared);
+  }
+
+
   ObjCProtocolDecl *lookupNestedProtocol(IdentifierInfo *Name);
                           
   // Lookup a method. First, we search locally. If a method isn't

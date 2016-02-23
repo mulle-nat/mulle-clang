@@ -5366,7 +5366,9 @@ def err_mulle_objc_property_synthesize_wrong_name : Error<
 "the mulle-objc runtime synthesized instance variable name must be the name of the property, prefixed by an underscrore.">;
 def err_mulle_objc_no_property_dot_expression : Error<
 "the mulle-objc runtime does not support . expressions with properties, use regular method calls">;
-
+def err_mulle_error_missing_property_ivar_decl : Error<
+  "synthesized property %0 needs a compatible"
+  " instance variable of the same name, prefixed with an underscore.">;
 def warn_setter_getter_impl_required : Warning<
   "property %0 requires method %1 to be defined - "
   "use @synthesize, @dynamic or provide a method implementation "

@@ -180,6 +180,42 @@ Decl *Sema::ActOnProperty(Scope *S, SourceLocation AtLoc,
       Res->setLexicalDeclContext(lexicalDC);
   }
 
+  // @mulle-objc@ language: introduce ivar for property at declaration time
+  if( Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+  {
+     ObjCIvarDecl       *Ivar;
+     ObjCInterfaceDecl  *ClassDeclared;
+
+     //
+     // can only do this for classes not protocols or categories
+     //
+     if (ObjCInterfaceDecl *CDecl = dyn_cast<ObjCInterfaceDecl>(ClassDecl))
+     {
+        Ivar = CDecl->lookupInstanceVariableOfProperty( Context, Res->getIdentifier(), ClassDeclared);
+        if( ! Ivar)
+        {
+           // create an Ivar and add it
+           Ivar = ObjCIvarDecl::Create( Context, CDecl,
+                                       AtLoc ,LParenLoc, Res->getDefaultSynthIvarName(Context),
+                                       Res->getType(), /*Dinfo=*/nullptr,
+                                       ObjCIvarDecl::Protected,
+                                       (Expr *)nullptr, true);
+           if (RequireNonAbstractType(AtLoc,
+                                      Res->getType(),
+                                      diag::err_abstract_type_in_decl,
+                                      AbstractSynthesizedIvarType))
+           {
+              Diag( Res->getLocation(), diag::note_property_declare);
+              Ivar->setInvalidDecl();
+           }
+           CDecl->addDecl(Ivar);
+           CDecl->makeDeclVisibleInContext(Ivar);
+        }
+        
+        Res->setPropertyIvarDecl( Ivar);
+     }
+  }
+  
   // Validate the attributes on the @property.
   CheckObjCPropertyAttributes(Res, AtLoc, Attributes, 
                               (isa<ObjCInterfaceDecl>(ClassDecl) ||
@@ -818,6 +854,7 @@ DiagnosePropertyMismatchDeclInProtocols(Sema &S, SourceLocation AtLoc,
     S.Diag(AtLoc, diag::note_property_synthesize);
 }
 
+
 /// ActOnPropertyImplDecl - This routine performs semantic checks and
 /// builds the AST node for a property implementation declaration; declared
 /// as \@synthesize or \@dynamic.
@@ -946,15 +983,31 @@ Decl *Sema::ActOnPropertyImplDecl(Scope *S,
   ObjCIvarDecl *Ivar = nullptr;
   bool CompleteTypeErr = false;
   bool compat = true;
+  
   // Check that we have a valid, previously declared ivar for @synthesize
-  // @mulle-objc@ language: always create an ivar, regardless of dynamic
-  if (Synthesize || getLangOpts().ObjCRuntime.hasMulleMetaABI()) {
+  if (Synthesize) {
     // @synthesize
+    
+    ObjCInterfaceDecl *ClassDeclared;
+
+    // @mulle-objc@ language: fix lookup of ivar variable for properties,
+    if( Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+    {
+      if (!PropertyIvar)
+      {
+         Ivar = IDecl->lookupInstanceVariableOfProperty( Context, PropertyId, ClassDeclared);
+         PropertyIvar = Ivar->getIdentifier();
+      }
+      else
+         Ivar = IDecl->lookupInstanceVariable( PropertyIvar, ClassDeclared);
+    }
+    else
+    {
     if (!PropertyIvar)
       PropertyIvar = PropertyId;
     // Check that this is a previously declared 'ivar' in 'IDecl' interface
-    ObjCInterfaceDecl *ClassDeclared;
-    Ivar = IDecl->lookupInstanceVariable(PropertyIvar, ClassDeclared);
+    Ivar = IDecl->lookupInstanceVariable( PropertyIvar, ClassDeclared);
+    }
     QualType PropType = property->getType();
     QualType PropertyIvarType = PropType.getNonReferenceType();
 
@@ -993,8 +1046,10 @@ Decl *Sema::ActOnPropertyImplDecl(Scope *S,
       // is the most common case of not using an ivar used for backing
       // property in non-default synthesis case.
       ObjCInterfaceDecl *ClassDeclared=nullptr;
+      
+      // @mulle-objc@ language: ivar for properties use lookupInstanceVariableOfProperty instead
       ObjCIvarDecl *originalIvar = 
-      IDecl->lookupInstanceVariable(property->getIdentifier(), 
+      IDecl->lookupInstanceVariableOfProperty( Context, property->getIdentifier(),
                                     ClassDeclared);
       if (originalIvar) {
         Diag(PropertyDiagLoc, 
@@ -1056,25 +1111,10 @@ Decl *Sema::ActOnPropertyImplDecl(Scope *S,
         Diag(property->getLocation(), diag::note_property_declare);
       }
       
-      ObjCIvarDecl::AccessControl  protection = ObjCIvarDecl::Private;
-      IdentifierInfo               *IvarIdentifier = PropertyIvar;
-       
-      // @mulle-objc@ language: make synthesized ivars default "protected" and prepend underscore
-      if( LangOpts.ObjCRuntime.hasMulleMetaABI())
-      {
-         std::string   underscored;
-         
-         protection = ObjCIvarDecl::Protected;
-         underscored = "_" + std::string( PropertyId->getNameStart());
-         IvarIdentifier = &Context.Idents.get( underscored);
-         
-         if( PropertyIvar != PropertyId && IvarIdentifier != PropertyIvar)
-            Diag(PropertyDiagLoc, diag::err_mulle_objc_property_synthesize_wrong_name);
-      }
       Ivar = ObjCIvarDecl::Create(Context, ClassImpDecl,
-                                  PropertyIvarLoc,PropertyIvarLoc, IvarIdentifier,
+                                  PropertyIvarLoc,PropertyIvarLoc, PropertyIvar,
                                   PropertyIvarType, /*Dinfo=*/nullptr,
-                                  protection,
+                                  ObjCIvarDecl::Private,
                                   (Expr *)nullptr, true);
       if (RequireNonAbstractType(PropertyIvarLoc,
                                  PropertyIvarType,
@@ -1087,8 +1127,10 @@ Decl *Sema::ActOnPropertyImplDecl(Scope *S,
       ClassImpDecl->addDecl(Ivar);
       IDecl->makeDeclVisibleInContext(Ivar);
 
-      // @mulle-objc@ language: ignore synthesis warning for fragile
-      if( ! LangOpts.ObjCRuntime.hasMulleMetaABI())
+      if (getLangOpts().ObjCRuntime.hasMulleMetaABI())
+        Diag(PropertyDiagLoc, diag::err_mulle_error_missing_property_ivar_decl)
+            << PropertyId;
+      else
       if (getLangOpts().ObjCRuntime.isFragile())
         Diag(PropertyDiagLoc, diag::error_missing_property_ivar_decl)
             << PropertyId;
@@ -1105,14 +1147,11 @@ Decl *Sema::ActOnPropertyImplDecl(Scope *S,
     }
      
     // @mulle-objc@ language: check that ivar name fits property
-    if( LangOpts.ObjCRuntime.hasMulleMetaABI())
+    if( LangOpts.ObjCRuntime.hasMulleMetaABI() && ! Ivar->isInvalidDecl())
     {
-       std::string      underscored;
        IdentifierInfo   *expected;
-        
-       underscored = "_" + std::string( property->getIdentifier()->getNameStart());
-       expected    = &Context.Idents.get( underscored);
-           
+       
+       expected = property->getDefaultSynthIvarName( Context);
        if( Ivar->getIdentifier() != expected)
           Diag(PropertyDiagLoc, diag::err_mulle_objc_property_synthesize_wrong_name);
     }
@@ -1318,11 +1357,13 @@ Decl *Sema::ActOnPropertyImplDecl(Scope *S,
       // but it requires an ivar of different name.
       ObjCInterfaceDecl *ClassDeclared=nullptr;
       ObjCIvarDecl *Ivar = nullptr;
+
+      // @mulle-objc@ language: ivar for properties use lookupInstanceVariableOfProperty instead
       if (!Synthesize)
-        Ivar = IDecl->lookupInstanceVariable(PropertyId, ClassDeclared);
+        Ivar = IDecl->lookupInstanceVariableOfProperty( Context, PropertyId, ClassDeclared);
       else {
-        if (PropertyIvar && PropertyIvar != PropertyId)
-          Ivar = IDecl->lookupInstanceVariable(PropertyId, ClassDeclared);
+        if (PropertyIvar && PropertyIvar != PropertyId)  /* looks like     vvv  a bug */
+          Ivar = IDecl->lookupInstanceVariableOfProperty( Context, PropertyId, ClassDeclared);
       }
       // Issue diagnostics only if Ivar belongs to current class.
       if (Ivar && Ivar->getSynthesize() && 

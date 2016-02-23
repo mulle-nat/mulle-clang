@@ -1505,7 +1505,7 @@ CodeGenFunction::generateObjCSetterBody(const ObjCImplementationDecl *classImpl,
 
   
   //
-  // @mulle-objc@ MetaAPI: property setter access paramDecl
+  // @mulle-objc@ MetaABI: property setter accesses paramDecl
   //
   // this code really should be runtime specific
   //

@@ -563,6 +563,28 @@ ObjCIvarDecl *ObjCInterfaceDecl::lookupInstanceVariable(IdentifierInfo *ID,
   return nullptr;
 }
 
+// @mulle-objc@ language: compatible lookup of instance variable for property
+ObjCIvarDecl *ObjCInterfaceDecl::lookupInstanceVariableOfProperty( ASTContext &C,
+                                                                   IdentifierInfo *PropertyName,
+                                                                   ObjCInterfaceDecl *&ClassDeclared)
+{
+   IdentifierInfo   *IvarIdentifier = PropertyName;
+   
+   //
+   // this should be somewhere alongside getDefaultSynthIvarName
+   // actually it's kind of curious, that this isn't the proper code
+   // in most cases
+   if( C.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+   {
+      std::string   underscored;
+   
+      underscored = "_" + std::string( IvarIdentifier->getNameStart());
+      IvarIdentifier = &C.Idents.get( underscored);
+   }
+
+   return( lookupInstanceVariable( IvarIdentifier, ClassDeclared));
+}
+
 /// lookupInheritedClass - This method returns ObjCInterfaceDecl * of the super
 /// class whose name is passed as argument. If it is not one of the super classes
 /// the it returns NULL.

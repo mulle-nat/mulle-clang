@@ -2478,6 +2478,20 @@ Sema::LookupInObjCMethod(LookupResult &Lookup, Scope *S, CXXScopeSpec &SS,
   if (!CurMethod)
     return ExprError();
 
+  //
+  // @mulle-objc@ MetaABI: Create MemberExpr for _param-><name>
+  // (nat) lookup if this is one of our parameters
+  //
+  if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+  {
+     FieldDecl   *FD;
+     
+     FD = CurMethod->FindParamRecordField( II);
+     if( FD)
+        return( GetMulle_paramFieldExpr( FD, S, SS, Loc));
+  }
+   
+   
   // There are two cases to handle here.  1) scoped lookup could have failed,
   // in which case we should look for an ivar.  2) scoped lookup could have
   // found a decl, but that decl is outside the current instance method (i.e.
@@ -2497,20 +2511,7 @@ Sema::LookupInObjCMethod(LookupResult &Lookup, Scope *S, CXXScopeSpec &SS,
   else
     LookForIvars = (Lookup.isSingleResult() &&
                     Lookup.getFoundDecl()->isDefinedOutsideFunctionOrMethod());
-  
-  //
-  // @mulle-objc@ MetaABI: Create MemberExpr for _param-><name>
-  // (nat) lookup if this is one of our parameters
-  //
-  if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
-  {
-     FieldDecl   *FD;
-     
-     FD = CurMethod->FindParamRecordField( II);
-     if( FD)
-        return( GetMulle_paramFieldExpr( FD, S, SS, Loc));
-  }
-  
+
   ObjCInterfaceDecl *IFace = nullptr;
   if (LookForIvars) {
     IFace = CurMethod->getClassInterface();
@@ -2535,8 +2536,16 @@ Sema::LookupInObjCMethod(LookupResult &Lookup, Scope *S, CXXScopeSpec &SS,
       if (IV->getAccessControl() == ObjCIvarDecl::Private &&
           !declaresSameEntity(ClassDeclared, IFace) &&
           !getLangOpts().DebuggerSupport)
-        Diag(Loc, diag::error_private_ivar_access) << IV->getDeclName();
+         Diag(Loc, diag::error_private_ivar_access) << IV->getDeclName();
 
+       // @mulle-objc@ AAO: In AAO mode ivars are just not available
+      if ( getLangOpts().ObjCAllocsAutoreleasedObjects)
+      {
+         Diag(Loc, diag::error_mulle_aao_ivar_access) << IV->getDeclName();
+         return ExprError();
+      }
+
+       
       // FIXME: This should use a new expr for a direct reference, don't
       // turn this into Self->ivar, just return a BareIVarExpr or something.
       IdentifierInfo &II = Context.Idents.get("self");

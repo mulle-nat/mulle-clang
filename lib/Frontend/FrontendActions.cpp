@@ -693,6 +693,8 @@ void PrintPreambleAction::ExecuteAction() {
   case IK_C:
   case IK_CXX:
   case IK_ObjC:
+  // @mulle-objc@ AAO: .aam filename extension support
+  case IK_ObjCAAO:
   case IK_ObjCXX:
   case IK_OpenCL:
   case IK_CUDA:

@@ -5359,8 +5359,15 @@ def warn_objc_circular_container : Warning<
   InGroup<DiagGroup<"objc-circular-container">>;
 def note_objc_circular_container_declared_here : Note<"'%0' declared here">;
 
-// @mulle-objc@ compiler: error message definition mulle-objc runtime missing
-def err_function_mulle_objc_missing : Error<
+// @mulle-objc@ compiler: error message definitions
+def error_mulle_aao_ivar_access : Error<"in AAO mode instance variables such as %0 are not accessible">, AccessControl;
+def err_mulle_aao_illegal_explicit_message : Error<
+"in AAO mode method %0 is not available">;
+def err_mulle_aao_illegal_retained_message : Error<
+"in AAO mode method %0 is not available, because it returns a retained object">;
+def err_mulle_aao_illegal_consumed_message : Error<
+"in AAO mode method %0 is not available, because it needs a retained argument">;
+def err_mulle_objc_runtime_function_missing : Error<
 "the mulle-objc runtime function %0 has not been declared yet">;
 def err_mulle_objc_property_synthesize_wrong_name : Error<
 "the mulle-objc runtime synthesized instance variable name must be the name of the property, prefixed by an underscrore.">;

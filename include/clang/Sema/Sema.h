@@ -7442,11 +7442,18 @@ public:
                                           ObjCMethodDecl *Method,
                                           MultiExprArg Args);
 
-   // @mulle-objc@ compiler: additional method CheckMulleObjCFunctionDefined
+  // @mulle-objc@ compiler: additional method CheckMulleObjCFunctionDefined
   bool  CheckMulleObjCFunctionDefined( Scope *S,
                                        SourceLocation Loc,
                                        StringRef Name);
 
+  // @mulle-objc@ AAO: check that selectors conform
+  int   CheckSelectorForAAOmode( Selector Sel,
+                                 ObjCMethodDecl *Method,
+                                 QualType ReceiverType,
+                                 SourceLocation SelLoc,
+                                 SourceRange RecRange);
+       
   ExprResult ActOnInstanceMessage(Scope *S,
                                   Expr *Receiver,
                                   Selector Sel,

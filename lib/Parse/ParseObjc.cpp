@@ -3275,6 +3275,28 @@ Parser::ParseObjCMessageExpressionBody(SourceLocation LBracLoc,
 
   unsigned nKeys = KeyIdents.size();
   if (nKeys == 0) {
+     // @mulle-objc@ AAO: replace alloc/copy/mutableCopy with instantiate & Co
+    if( getLangOpts().ObjCAllocsAutoreleasedObjects)
+    {
+       StringRef   s;
+       
+       s = selIdent->getName();
+       if( s == "alloc")
+       {
+          Diag( Loc, diag::warn_mulle_aao_rename_selector) << s << "instantiate";
+          selIdent = &PP.getIdentifierTable().get( "instantiate");
+       }
+       else if( s == "copy")
+       {
+          Diag( Loc, diag::warn_mulle_aao_rename_selector) << s << "immutableInstance";
+          selIdent = &PP.getIdentifierTable().get( "immutableInstance");
+       }
+       else if( s == "mutableCopy")
+       {
+          Diag( Loc, diag::warn_mulle_aao_rename_selector) << s << "mutableInstance";
+          selIdent = &PP.getIdentifierTable().get( "mutableInstance");
+       }
+    }
     KeyIdents.push_back(selIdent);
     KeyLocs.push_back(Loc);
   }

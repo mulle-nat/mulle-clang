@@ -1719,9 +1719,6 @@ llvm::StructType *CGObjCCommonMulleRuntime::GetOrCreateNSConstantStringType( voi
 llvm::ConstantStruct *CGObjCMulleRuntime::CreateNSConstantStringStruct( StringRef S, unsigned StringLength)
 {
    llvm::Constant *Fields[4];
-   ASTContext   *Context;
-   
-   Context = &CGM.getContext();
    
    // drop LONG_MAX
    llvm::Type *Ty = CGM.getTypes().ConvertType(CGM.getContext().LongTy);
@@ -1979,11 +1976,6 @@ CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction
                                            ActualArgs,
                                            FunctionType::ExtInfo(),
                                            RequiredArgs::All);
-   unsigned int   a_size;
-   unsigned int   c_size;
-   
-   a_size = ActualArgs.size();
-   c_size = CallArgs.size();
 
    /* if the method -release hasn't been declared yet, then
       we emit a void function call, but the compiler expects id 
@@ -2442,14 +2434,11 @@ public:
 
 static bool  param_unused_after_expr( ObjCMethodDecl *Method, ObjCMessageExpr *Expr)
 {
-   // cache this later
-   ASTContext             *Context;
    MulleStatementVisitor   Visitor( Method, Expr);
    
    if( ! Method->getParamDecl())
       return( false);
    
-   Context    = &Method->getASTContext();
    Stmt *Body = Method->getBody();
    return( Visitor.TraverseStmt( Body));
 }

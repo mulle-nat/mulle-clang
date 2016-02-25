@@ -625,7 +625,6 @@ void   CodeGenFunction::EmitMetaABIWriteReturnValue( const Decl *FuncDecl, const
    QualType               recordTy;
    QualType               recordPtrTy;
    llvm::Type             *llvmRecType;
-   llvm::Type             *llvmPointerType;
    llvm::Value            *param;
    llvm::Value            *paramAddr;
    unsigned               alignment;
@@ -664,7 +663,6 @@ void   CodeGenFunction::EmitMetaABIWriteReturnValue( const Decl *FuncDecl, const
          recordTy    = CGM.getContext().getTagDeclType( RD);
          recordPtrTy = CGM.getContext().getPointerType( recordTy);
          llvmRecType = CGM.getTypes().ConvertTypeForMem( recordTy);
-         llvmPointerType = llvmRecType->getPointerTo();
          
          // get _param address (known to be big enough)
          param = LocalDeclMap[ MD->getParamDecl()];
@@ -1235,11 +1233,6 @@ CodeGenFunction::generateObjCGetterBody(const ObjCImplementationDecl *classImpl,
       // @mulle-objc@ MetaABI: need proper casting for property return value
       if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
       {
-         llvm::Value *param = nullptr;
-         
-         // for non-direct returns we need to figure out _param her (e.g. double)
-         if( getterMethod->getRvalRecord())
-            param = Builder.CreateLoad( LocalDeclMap[ getterMethod->getParamDecl()], "param");
          EmitMetaABIWriteScalarReturnValue( getterMethod, value, ivarType);
          return;
       }

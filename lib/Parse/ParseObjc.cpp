@@ -3276,7 +3276,7 @@ Parser::ParseObjCMessageExpressionBody(SourceLocation LBracLoc,
   unsigned nKeys = KeyIdents.size();
   if (nKeys == 0) {
      // @mulle-objc@ AAO: replace alloc/copy/mutableCopy with instantiate & Co
-    if( getLangOpts().ObjCAllocsAutoreleasedObjects)
+    if( getLangOpts().ObjCAllocsAutoreleasedObjects && selIdent)
     {
        StringRef   s;
        

@@ -3775,11 +3775,17 @@ void  CGObjCCommonMulleRuntime::SetPropertyInfoToEmit( const ObjCPropertyDecl *P
    Selector   getter = PD->getGetterName();
    Selector   setter = PD->getSetterName();
    
+   const llvm::APInt zero(32, 0);
+   llvm::Constant  *zeroSel  = llvm::Constant::getIntegerValue(CGM.Int32Ty, zero);
+   
    Prop[ 0] = HashPropertyConstantForString( PD->getIdentifier()->getNameStart());
    Prop[ 1] = GetPropertyName(PD->getIdentifier());
    Prop[ 2] = GetPropertyTypeString(PD, Container);
-   Prop[ 3] = ! getter.isNull() ? HashSelConstantForString( getter.getAsString()) : 0;
-   Prop[ 4] = ! setter.isNull() ? HashSelConstantForString( setter.getAsString()) : 0;
+   Prop[ 3] = ! getter.isNull() ? HashSelConstantForString( getter.getAsString())
+                                : zeroSel;
+   Prop[ 4] = (! setter.isNull() && ! PD->isReadOnly())
+                ? HashSelConstantForString( setter.getAsString())
+                : zeroSel;
 }
 
 

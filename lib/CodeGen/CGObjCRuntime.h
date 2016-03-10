@@ -32,6 +32,7 @@ namespace llvm {
 }
 
 namespace clang {
+  class Parser;
 namespace CodeGen {
   class CodeGenFunction;
 }
@@ -168,6 +169,29 @@ public:
                       const ObjCInterfaceDecl *Class = nullptr,
                       const ObjCMethodDecl *Method = nullptr) = 0;
 
+   // @mulle-objc@ MetaABI: Callback to generate LLVM method argument list 
+   virtual llvm::Value   *GenerateCallArgs( CodeGenFunction &CGF,
+                                            CallArgList &Args,
+                                            const ObjCMethodDecl *method,
+                                            const ObjCMessageExpr *Expr);
+
+  /// @mulle-objc@ MetaABI: callback in special cases to create param decl
+   virtual CodeGen::RValue  EmitFastEnumeratorCall( CodeGen::CodeGenFunction &CGF,
+                                                    ReturnValueSlot ReturnSlot,
+                                                    QualType ResultType,
+                                                    Selector Sel,
+                                                    llvm::Value *Receiver,
+                                                    llvm::Value *StatePtr,
+                                                    QualType StateTy,
+                                                    llvm::Value *ItemsPtr,
+                                                    QualType ItemsTy,
+                                                    llvm::Value *Count,
+                                                    QualType CountTy);
+
+  /// @mulle-objc@ compiler: pass through Parser to ObjCRuntime when finished
+  virtual void      ParserDidFinish( clang::Parser *P) {};
+   
+   
   /// Generate an Objective-C message send operation to the super
   /// class initiated in a method for Class and with the given Self
   /// object.
@@ -307,6 +331,7 @@ public:
 //TODO: This should include some way of selecting which runtime to target.
 CGObjCRuntime *CreateGNUObjCRuntime(CodeGenModule &CGM);
 CGObjCRuntime *CreateMacObjCRuntime(CodeGenModule &CGM);
+CGObjCRuntime *CreateMulleObjCRuntime(CodeGenModule &CGM);
 }
 }
 #endif

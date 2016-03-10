@@ -5329,9 +5329,12 @@ void ASTContext::getObjCEncodingForPropertyDecl(const ObjCPropertyDecl *PD,
       SynthesizePID = PropertyImpDecl;
   }
 
+  // @mulle-objc@ runtime: drop leading 'T' from property signature
+  if( ! getLangOpts().ObjCRuntime.hasMulleMetaABI())
+  {
   // FIXME: This is not very efficient.
   S = "T";
-
+  }
   // Encode result type.
   // GCC has some special rules regarding encoding of properties which
   // closely resembles encoding of ivars.
@@ -6076,7 +6079,10 @@ TypedefDecl *ASTContext::getObjCIdDecl() const {
 
 TypedefDecl *ASTContext::getObjCSelDecl() const {
   if (!ObjCSelDecl) {
-    QualType T = getPointerType(ObjCBuiltinSelTy);
+    // @mulle-objc@ uniqueid: change SEL type to uintptr_t
+    QualType T = getLangOpts().ObjCRuntime.hasMulleMetaABI()
+                     ? getIntTypeForBitwidth(32, false)
+                     : getPointerType(ObjCBuiltinSelTy);
     ObjCSelDecl = buildImplicitTypedef(T, "SEL");
   }
   return ObjCSelDecl;
@@ -6091,10 +6097,18 @@ TypedefDecl *ASTContext::getObjCClassDecl() const {
   return ObjCClassDecl;
 }
 
-ObjCInterfaceDecl *ASTContext::getObjCProtocolDecl() const {
+/// @mulle-objc@ uniqueid: change type of getObjCProtocolDecl to uintptr_t
+NamedDecl *ASTContext::getObjCProtocolDecl() const {
   if (!ObjCProtocolClassDecl) {
-    ObjCProtocolClassDecl 
-      = ObjCInterfaceDecl::Create(*this, getTranslationUnitDecl(), 
+    if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+    {
+      QualType T = getLangOpts().ObjCRuntime.hasMulleMetaABI() ? getIntTypeForBitwidth(32, false)
+                                                               : getPointerType(ObjCBuiltinSelTy);
+      ObjCProtocolClassDecl = buildImplicitTypedef(T, "PROTOCOL");
+    }
+    else
+      ObjCProtocolClassDecl
+         = ObjCInterfaceDecl::Create(*this, getTranslationUnitDecl(),
                                   SourceLocation(),
                                   &Idents.get("Protocol"),
                                   /*typeParamList=*/nullptr,

@@ -234,6 +234,10 @@ namespace {
     void HandleDependentLibrary(llvm::StringRef Lib) override {
       Builder->AddDependentLib(Lib);
     }
+    
+    void ParserDidFinish( clang::Parser *P) override {
+      Builder->ParserDidFinish( P);
+    }
   };
 }
 

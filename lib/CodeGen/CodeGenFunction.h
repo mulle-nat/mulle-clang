@@ -1247,6 +1247,22 @@ public:
                               const ObjCPropertyImplDecl *propImpl,
                               llvm::Constant *AtomicHelperFn);
 
+  // @mulle-objc@ MetaABI: write/read return values
+  void             EmitMetaABIWriteScalarReturnValue( const Decl *FuncDecl, 
+                                                      llvm::Value *ExprResult,
+                                                      QualType ExprType);
+  void             EmitMetaABIWriteAggregateReturnValue( const Decl *FuncDecl,
+                                                         Address ExprResult,
+                                                         Address Param,
+                                                         QualType ExprType);
+  void             EmitMetaABIWriteReturnValue( const Decl *FuncDecl, const Expr *RV);
+  CodeGen::RValue  EmitMetaABIReadReturnValue( const ObjCMethodDecl *Method,
+                                            CodeGen::RValue Rvalue,
+                                            CodeGen::RValue Param,
+                                            ReturnValueSlot Return,
+                                            QualType ResultType);
+   
+
   //===--------------------------------------------------------------------===//
   //                                  Block Bits
   //===--------------------------------------------------------------------===//

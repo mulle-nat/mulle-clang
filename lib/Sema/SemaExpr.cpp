@@ -2123,7 +2123,7 @@ Sema::ActOnIdExpression(Scope *S, CXXScopeSpec &SS,
     // If this reference is in an Objective-C method, then we need to do
     // some special Objective-C lookup, too.
     if (IvarLookupFollowUp) {
-      ExprResult E(LookupInObjCMethod(R, S, II, true));
+      ExprResult E(LookupInObjCMethod(R, S, SS, II, true));
       if (E.isInvalid())
         return ExprError();
 
@@ -2205,7 +2205,8 @@ Sema::ActOnIdExpression(Scope *S, CXXScopeSpec &SS,
     // reference the ivar.
     if (ObjCIvarDecl *Ivar = R.getAsSingle<ObjCIvarDecl>()) {
       R.clear();
-      ExprResult E(LookupInObjCMethod(R, S, Ivar->getIdentifier()));
+      // @mulle-objc@ compiler: added CXXScopeSpec to LookupInObjCMethod arguments
+      ExprResult E(LookupInObjCMethod(R, S, SS, Ivar->getIdentifier()));
       // In a hopelessly buggy code, Objective-C instance variable
       // lookup fails and no expression will be built to reference it.
       if (!E.isInvalid() && !E.get())
@@ -2356,6 +2357,87 @@ ExprResult Sema::BuildQualifiedDeclarationNameExpr(
   return BuildDeclarationNameExpr(SS, R, /* ADL */ false);
 }
 
+
+/* @mulle-objc@ MetaABI: GetMulle_paramExpr create an expression to access _param by name */
+ExprResult   Sema::GetMulle_paramExpr( Scope *S, CXXScopeSpec &SS, SourceLocation Loc, StringRef Name)
+{
+   DeclarationName   DN;
+   IdentifierInfo    *II;
+   
+   // hacked together without a clue
+   II  = &Context.Idents.get( Name);
+   DN  = DeclarationName( II);
+   
+   LookupResult R( *this, DN, Loc, LookupOrdinaryName);
+   LookupParsedName( R, S, &SS, false);
+   if( ! R.empty())
+      return( BuildDeclarationNameExpr( SS, R, false));
+   
+   // this can't really happen
+   return ExprError();
+}
+
+
+ExprResult   Sema::GetMulle_paramExprAsType( QualType type, Scope *S, CXXScopeSpec &SS, SourceLocation Loc, StringRef Name)
+{
+   DeclarationName   DN;
+   IdentifierInfo    *II;
+   ExprResult        E;
+   
+   // hacked together without a clue
+   II  = &Context.Idents.get( Name);
+   DN  = DeclarationName( II);
+   
+   LookupResult R( *this, DN, Loc, LookupOrdinaryName);
+   LookupParsedName( R, S, &SS, false);
+   if( ! R.empty())
+   {
+      ValueDecl *VD = dyn_cast<ValueDecl>( R.getFoundDecl());
+      if( VD)
+      {
+         E = BuildDeclRefExpr( VD, type, VK_LValue, Loc, &SS);
+         E.get()->viewAST();
+         return( E);
+      }
+   }
+   
+   // this can't really happen
+   return ExprError();
+}
+
+
+
+/* @mulle-objc@ MetaABI: GetMulle_paramFieldExpr create an expression to access _param->field */
+ExprResult
+Sema::GetMulle_paramFieldExpr( FieldDecl *FD, Scope *S, CXXScopeSpec &SS, SourceLocation Loc)
+{
+     // this couldn't be any easier... 
+     DeclarationNameInfo   memberNameInfo( FD->getDeclName(), Loc);
+     DeclAccessPair        fakeFoundDecl = DeclAccessPair::make(FD, FD->getAccess());
+     ExprResult BaseExpr = GetMulle_paramExpr( S, SS, Loc, "_param");
+     ExprResult CastExpr = DefaultLvalueConversion( BaseExpr.get());
+/*     ExprResult CastExpr = ImplicitCastExpr::Create(*Ctx, BaseExpr.get()->getType(), CK_LValueToRValue, BaseExpr.get(), nullptr, VK_RValue);
+*/
+     ExprResult Result   = MemberExpr::Create( Context,
+                                              CastExpr.get(),
+                                              true,
+                                              SourceLocation(),   // (nat) blind add
+                                              SS.getWithLocInContext(Context),
+                                              SourceLocation(), // invalid template location
+                                              FD,
+                                              fakeFoundDecl,
+                                              memberNameInfo,
+                                              nullptr,
+                                              FD->getType(),
+                                              VK_LValue, // maybe so, maybe not so
+                                              OK_Ordinary);
+     
+     MarkAnyDeclReferenced(Loc, FD, true);
+     
+     return( Result);
+}
+
+
 /// LookupInObjCMethod - The parser has read a name in, and Sema has
 /// detected that we're currently inside an ObjC method.  Perform some
 /// additional lookup.
@@ -2365,15 +2447,29 @@ ExprResult Sema::BuildQualifiedDeclarationNameExpr(
 ///
 /// Returns a null sentinel to indicate trivial success.
 ExprResult
-Sema::LookupInObjCMethod(LookupResult &Lookup, Scope *S,
+Sema::LookupInObjCMethod(LookupResult &Lookup, Scope *S, CXXScopeSpec &SS,
                          IdentifierInfo *II, bool AllowBuiltinCreation) {
   SourceLocation Loc = Lookup.getNameLoc();
   ObjCMethodDecl *CurMethod = getCurMethodDecl();
-  
+
   // Check for error condition which is already reported.
   if (!CurMethod)
     return ExprError();
 
+  //
+  // @mulle-objc@ MetaABI: Create MemberExpr for _param-><name>
+  // (nat) lookup if this is one of our parameters
+  //
+  if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+  {
+     FieldDecl   *FD;
+     
+     FD = CurMethod->FindParamRecordField( II);
+     if( FD)
+        return( GetMulle_paramFieldExpr( FD, S, SS, Loc));
+  }
+   
+   
   // There are two cases to handle here.  1) scoped lookup could have failed,
   // in which case we should look for an ivar.  2) scoped lookup could have
   // found a decl, but that decl is outside the current instance method (i.e.
@@ -2393,6 +2489,7 @@ Sema::LookupInObjCMethod(LookupResult &Lookup, Scope *S,
   else
     LookForIvars = (Lookup.isSingleResult() &&
                     Lookup.getFoundDecl()->isDefinedOutsideFunctionOrMethod());
+
   ObjCInterfaceDecl *IFace = nullptr;
   if (LookForIvars) {
     IFace = CurMethod->getClassInterface();
@@ -2417,8 +2514,16 @@ Sema::LookupInObjCMethod(LookupResult &Lookup, Scope *S,
       if (IV->getAccessControl() == ObjCIvarDecl::Private &&
           !declaresSameEntity(ClassDeclared, IFace) &&
           !getLangOpts().DebuggerSupport)
-        Diag(Loc, diag::error_private_ivar_access) << IV->getDeclName();
+         Diag(Loc, diag::error_private_ivar_access) << IV->getDeclName();
 
+       // @mulle-objc@ AAO: In AAO mode ivars are just not available
+      if ( getLangOpts().ObjCAllocsAutoreleasedObjects)
+      {
+         Diag(Loc, diag::error_mulle_aao_ivar_access) << IV->getDeclName();
+         return ExprError();
+      }
+
+       
       // FIXME: This should use a new expr for a direct reference, don't
       // turn this into Self->ivar, just return a BareIVarExpr or something.
       IdentifierInfo &II = Context.Idents.get("self");
@@ -4301,7 +4406,8 @@ Sema::CreateBuiltinArraySubscriptExpr(Expr *Base, SourceLocation LLoc,
 
     // Use custom logic if this should be the pseudo-object subscript
     // expression.
-    if (!LangOpts.isSubscriptPointerArithmetic())
+    // @mulle-objc@ language: turn off array subscripting
+    if (!LangOpts.isSubscriptPointerArithmetic() && ! LangOptions().ObjCRuntime.hasMulleMetaABI())
       return BuildObjCSubscriptExpression(RLoc, BaseExpr, IndexExpr, nullptr,
                                           nullptr);
 

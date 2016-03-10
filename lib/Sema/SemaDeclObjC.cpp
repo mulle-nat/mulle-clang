@@ -318,6 +318,12 @@ void Sema::ActOnStartOfObjCMethodDef(Scope *FnBodyScope, Decl *D) {
 
   PushOnScopeChains(MDecl->getSelfDecl(), FnBodyScope);
   PushOnScopeChains(MDecl->getCmdDecl(), FnBodyScope);
+   // @mulle-objc@ MetaABI: save scope for later retrieval in ActonMethod
+   bool hasMetaABIParam;
+   
+   hasMetaABIParam = getLangOpts().ObjCRuntime.hasMulleMetaABI() && MDecl->getParamDecl();
+   if( hasMetaABIParam)
+      PushOnScopeChains(MDecl->getParamDecl(), FnBodyScope);
 
   // The ObjC parser requires parameter names so there's no need to check.
   CheckParmsForFunctionDef(MDecl->param_begin(), MDecl->param_end(),
@@ -331,8 +337,14 @@ void Sema::ActOnStartOfObjCMethodDef(Scope *FnBodyScope, Decl *D) {
       Diag(Param->getLocation(), diag::warn_arc_strong_pointer_objc_pointer) <<
             Param->getType();
     
-    if (Param->getIdentifier())
-      PushOnScopeChains(Param, FnBodyScope);
+     // @mulle-objc@ MetaABI: Remove Parameters from Scope
+     // (nat) pushing the param identifier on the scope is done here
+     //
+     if( ! hasMetaABIParam)
+     {
+       if (Param->getIdentifier())
+         PushOnScopeChains(Param, FnBodyScope);
+     }
   }
 
   // In ARC, disallow definition of retain/release/autorelease/retainCount
@@ -2710,8 +2722,22 @@ void Sema::MatchAllMethodDeclarations(const SelectorSet &InsMap,
     if (!I->isPropertyAccessor() &&
         !InsMap.count(I->getSelector())) {
       if (ImmediateClass)
+      {
+         // @mulle-objc@ language: remove warnings for unimplemented instance methods like -retain, -release which are always defined
+         if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+         {
+            std::string   s;
+            
+            s = I->getNameAsString();
+            if( s != "release" &&
+                s != "retain")
+               WarnUndefinedMethod(*this, IMPDecl->getLocation(), I, IncompleteImpl,
+                                   diag::warn_undef_method_impl);
+         }
+         else
         WarnUndefinedMethod(*this, IMPDecl->getLocation(), I, IncompleteImpl,
                             diag::warn_undef_method_impl);
+      }
       continue;
     } else {
       ObjCMethodDecl *ImpMethodDecl =
@@ -2736,8 +2762,22 @@ void Sema::MatchAllMethodDeclarations(const SelectorSet &InsMap,
       continue;
     if (!ClsMap.count(I->getSelector())) {
       if (ImmediateClass)
+      {
+         // @mulle-objc@ language: remove warnings for unimplemented class methods like +new, +alloc which are always defined
+         if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+         {
+            std::string   s;
+            
+            s = I->getNameAsString();
+            if( s != "new" &&
+                s != "alloc")
+            WarnUndefinedMethod(*this, IMPDecl->getLocation(), I, IncompleteImpl,
+                                diag::warn_undef_method_impl);
+         }
+         else
         WarnUndefinedMethod(*this, IMPDecl->getLocation(), I, IncompleteImpl,
                             diag::warn_undef_method_impl);
+      }
     } else {
       ObjCMethodDecl *ImpMethodDecl =
         IMPDecl->getClassMethod(I->getSelector());
@@ -4126,6 +4166,148 @@ static void mergeInterfaceMethodToImpl(Sema &S,
   }
 }
 
+//
+// @mulle-objc@ MetaABI: creates a struct from method parameters
+//
+unsigned int   Sema::metaABIDescription( SmallVector<ParmVarDecl*, 16> &Params,
+                                         QualType resultType)
+{
+   unsigned int   desc;
+   
+   desc = resultType->isVoidType() ? 0 : MetaABIVoidPtrRval;
+   if( typeNeedsMetaABIAlloca( resultType))
+      desc = MetaABIRvalAsStruct;
+   
+   switch( Params.size())
+   {
+   case 0 :
+      break;
+   case 1 :
+      if( typeNeedsMetaABIAlloca( Params[ 0]->getType()))
+         desc |= MetaABIParamAsStruct;
+      else
+         desc |= MetaABIVoidPtrParam;
+      break;
+      
+   default :
+      desc |= MetaABIParamAsStruct;
+      break;
+   }
+   return( desc);
+}
+
+
+void   Sema::SetMulleObjCParam( ObjCMethodDecl *ObjCMethod,
+                                Selector Sel,
+                                SmallVector<ParmVarDecl*, 16> *Params,
+                                QualType resultType,
+                                unsigned int abiDesc,
+                                SourceLocation   Loc)
+{
+   StringRef  RecordName;
+   QualType   PtrTy;
+   
+   // - (void *) foo; is ez no parameter or bogus parameter
+   if( abiDesc & MetaABIRvalAsStruct)
+   {
+      // i am lazy and stuff records into records...
+      RecordName = "rval." + Sel.getAsString();
+      IdentifierInfo  *RecordID = &Context.Idents.get( RecordName);
+      
+      RecordDecl  *RD = RecordDecl::Create( Context, TTK_Struct, CurContext, Loc, Loc, RecordID);
+      FieldDecl   *FD;
+      
+      FD = FieldDecl::Create( Context, RD,
+                             Loc, Loc,
+                             &Context.Idents.get("rval"),
+                             resultType,
+                             nullptr,
+                             nullptr,
+                             false,  // Mutable... only for C++
+                             ICIS_NoInit);
+      RD->addDecl( FD);
+      RD->completeDefinition();
+      
+      // some voodoo, blindly copied
+      AddAlignmentAttributesForRecord(RD);
+      AddMsStructLayoutForRecord(RD);
+      ObjCMethod->setRvalRecord( RD);
+   }
+
+   //
+   // this could be trouble, if someone has declared the same method
+   // already ? check this
+   //
+   RecordName = "p." + Sel.getAsString();
+   IdentifierInfo  *RecordID = &Context.Idents.get( RecordName);
+   
+   RecordDecl  *RD = RecordDecl::Create( Context, TTK_Struct, CurContext, Loc, Loc, RecordID);
+   
+   for (unsigned i = 0, e = Params->size(); i != e; ++i)
+   {
+      ParmVarDecl *Param = (*Params)[ i];
+      FieldDecl   *FD;
+      
+      FD = FieldDecl::Create( Context, RD,
+                             Param->getLocation(), Param->getLocEnd(),
+                             Param->getIdentifier(),
+                             Param->getType(),
+                             Param->getTypeSourceInfo(),
+                             Param->getDefaultArg(),
+                             false,  // Mutable... only for C++
+                             ICIS_NoInit);
+      RD->addDecl( FD);
+   }
+   RD->completeDefinition();
+   
+   // some voodoo, blindly copied
+   AddAlignmentAttributesForRecord(RD);
+   AddMsStructLayoutForRecord(RD);
+   
+   ObjCMethod->setParamRecord( RD);
+   
+   // (nat) fake it up, so that every method looks exactly alike
+   //       add our _param implicit decl now.
+   //
+   // convert record to a QualType
+   QualType RecTy = Context.getTagDeclType(RD);
+   PtrTy = Context.getPointerType( RecTy);
+   
+   ImplicitParamDecl  *Param = ImplicitParamDecl::Create(Context,
+                                                         ObjCMethod,
+                                                         Loc,
+                                                         &Context.Idents.get("_param"),
+                                                         PtrTy);
+   
+   ObjCMethod->setParamDecl( Param);
+   // this is implicitly done later in ActOnStartOfObjCMethodDef
+   //      IdResolver.AddDecl(Param);  // this adds it to search scope!
+}
+
+
+// ez to remember for rval:
+// 1. if FP it's in _param,
+// 2. if __alignof__(x) > __alignof__( void *), it's in _param
+// 3. if sizeof(x) >sizeof( void *), it's in _param
+
+bool  Sema::typeNeedsMetaABIAlloca( QualType type)
+{
+   if( Context.getTypeSize( type) > Context.getTypeSize( Context.VoidPtrTy))
+      return( true);
+   // should log this, as this is unusual
+   if( Context.getTypeAlign( type) > Context.getTypeAlign( Context.VoidPtrTy))
+      return( true);
+   if( type->isFloatingType())
+      return( true);
+   if( type->isUnionType())
+      return( true);
+   if( type->isStructureOrClassType())
+      return( true);
+   
+   return( false);
+}
+
+
 Decl *Sema::ActOnMethodDeclaration(
     Scope *S,
     SourceLocation MethodLoc, SourceLocation EndLoc,
@@ -4222,14 +4404,23 @@ Decl *Sema::ActOnMethodDeclaration(
       Diag(Param->getLocation(), diag::err_block_on_nonlocal);
       Param->setInvalidDecl();
     }
-    S->AddDecl(Param);
-    IdResolver.AddDecl(Param);
+     
+     // @mulle-objc@ MetaABI: Remove Parameters from Scope
+     // (nat) This is done before already.... but we don't want it anyway.
+     //       Keep regular parameters outside of the scopes.
+      if( ! getLangOpts().ObjCRuntime.hasMulleMetaABI())
+      {
+         S->AddDecl(Param);
+         // Scope, IdResolver ??
+         IdResolver.AddDecl(Param);
+      }
 
     Params.push_back(Param);
   }
   
   for (unsigned i = 0, e = CNumArgs; i != e; ++i) {
     ParmVarDecl *Param = cast<ParmVarDecl>(CParamInfo[i].Param);
+     // this ArgType code appears to be completely superflous
     QualType ArgType = Param->getType();
     if (ArgType.isNull())
       ArgType = Context.getObjCIdType();
@@ -4242,6 +4433,39 @@ Decl *Sema::ActOnMethodDeclaration(
   }
   
   ObjCMethod->setMethodParams(Context, Params, SelectorLocs);
+
+  // @mulle-objc@ MetaABI: create ParamRecord
+  // the params are what is used for syntax checks and all the
+  // other good stuff.
+  //
+  // The actual ParameterBlock that is used for code generation
+  // is kept separately. For now we assume that there
+  // is alwas a _param block, except if there are no arguments.
+  // If we have only one parameter fitting into a void *,
+  // we also don't need a _param block, but keep the argument as is
+  //
+   if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+   {
+      unsigned int   desc;
+      
+      desc = metaABIDescription( Params, resultDeclType);
+      if( isVariadic)
+         desc |= MetaABIParamAsStruct;
+
+      if( desc == MetaABIVoidPtrParam)
+      {
+         ParmVarDecl *Param = Params[ 0];
+         // reinstitute as regular parameter
+         S->AddDecl(Param);
+         IdResolver.AddDecl(Param);
+         ObjCMethod->setMetaABIVoidPointerParam( true);
+      }
+      else
+         if( desc)
+            SetMulleObjCParam( ObjCMethod, Sel, &Params, resultDeclType, desc, MethodLoc);
+   }
+   // DONE
+   
   ObjCMethod->setObjCDeclQualifier(
     CvtQTToAstBitMask(ReturnQT.getObjCDeclQualifier()));
 

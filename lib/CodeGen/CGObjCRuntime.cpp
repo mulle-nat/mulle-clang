@@ -389,3 +389,35 @@ CGObjCRuntime::getMessageSendInfo(const ObjCMethodDecl *method,
     CGM.getTypes().GetFunctionType(argsInfo)->getPointerTo();
   return MessageSendInfo(argsInfo, signatureType);
 }
+
+//
+// @mulle-objc@ MetaABI: to generate LLVM method argument list
+//   this is done differently in mulle-objc so this little code
+//   snippet is placed into the runtime
+//
+llvm::Value  *CGObjCRuntime::GenerateCallArgs( CodeGenFunction &CGF,
+                                               CallArgList &Args,
+                                               const ObjCMethodDecl *method,
+                                               const ObjCMessageExpr *Expr)
+{
+   CGF.EmitCallArgs( Args, method, Expr->arguments());
+   return( nullptr);
+}
+
+
+CodeGen::RValue  CGObjCRuntime::EmitFastEnumeratorCall( CodeGen::CodeGenFunction &CGF,
+                                                       ReturnValueSlot ReturnSlot,
+                                                       QualType ResultType,
+                                                       Selector Sel,
+                                                       llvm::Value *Receiver,
+                                                       llvm::Value *StatePtr,
+                                                       QualType StateTy,
+                                                       llvm::Value *ItemsPtr,
+                                                       QualType ItemsTy,
+                                                       llvm::Value *Count,
+                                                       QualType CountTy)
+
+{
+   return( RValue::get( Receiver));  // bogus, this code is never used
+}
+

@@ -941,6 +941,15 @@ def err_omp_unknown_map_type_modifier : Error<
 def err_omp_map_type_missing : Error<
   "missing map type">;
 
+// Mulle ObjC support.
+def err_mulle_objc_no_nullable : Error<
+  "nullable is not supported in Mulle ObjC (everything is nullable by default)">;
+def err_mulle_objc_no_package : Error<
+  "@package is not supported in Mulle ObjC">;
+def err_mulle_objc_no_cpp_generics : Error<
+  "C++ like generics are not supported in Mulle ObjC">;
+def err_mulle_objc_no_support_for_property_modifier  : Error<
+  "%0 is not supported in Mulle ObjC">;
 // Pragma loop support.
 def err_pragma_loop_missing_argument : Error<
   "missing argument; expected %select{an integer value|"

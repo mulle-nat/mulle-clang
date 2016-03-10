@@ -315,26 +315,67 @@ CodeGenTypes::arrangeObjCMethodDeclaration(const ObjCMethodDecl *MD) {
   return arrangeObjCMessageSendSignature(MD, MD->getSelfDecl()->getType());
 }
 
+///
 /// Arrange the argument and result information for the function type
 /// through which to perform a send to the given Objective-C method,
 /// using the given receiver type.  The receiver type is not always
 /// the 'self' type of the method or even an Objective-C pointer type.
 /// This is *not* the right method for actually performing such a
 /// message send, due to the possibility of optional arguments.
+///
 const CGFunctionInfo &
 CodeGenTypes::arrangeObjCMessageSendSignature(const ObjCMethodDecl *MD,
                                               QualType receiverType) {
   SmallVector<CanQualType, 16> argTys;
+  CallingConv                  callConv;
+  CanQualType                  returnType;
+  
+  bool IsWindows = getContext().getTargetInfo().getTriple().isOSWindows();
+  
   argTys.push_back(Context.getCanonicalParamType(receiverType));
   argTys.push_back(Context.getCanonicalParamType(Context.getObjCSelType()));
+
+   // @mulle-objc@ MetaABI: Hack ObjCMessageSendSignature 
+   if( Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+   {
+      RecordDecl *RD = MD->getParamRecord();
+      if( RD)
+      {
+         QualType RecTy = Context.getTagDeclType( RD);
+         QualType PtrTy = Context.getPointerType( RecTy);
+   
+         argTys.push_back( Context.getCanonicalParamType( PtrTy));
+      }
+      else
+         if( MD->isMetaABIVoidPointerParam())
+            argTys.push_back( Context.getCanonicalParamType( Context.VoidPtrTy));
+      
+      // fix up calling convention for MD, to be like mulle_objc_object_inline_call
+      // it would be nice to not just use the default, but use the actual one
+      // with which mulle_objc_object_inline_call was declared
+      callConv = Context.getDefaultCallingConvention( false, false);
+      
+      // @mulle-objc@ MetaABI: fix returnType to void * (Part I)
+      if( MD->getReturnType()->isVoidType())
+         returnType = Context.VoidTy;
+      else
+         returnType = Context.VoidPtrTy;
+   }
+   else
+   {
   // FIXME: Kill copy?
-  for (const auto *I : MD->params()) {
-    argTys.push_back(Context.getCanonicalParamType(I->getType()));
-  }
+      for (const auto *I : MD->params()) {
+         argTys.push_back(Context.getCanonicalParamType(I->getType()));
+      }
+      callConv = getCallingConventionForDecl( MD, IsWindows);
+
+      returnType = GetReturnType(MD->getReturnType());
+   }
 
   FunctionType::ExtInfo einfo;
-  bool IsWindows = getContext().getTargetInfo().getTriple().isOSWindows();
-  einfo = einfo.withCallingConv(getCallingConventionForDecl(MD, IsWindows));
+  
+  // @mulle-objc@ MetaABI: message signature: fix call convention
+  einfo = einfo.withCallingConv( callConv);
 
   if (getContext().getLangOpts().ObjCAutoRefCount &&
       MD->hasAttr<NSReturnsRetainedAttr>())
@@ -343,8 +384,9 @@ CodeGenTypes::arrangeObjCMessageSendSignature(const ObjCMethodDecl *MD,
   RequiredArgs required =
     (MD->isVariadic() ? RequiredArgs(argTys.size()) : RequiredArgs::All);
 
+  // @mulle-objc@ MetaABI: fix returnType to void * (Part II)
   return arrangeLLVMFunctionInfo(
-      GetReturnType(MD->getReturnType()), /*instanceMethod=*/false,
+      returnType, /*instanceMethod=*/false,
       /*chainCall=*/false, argTys, einfo, required);
 }
 
@@ -1947,6 +1989,17 @@ void CodeGenFunction::EmitFunctionProlog(const CGFunctionInfo &FI,
         auto AI = FnArgs[FirstIRArg];
         llvm::Value *V = AI;
 
+         // @mulle-objc@ language: make implicit nonnullable in llvm if so desired
+         if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+         {
+            if (const ImplicitParamDecl *IPD = dyn_cast<ImplicitParamDecl>(Arg)) {
+               if (IPD->getAttr<NonNullAttr>())
+                  AI->addAttr(llvm::AttributeSet::get(getLLVMContext(),
+                                                      AI->getArgNo() + 1,
+                                                      llvm::Attribute::NonNull));
+            }
+         }
+       
         if (const ParmVarDecl *PVD = dyn_cast<ParmVarDecl>(Arg)) {
           if (getNonNullAttr(CurCodeDecl, PVD, PVD->getType(),
                              PVD->getFunctionScopeIndex()))
@@ -2017,7 +2070,6 @@ void CodeGenFunction::EmitFunctionProlog(const CGFunctionInfo &FI,
         // Ensure the argument is the correct type.
         if (V->getType() != ArgI.getCoerceToType())
           V = Builder.CreateBitCast(V, ArgI.getCoerceToType());
-
         if (isPromoted)
           V = emitArgumentDemotion(*this, Arg, V);
 
@@ -2034,8 +2086,27 @@ void CodeGenFunction::EmitFunctionProlog(const CGFunctionInfo &FI,
         // in here, add a cast to the argument type.
         llvm::Type *LTy = ConvertType(Arg->getType());
         if (V->getType() != LTy)
-          V = Builder.CreateBitCast(V, LTy);
-
+        {
+            // @mulle-objc@ MetaABI: function argument _param, cast from void pointer to uintptr_t (methods only)
+            if( CGM.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+            {
+               if( dyn_cast_or_null<ObjCMethodDecl>(CurCodeDecl))
+               {
+                  if( AI->getArgNo() == 2) // after _cmd
+                  {
+                     // got to be but check anyway, cast it to long
+                     if( V->getType()->isPointerTy() && Arg->getType()->isIntegerType())
+                     {
+                        V = Builder.CreatePtrToInt( V, ConvertType( getContext().getUIntPtrType()));
+                        V = Builder.CreateIntCast( V, LTy, true);
+                     }
+                  }
+               }
+            }
+           
+            // @mulle-objc@ MetaABI: lost this bitcast last time in the merge
+            V = Builder.CreateBitCast(V, LTy);
+        }
         ArgVals.push_back(ParamValue::forDirect(V));
         break;
       }
@@ -3334,6 +3405,23 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
         else
           V = Builder.CreateLoad(RV.getAggregateAddress());
 
+         // @mulle-objc@ MetaABI: function call argument, cast into void *, if dst is objc method (or NULL)
+	if( ArgNo == 2 && CGM.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+	{
+            const ObjCMethodDecl *MD = dyn_cast_or_null<ObjCMethodDecl>( CalleeInfo.getCalleeDecl());
+            
+            if( ! CalleeInfo.getCalleeDecl() || (MD && ! MD->getParamDecl()))
+	    {
+               // promote all non pointers to long and make them pointers
+	       if( ! V->getType()->isPointerTy())
+	       {
+                  // is this right ?
+                  V = Builder.CreateSExt( V, ConvertType( getContext().LongTy));
+	          V = Builder.CreateIntToPtr( V, ArgInfo.getCoerceToType());
+	       }
+	    }
+	}
+	
         // We might have to widen integers, but we should never truncate.
         if (ArgInfo.getCoerceToType() != V->getType() &&
             V->getType()->isIntegerTy())

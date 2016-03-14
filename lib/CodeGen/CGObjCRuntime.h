@@ -59,6 +59,11 @@ namespace CodeGen {
 
 // FIXME: Several methods should be pure virtual but aren't to avoid the
 // partially-implemented subclass breaking.
+struct CGObjCRuntimeLifetimeMarker
+{
+   llvm::Value  *SizeV;
+   llvm::Value  *Addr;
+};
 
 /// Implements runtime-specific code generation functions.
 class CGObjCRuntime {
@@ -170,10 +175,10 @@ public:
                       const ObjCMethodDecl *Method = nullptr) = 0;
 
    // @mulle-objc@ MetaABI: Callback to generate LLVM method argument list 
-   virtual llvm::Value   *GenerateCallArgs( CodeGenFunction &CGF,
-                                            CallArgList &Args,
-                                            const ObjCMethodDecl *method,
-                                            const ObjCMessageExpr *Expr);
+   virtual CGObjCRuntimeLifetimeMarker   GenerateCallArgs( CodeGenFunction &CGF,
+                                                           CallArgList &Args,
+                                                           const ObjCMethodDecl *method,
+                                                           const ObjCMessageExpr *Expr);
 
   /// @mulle-objc@ MetaABI: callback in special cases to create param decl
    virtual CodeGen::RValue  EmitFastEnumeratorCall( CodeGen::CodeGenFunction &CGF,

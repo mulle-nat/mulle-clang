@@ -1262,10 +1262,10 @@ namespace {
                                                      RecordDecl *RD,
                                                      llvm::ArrayRef<const Expr*> &Exprs);
       
-      llvm::Value  *GenerateCallArgs( CodeGenFunction &CGF,
-                                      CallArgList &Args,
-                                      const ObjCMethodDecl *method,
-                                      const ObjCMessageExpr *Expr) override;
+      CGObjCRuntimeLifetimeMarker   GenerateCallArgs( CodeGenFunction &CGF,
+                                                      CallArgList &Args,
+                                                      const ObjCMethodDecl *method,
+                                                      const ObjCMessageExpr *Expr) override;
       QualType   CreateVoid5PtrTy( void);
       LValue     GenerateAllocaedUnion( CodeGenFunction &CGF,
                                         RecordDecl *UD);
@@ -2852,13 +2852,17 @@ LValue  CGObjCMulleRuntime::GenerateAllocaedUnion( CodeGenFunction &CGF,
 }
 
 
-llvm::Value  *CGObjCMulleRuntime::GenerateCallArgs( CodeGenFunction &CGF,
-                                               CallArgList &Args,
-                                               const ObjCMethodDecl *method,
-                                               const ObjCMessageExpr *Expr)
+CGObjCRuntimeLifetimeMarker  CGObjCMulleRuntime::GenerateCallArgs( CodeGenFunction &CGF,
+                                                                   CallArgList &Args,
+                                                                   const ObjCMethodDecl *method,
+                                                                   const ObjCMessageExpr *Expr)
 {
    RecordDecl   *RD;
    RecordDecl   *RV;
+   CGObjCRuntimeLifetimeMarker  Marker;
+   
+   Marker.SizeV = nullptr;
+   Marker.Addr  = nullptr;
    
    // Initialize the captured struct.
    RD = NULL;
@@ -2901,7 +2905,7 @@ llvm::Value  *CGObjCMulleRuntime::GenerateCallArgs( CodeGenFunction &CGF,
          }
          CGF.EmitCallArg( Args, Arg, CGM.getContext().VoidPtrTy);
       }
-      return( nullptr);
+      return( Marker);
    }
    
 
@@ -2915,7 +2919,8 @@ llvm::Value  *CGObjCMulleRuntime::GenerateCallArgs( CodeGenFunction &CGF,
    // specify beginning of life for this alloca
    // do this always, so that the optimizer can get rid of it
    //
-   llvm::Value  *emitMarker = CGF.EmitLifetimeStart( get_size_of_type( &CGM, Union.getType()), Union.getPointer());
+   Marker.Addr  = Union.getPointer();
+   Marker.SizeV = CGF.EmitLifetimeStart( get_size_of_type( &CGM, Union.getType()), Marker.Addr);
 
    // now get record out of union again
    LValue Record = CGF.EmitLValueForField( Union, *UD->field_begin());
@@ -3006,11 +3011,14 @@ llvm::Value  *CGObjCMulleRuntime::GenerateCallArgs( CodeGenFunction &CGF,
                                       false);
                
                // dont need the alloca anymore
-               if( emitMarker)
-                  CGF.EmitLifetimeEnd( emitMarker, Union.getPointer());
+               if( Marker.SizeV)
+               {
+                  CGF.EmitLifetimeEnd( Marker.SizeV, Marker.Addr);
+                  Marker.SizeV = nullptr;
+               }
                
                Args.add( loaded, CGM.getContext().VoidPtrTy);
-               return( nullptr);
+               return( Marker);
             }
          }
       }
@@ -3019,7 +3027,7 @@ llvm::Value  *CGObjCMulleRuntime::GenerateCallArgs( CodeGenFunction &CGF,
 skip:
    // we are always pushing a void through mulle_objc_calls
    Args.add( RValue::get( Record.getPointer()), CGM.getContext().VoidPtrTy);
-   return( emitMarker);
+   return( Marker);
 }
 
 #pragma mark -

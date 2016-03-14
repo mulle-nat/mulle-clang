@@ -434,9 +434,9 @@ RValue CodeGenFunction::EmitObjCMessageExpr(const ObjCMessageExpr *E,
   // take arguments, push it into one big struct
   // Emit this argument
   //
-  llvm::Value   *alloca;
+  CGObjCRuntimeLifetimeMarker   Marker;
    
-  alloca = Runtime.GenerateCallArgs( *this, Args, method, E);
+  Marker = Runtime.GenerateCallArgs( *this, Args, method, E);
 
   // For delegate init calls in ARC, do an unsafe store of null into
   // self.  This represents the call taking direct ownership of that
@@ -494,15 +494,8 @@ RValue CodeGenFunction::EmitObjCMessageExpr(const ObjCMessageExpr *E,
   // @mulle-objc@ MetaABI: tell optimizer the lifetime is done for this alloca
   // non-mulle runtimes will NULL here
   //
-  if( alloca)
-  {
-     llvm::Type  *type  = alloca->getType();
-     unsigned     size  = CGM.getDataLayout().getTypeAllocSize( type);
-     llvm::Value *SizeV = llvm::ConstantInt::get(Int64Ty, size);
-   
-     EmitLifetimeEnd( SizeV, alloca);
-     delete alloca;  // <<<--- very unclang like, check this
-  }
+  if( Marker.SizeV)  // leaks probably, coz alloced
+     EmitLifetimeEnd( Marker.SizeV, Marker.Addr);
   
   return AdjustObjCObjectType(*this, E->getType(), result);
 }

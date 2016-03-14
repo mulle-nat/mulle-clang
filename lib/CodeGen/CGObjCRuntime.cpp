@@ -395,13 +395,17 @@ CGObjCRuntime::getMessageSendInfo(const ObjCMethodDecl *method,
 //   this is done differently in mulle-objc so this little code
 //   snippet is placed into the runtime
 //
-llvm::Value  *CGObjCRuntime::GenerateCallArgs( CodeGenFunction &CGF,
-                                               CallArgList &Args,
-                                               const ObjCMethodDecl *method,
-                                               const ObjCMessageExpr *Expr)
+CGObjCRuntimeLifetimeMarker   CGObjCRuntime::GenerateCallArgs( CodeGenFunction &CGF,
+                                                               CallArgList &Args,
+                                                               const ObjCMethodDecl *method,
+                                                               const ObjCMessageExpr *Expr)
 {
+   CGObjCRuntimeLifetimeMarker  Marker;
    CGF.EmitCallArgs( Args, method, Expr->arguments());
-   return( nullptr);
+   
+   Marker.SizeV = nullptr;
+   Marker.Addr  = nullptr;
+   return( Marker);
 }
 
 

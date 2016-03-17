@@ -3188,13 +3188,13 @@ ExprResult Sema::ActOnInstanceMessage(Scope *S,
   if (Sel == RespondsToSelectorSel)
     RemoveSelectorFromWarningCache(*this, Args[0]);
 
-   // @mulle-objc@ runtime: Check that mulle_objc_object_inline_call is defined
+   // @mulle-objc@ runtime: Check that mulle_objc_object_call is defined
   // (nat) check now that method dispatcher function is enabled
   // if we do this during code generation, it's too late. We don't have the
   // lookup and error facilities easily available
    if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
    {
-      if( ! CheckMulleObjCFunctionDefined( S, LBracLoc, (char *) "mulle_objc_object_inline_call"))
+      if( ! CheckMulleObjCFunctionDefined( S, LBracLoc, (char *) "mulle_objc_object_call"))
          return ExprError();
    }
   

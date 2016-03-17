@@ -79,7 +79,7 @@ namespace {
       // The types of these functions don't really matter because we
       // should always bitcast before calling them. (??)
       
-      /// id mulle_objc_object_inline_call (id, SEL, void *)
+      /// id mulle_objc_object_call (id, SEL, void *)
       ///
       /// The messenger, used for all message sends, except super calls
       /// might need another one, when params is null..
@@ -91,10 +91,10 @@ namespace {
          // be called a lot.
          switch( optLevel)
          {
-         default : name = "mulle_objc_object_inline_call"; break;
-         case 1  : name = "mulle_objc_object_call"; break;
+         default : name = "mulle_objc_object_inline_constant_selector_call"; break;
+         case 1  : name = "mulle_objc_object_constant_selector_call"; break;
          case -1 :
-         case 0  : name = "mulle_objc_object_no_inline_call"; break;
+         case 0  : name = "mulle_objc_object_call"; break;
          }
 
          llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy, ParamsPtrTy };
@@ -116,10 +116,10 @@ namespace {
          // be called a lot.
          switch( optLevel)
          {
-         default : name = "mulle_objc_object_inline_call"; break;
-         case 1  : name = "mulle_objc_object_call"; break;
+         default : name = "mulle_objc_object_inline_constant_selector_call"; break;
+         case 1  : name = "mulle_objc_object_constant_selector_call"; break;
          case -1 :
-         case 0  : name = "mulle_objc_object_no_inline_call"; break;
+         case 0  : name = "mulle_objc_object_call"; break;
          }
 
          llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy };
@@ -137,20 +137,6 @@ namespace {
       
       
 
-      llvm::Constant *getMessageSendAllocFn() const {
-         llvm::Type *params[] = { ObjectPtrTy };
-         return CGM.CreateRuntimeFunction(llvm::FunctionType::get( ObjectPtrTy,
-                                                                  params, false),
-                                          "mulle_objc_class_alloc_instance");
-      }
-
-      llvm::Constant *getMessageSendNewFn() const {
-         llvm::Type *params[] = { ObjectPtrTy };
-         return CGM.CreateRuntimeFunction(llvm::FunctionType::get( ObjectPtrTy,
-                                                                  params, false),
-                                          "mulle_objc_class_new_instance");
-      }
-      
       llvm::Constant *getMessageSendRetainFn() const {
          llvm::Type *params[] = { ObjectPtrTy };
          return CGM.CreateRuntimeFunction(llvm::FunctionType::get( ObjectPtrTy,

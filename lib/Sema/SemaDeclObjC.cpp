@@ -4434,6 +4434,26 @@ Decl *Sema::ActOnMethodDeclaration(
   
   ObjCMethod->setMethodParams(Context, Params, SelectorLocs);
 
+  // @mulle-objc@ AAO: check that family is compatible
+  // the params are what is used for syntax checks and all the
+  // other good stuff.
+  if( getLangOpts().ObjCAllocsAutoreleasedObjects)
+  {
+     switch( Sel.getMethodFamily())
+     {
+     case ObjCMethodFamily::OMF_alloc       :
+     case ObjCMethodFamily::OMF_new         :
+     case ObjCMethodFamily::OMF_copy        :
+     case ObjCMethodFamily::OMF_mutableCopy :
+     case ObjCMethodFamily::OMF_autorelease :
+     case ObjCMethodFamily::OMF_release     :
+     case ObjCMethodFamily::OMF_retain      :
+     case ObjCMethodFamily::OMF_retainCount :
+         Diag(ObjCMethod->getLocation(), diag::err_mulle_aao_unsupported_method_family)
+            << ObjCMethod->getDeclName();
+     }
+  }
+
   // @mulle-objc@ MetaABI: create ParamRecord
   // the params are what is used for syntax checks and all the
   // other good stuff.

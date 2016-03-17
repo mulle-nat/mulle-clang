@@ -4285,13 +4285,20 @@ llvm::Constant *CGObjCMulleRuntime::GetMethodConstant(const ObjCMethodDecl *MD) 
    if (!Fn)
       return nullptr;
    
+   int   bits;
+   
+   // every method remembers if it's been written in aaomode
+   bits  = CGM.getLangOpts().ObjCAllocsAutoreleasedObjects ? 0x4 : 0x0;
+   // also remember method family (nice for checking if it's init or something)
+   bits |= MD->getMethodFamily() << 16;
+   
    llvm::Constant *Method[] = {
       llvm::ConstantExpr::getBitCast( HashSelConstantForString( MD->getSelector().getAsString()),
                                        ObjCTypes.SelectorIDTy),
       llvm::ConstantExpr::getBitCast(GetMethodVarName(MD->getSelector()),
                                      ObjCTypes.Int8PtrTy),
       GetMethodVarType(MD),
-      llvm::ConstantInt::get(ObjCTypes.IntTy, 0),
+      llvm::ConstantInt::get(ObjCTypes.IntTy, bits),
       
       llvm::ConstantExpr::getBitCast(Fn, ObjCTypes.Int8PtrTy)
    };
@@ -4444,26 +4451,30 @@ llvm::Constant *CGObjCMulleRuntime::EmitLoadInfoList(Twine Name,
                                                      llvm::Constant *HashNameList)
 {
    llvm::Constant   *Values[8];
-
+   
    if( ! runtime_version)
       llvm_unreachable( "Missing runtime header in compilation, can not emit loadinfo");
    
    //
    // should get these values from the header
    //
-   Values[0] = llvm::ConstantInt::get(ObjCTypes.IntTy, runtime_version);        // major, minor, patch version
+   Values[0] = llvm::ConstantInt::get(ObjCTypes.IntTy, runtime_version);     // major, minor, patch version
    Values[1] = llvm::ConstantInt::get(ObjCTypes.IntTy, foundation_version);  // foundation
-   Values[2] = llvm::ConstantInt::get(ObjCTypes.IntTy, user_version);  // foundation
+   Values[2] = llvm::ConstantInt::get(ObjCTypes.IntTy, user_version);        // user
  
    unsigned int   optLevel;
    
    optLevel  = CGM.getLangOpts().OptimizeSize ? -1 : CGM.getCodeGenOpts().OptimizationLevel;
    optLevel &= 0x7;
    
+   unsigned int   aaomode;
+   
+   aaomode   = CGM.getLangOpts().ObjCAllocsAutoreleasedObjects;
+   
    //
-   // memorize optLevel too, might come in useful
+   // memorize aoomodea nd optLevel too, might come in useful
    //
-   Values[3] = llvm::ConstantInt::get(ObjCTypes.IntTy, (optLevel << 2) | 1);     // bits, 1 == sorted
+   Values[3] = llvm::ConstantInt::get(ObjCTypes.IntTy, (optLevel << 16) | (aaomode << 1) | 1);     // bits, 1 == sorted
    Values[4] = ClassList;
    Values[5] = CategoryList;
    Values[6] = StringList;

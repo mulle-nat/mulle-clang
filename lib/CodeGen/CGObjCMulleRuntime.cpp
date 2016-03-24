@@ -151,13 +151,6 @@ namespace {
                                           "mulle_objc_object_release");
       }
       
-      llvm::Constant *getMessageSendAutoreleaseFn() const {
-         llvm::Type *params[] = { ObjectPtrTy };
-         return CGM.CreateRuntimeFunction(llvm::FunctionType::get( ObjectPtrTy,
-                                                                  params, false),
-                                          "mulle_objc_object_autorelease");
-      }
-
       // improve legacy code to basically a no-op
       llvm::Constant *getMessageSendZoneFn() const {
          llvm::Type *params[] = { ObjectPtrTy };
@@ -1932,37 +1925,39 @@ CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction
    nArgs         = CallArgs.size();
    if( ! nArgs)
    {
-      selName  = Sel.getAsString();
-      do
+      int optLevel = CGM.getLangOpts().OptimizeSize ? -1 : CGM.getCodeGenOpts().OptimizationLevel;
+
+      //
+      // use shortcuts when optimizing O2 and up
+      //
+      if( optLevel >= 2)
       {
-         if( selName == "autorelease")
+         selName = Sel.getAsString();
+         do
          {
-            Fn            = ObjCTypes.getMessageSendAutoreleaseFn();
-            TmpResultType = CGF.getContext().getObjCInstanceType();
-            break;
+            if( selName == "release")
+            {
+               Fn            = ObjCTypes.getMessageSendReleaseFn();
+               TmpResultType = CGF.getContext().VoidTy;
+               break;
+            }
+            if( selName == "retain")
+            {
+               Fn            = ObjCTypes.getMessageSendRetainFn();
+               TmpResultType = CGF.getContext().getObjCInstanceType();
+               break;
+            }
+            
+            /* could just make this a nullptr */
+            if( selName == "zone")
+            {
+               Fn            = ObjCTypes.getMessageSendZoneFn();
+               TmpResultType = CGF.getContext().VoidPtrTy;
+               break;
+            }
          }
-         if( selName == "release")
-         {
-            Fn            = ObjCTypes.getMessageSendReleaseFn();
-            TmpResultType = CGF.getContext().VoidTy;
-            break;
-         }
-         if( selName == "retain")
-         {
-            Fn            = ObjCTypes.getMessageSendRetainFn();
-            TmpResultType = CGF.getContext().getObjCInstanceType();
-            break;
-         }
-         
-         /* could just make this a nullptr */
-         if( selName == "zone")
-         {
-            Fn            = ObjCTypes.getMessageSendZoneFn();
-            TmpResultType = CGF.getContext().VoidPtrTy;
-            break;
-         }
+         while( 0);
       }
-      while( 0);
    }
    
    if( Fn == nullptr)  // regular method send call

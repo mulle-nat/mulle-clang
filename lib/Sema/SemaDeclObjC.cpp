@@ -4204,8 +4204,8 @@ void   Sema::SetMulleObjCParam( ObjCMethodDecl *ObjCMethod,
                                 unsigned int abiDesc,
                                 SourceLocation   Loc)
 {
-   StringRef  RecordName;
-   QualType   PtrTy;
+   std::string  RecordName;
+   QualType     PtrTy;
    
    // - (void *) foo; is ez no parameter or bogus parameter
    if( abiDesc & MetaABIRvalAsStruct)

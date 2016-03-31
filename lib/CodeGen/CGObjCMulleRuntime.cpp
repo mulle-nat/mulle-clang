@@ -219,8 +219,7 @@ namespace {
       llvm::Type *StaticStringListTy;
       llvm::Type *HashNameListTy;
       llvm::Type *LoadInfoTy;
-      
-      llvm::Type *Array5ObjectPtrTy;
+     
       
    private:
       /// ProtocolPtrTy - LLVM type for external protocol handles
@@ -565,9 +564,6 @@ namespace {
       llvm::Type *MethodListTy;
       /// MethodListPtrTy - LLVM type for struct objc_method_list *.
       llvm::Type *MethodListPtrTy;
-      /// Array5ObjectPtrTy - LLVM type for void *array[ 5], which is used for
-      /// rounding.
-      llvm::Type *Array5ObjectPtrTy;
       
       /// ExceptionDataTy - LLVM type for struct _objc_exception_data.
       private:  // @mulle-objc@ need to keep this lazy
@@ -1458,6 +1454,8 @@ ObjCTypes(cgm) {
    memset( fastclassids, 0, sizeof( fastclassids));
    fastclassids_defined = false;
    _trace_fastids = true;  // need compiler flag
+   
+   NSConstantStringType = nullptr;
    
    EmitImageInfo();
 }
@@ -6555,6 +6553,8 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
                             llvm::PointerType::getUnqual( ClassListTy),
                             llvm::PointerType::getUnqual( CategoryListTy),
                             nullptr);
+   
+   ExceptionDataTy = nullptr; // later on demand
 }
 
 

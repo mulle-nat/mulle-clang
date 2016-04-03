@@ -1199,7 +1199,13 @@ CodeGenFunction::generateObjCGetterBody(const ObjCImplementationDecl *classImpl,
         RV.getScalarVal(),
         getTypes().ConvertType(getterMethod->getReturnType())));
 
-    EmitReturnOfRValue(RV, propType);
+      // @mulle-objc@ MetaABI: need proper casting for property return value
+      if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+      {
+         EmitMetaABIWriteScalarReturnValue( getterMethod, RV.getScalarVal(), propType);
+         return;
+      }
+      EmitReturnOfRValue(RV, propType);
 
     // objc_getProperty does an autorelease, so we should suppress ours.
     AutoreleaseResult = false;

@@ -277,9 +277,6 @@ namespace {
          return( fn);
       }
       
-      /*
-       * Properties will be supported sometime
-       */
       llvm::Constant *getGetPropertyFn() {
          CodeGen::CodeGenTypes &Types = CGM.getTypes();
          ASTContext &Ctx = CGM.getContext();
@@ -296,7 +293,7 @@ namespace {
          Types.GetFunctionType(Types.arrangeLLVMFunctionInfo(
                                                              IdType, false, false, Params, FunctionType::ExtInfo(),
                                                              RequiredArgs::All));
-         return CGM.CreateRuntimeFunction(FTy, "mulle_objc_object_get_property");
+         return CGM.CreateRuntimeFunction(FTy, "mulle_objc_object_get_property_value");
       }
       
       llvm::Constant *getSetPropertyFn() {
@@ -316,9 +313,10 @@ namespace {
          Types.GetFunctionType(Types.arrangeLLVMFunctionInfo(
                                                              Ctx.VoidTy, false, false, Params, FunctionType::ExtInfo(),
                                                              RequiredArgs::All));
-         return CGM.CreateRuntimeFunction(FTy, "mulle_objc_object_set_object_property");
+         return CGM.CreateRuntimeFunction(FTy, "mulle_objc_object_set_property_value");
       }
       
+      // this is not really used
       llvm::Constant *getOptimizedSetPropertyFn(bool atomic, bool copy) {
          CodeGen::CodeGenTypes &Types = CGM.getTypes();
          ASTContext &Ctx = CGM.getContext();

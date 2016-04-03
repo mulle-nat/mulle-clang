@@ -1151,6 +1151,8 @@ Decl *Sema::ActOnPropertyImplDecl(Scope *S,
       }
     }
 
+    // @mulle-objc@ next check is meaningless in MulleObjC 
+    if( ! Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
     if (AtLoc.isInvalid()) {
       // Check when default synthesizing a property that there is 
       // an ivar matching property name and issue warning; since this

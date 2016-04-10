@@ -2445,7 +2445,7 @@ ExprResult Sema::BuildClassMessage(TypeSourceInfo *ReceiverTypeInfo,
     }
   }
   
-  // @mulle-objc@ AAO: check class selectors
+  // @mulle-objc@ AAM:  check class selectors
   if( getLangOpts().ObjCAllocsAutoreleasedObjects)
   {
      CheckSelectorForAAOmode( Sel, Method, ReceiverType, SelLoc, ReceiverTypeInfo->getTypeLoc().getSourceRange());
@@ -2521,7 +2521,7 @@ static bool  hasEnding (std::string const &fullString, std::string const &ending
 }
 
 
-// @mulle-objc@ AAO: check that selectors conform
+// @mulle-objc@ AAM:  check that selectors conform
 int   Sema::CheckSelectorForAAOmode( Selector Sel,
                                      ObjCMethodDecl *Method,
                                      QualType ReceiverType,
@@ -3040,7 +3040,7 @@ ExprResult Sema::BuildInstanceMessage(Expr *Receiver,
     }
   }
    
-  // @mulle-objc@ AAO: check that selectors conform
+  // @mulle-objc@ AAM:  check that selectors conform
   // Similiar but just not the same as ARC, since this is an instance method
   // we shouldn't check the whole range of selectors, but we do anyway...
    

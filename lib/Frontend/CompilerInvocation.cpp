@@ -1148,8 +1148,8 @@ static InputKind ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       .Case("cuda", IK_CUDA)
       .Case("c++", IK_CXX)
       .Case("objective-c", IK_ObjC)
-      // @mulle-objc@ AAO: .aam filename extension support
-      .Case("objective-c-aao", IK_ObjCAAO)
+      // @mulle-objc@ AAM:  .aam filename extension support
+      .Case("objective-c-aam", IK_ObjCAAM)
       .Case("objective-c++", IK_ObjCXX)
       .Case("cpp-output", IK_PreprocessedC)
       .Case("assembler-with-cpp", IK_Asm)
@@ -1326,8 +1326,8 @@ void CompilerInvocation::setLangDefaults(LangOptions &Opts, InputKind IK,
 
   }
 
-   // @mulle-objc@ AAO: .aam filename extension support
-  if( IK == IK_ObjCAAO)
+   // @mulle-objc@ AAM:  .aam filename extension support
+  if( IK == IK_ObjCAAM)
   {
      Opts.ObjCAllocsAutoreleasedObjects = 1;
      Opts.ObjC1 = Opts.ObjC2 = 1;
@@ -1351,8 +1351,8 @@ void CompilerInvocation::setLangDefaults(LangOptions &Opts, InputKind IK,
     case IK_C:
     case IK_PreprocessedC:
     case IK_ObjC:
-    // @mulle-objc@ AAO: .aam filename extension support
-    case IK_ObjCAAO:
+    // @mulle-objc@ AAM:  .aam filename extension support
+    case IK_ObjCAAM:
     case IK_PreprocessedObjC:
       LangStd = LangStandard::lang_gnu11;
       break;
@@ -1455,9 +1455,9 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
       const LangStandard &Std = LangStandard::getLangStandardForKind(LangStd);
       switch (IK) {
       case IK_C:
-      // @mulle-objc@ AAO: .aam filename extension support
+      // @mulle-objc@ AAM:  .aam filename extension support
       case IK_ObjC:
-      case IK_ObjCAAO:
+      case IK_ObjCAAM:
       case IK_PreprocessedC:
       case IK_PreprocessedObjC:
         if (!(Std.isC89() || Std.isC99()))

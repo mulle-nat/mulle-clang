@@ -97,8 +97,8 @@ bool types::isAcceptedByClang(ID Id) {
   case TY_ObjCXXHeader: case TY_PP_ObjCXXHeader:
   case TY_AST: case TY_ModuleFile:
   case TY_LLVM_IR: case TY_LLVM_BC:
-  // @mulle-objc@ AAO: .aam filename extension support
-  case TY_ObjCAAO:
+  // @mulle-objc@ AAM:  .aam filename extension support
+  case TY_ObjCAAM:
         return true;
   }
 }
@@ -112,8 +112,8 @@ bool types::isObjC(ID Id) {
   case TY_ObjCXX: case TY_PP_ObjCXX:
   case TY_ObjCHeader: case TY_PP_ObjCHeader:
   case TY_ObjCXXHeader: case TY_PP_ObjCXXHeader: case TY_PP_ObjCXX_Alias:
-  // @mulle-objc@ AAO: .aam filename extension support
-  case TY_ObjCAAO:
+  // @mulle-objc@ AAM:  .aam filename extension support
+  case TY_ObjCAAM:
         return true;
   }
 }
@@ -161,9 +161,9 @@ types::ID types::lookupTypeForExtension(const char *Ext) {
   return llvm::StringSwitch<types::ID>(Ext)
            .Case("c", TY_C)
            .Case("i", TY_PP_C)
-           // @mulle-objc@ AAO: .aam filename extension support
+           // @mulle-objc@ AAM:  .aam filename extension support
            .Case("m", TY_ObjC)
-           .Case("aam", TY_ObjCAAO)
+           .Case("aam", TY_ObjCAAM)
            .Case("M", TY_ObjCXX)
            .Case("h", TY_CHeader)
            .Case("C", TY_CXX)

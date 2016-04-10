@@ -2516,7 +2516,7 @@ Sema::LookupInObjCMethod(LookupResult &Lookup, Scope *S, CXXScopeSpec &SS,
           !getLangOpts().DebuggerSupport)
          Diag(Loc, diag::error_private_ivar_access) << IV->getDeclName();
 
-       // @mulle-objc@ AAO: In AAO mode ivars are just not available
+       // @mulle-objc@ AAM:  In AAM ivars are just not available
       if ( getLangOpts().ObjCAllocsAutoreleasedObjects)
       {
          Diag(Loc, diag::error_mulle_aao_ivar_access) << IV->getDeclName();

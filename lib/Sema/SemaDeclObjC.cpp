@@ -4434,7 +4434,7 @@ Decl *Sema::ActOnMethodDeclaration(
   
   ObjCMethod->setMethodParams(Context, Params, SelectorLocs);
 
-  // @mulle-objc@ AAO: check that family is compatible
+  // @mulle-objc@ AAM:  check that family is compatible
   // the params are what is used for syntax checks and all the
   // other good stuff.
   if( getLangOpts().ObjCAllocsAutoreleasedObjects)

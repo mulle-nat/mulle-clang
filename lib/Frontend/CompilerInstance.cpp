@@ -876,9 +876,9 @@ static InputKind getSourceInputKindFromOptions(const LangOptions &LangOpts) {
     return IK_OpenCL;
   if (LangOpts.CUDA)
     return IK_CUDA;
-  // @mulle-objc@ AAO: .aam filename extension support
+  // @mulle-objc@ AAM:  .aam filename extension support
   if (LangOpts.ObjC1)
-     return LangOpts.CPlusPlus? IK_ObjCXX : (LangOpts.ObjCAllocsAutoreleasedObjects ? IK_ObjCAAO : IK_ObjC);
+     return LangOpts.CPlusPlus? IK_ObjCXX : (LangOpts.ObjCAllocsAutoreleasedObjects ? IK_ObjCAAM : IK_ObjC);
   return LangOpts.CPlusPlus? IK_CXX : IK_C;
 }
 

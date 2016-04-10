@@ -7515,7 +7515,7 @@ public:
                                        SourceLocation Loc,
                                        StringRef Name);
 
-  // @mulle-objc@ AAO: check that selectors conform
+  // @mulle-objc@ AAM:  check that selectors conform
   int   CheckSelectorForAAOmode( Selector Sel,
                                  ObjCMethodDecl *Method,
                                  QualType ReceiverType,

@@ -208,9 +208,9 @@ def warn_mt_message : Warning<"[rewriter] %0">;
 def note_mt_message : Note<"[rewriter] %0">;
 
 
-// @mulle-objc@ AAO: warn when renaming selectors
+// @mulle-objc@ AAM:  warn when renaming selectors
 def warn_mulle_aao_rename_selector : Warning<
-"in AAO mode method calls to '%0' are actually calls to '%1'">,
+"in AAM method calls to '%0' are actually calls to '%1'">,
 InGroup<AAORenaming>;
 
 

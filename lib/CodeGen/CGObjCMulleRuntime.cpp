@@ -1451,7 +1451,7 @@ ObjCTypes(cgm) {
 
    memset( fastclassids, 0, sizeof( fastclassids));
    fastclassids_defined = false;
-   _trace_fastids = true;  // need compiler flag
+   _trace_fastids = getenv( "MULLE_CLANG_TRACE_FASTCLASS") ? 1 : 0;  // need compiler flag
    
    NSConstantStringType = nullptr;
    
@@ -2630,17 +2630,22 @@ RecordDecl  *CGObjCMulleRuntime::CreateOnTheFlyRecordDecl( const ObjCMessageExpr
 
    for (unsigned i = 0, e = Expr->getNumArgs(); i != e; ++i)
    {
-      FieldDecl   *FD;
-   
+      FieldDecl         *FD;
+      const Expr::Expr  *arg;
+      
       sprintf( buf, "param_%d", i);
       FieldName = buf;
-
+      
+      // use expression type, but probably should promote...
+      
+      arg = Expr->getArg( i);
+      
       IdentifierInfo  *FieldID = &Context->Idents.get( FieldName);
       FD = FieldDecl::Create(  *Context, RD,
                                SourceLocation(), SourceLocation(),
                                FieldID,
-                               Context->ObjCBuiltinIdTy,
-                               Context->CreateTypeSourceInfo( Context->ObjCBuiltinIdTy, 0),
+                               arg->getType(),
+                               Context->CreateTypeSourceInfo( arg->getType(), 0),
                                NULL,
                                false,  // Mutable... only for C++
                                ICIS_NoInit);
@@ -2856,6 +2861,14 @@ CGObjCRuntimeLifetimeMarker  CGObjCMulleRuntime::GenerateCallArgs( CodeGenFuncti
          RD = CreateVariadicOnTheFlyRecordDecl( method->getSelector(), RD, Args);
       }
    }
+   else
+   {
+      // missing method declaration
+      do
+      {
+      }
+      while(0);
+   }
    
    // special case, argument is void * compatible, there is no paramRecord.
    // yet one argument will likely have been passed
@@ -2863,26 +2876,35 @@ CGObjCRuntimeLifetimeMarker  CGObjCMulleRuntime::GenerateCallArgs( CodeGenFuncti
    {
       assert( ! RV);
       
-      if( Expr->getNumArgs())
+      switch( Expr->getNumArgs())
       {
-         const Expr::Expr  *Arg = const_cast<Expr::Expr *>( Expr->getArg( 0));
-         
-         if( Arg->isIntegerConstantExpr(CGM.getContext()))
+      case 1 :
          {
-            TypeSourceInfo *TInfo = CGM.getContext().getTrivialTypeSourceInfo(CGM.getContext().VoidPtrTy, SourceLocation());
-            Arg  = CStyleCastExpr::Create( CGM.getContext(),
-                                          CGM.getContext().VoidPtrTy,
-                                          VK_RValue,
-                                          CK_IntegralToPointer,
-                                          (Expr::Expr *) Arg,
-                                          NULL,
-                                          TInfo,
-                                          SourceLocation(),
-                                          SourceLocation());
+            const Expr::Expr  *Arg = const_cast<Expr::Expr *>( Expr->getArg( 0));
+            
+            if( Arg->isIntegerConstantExpr(CGM.getContext()))
+            {
+               TypeSourceInfo *TInfo = CGM.getContext().getTrivialTypeSourceInfo(CGM.getContext().VoidPtrTy, SourceLocation());
+               Arg  = CStyleCastExpr::Create( CGM.getContext(),
+                                             CGM.getContext().VoidPtrTy,
+                                             VK_RValue,
+                                             CK_IntegralToPointer,
+                                             (Expr::Expr *) Arg,
+                                             NULL,
+                                             TInfo,
+                                             SourceLocation(),
+                                             SourceLocation());
+            }
+            CGF.EmitCallArg( Args, Arg, CGM.getContext().VoidPtrTy);
          }
-         CGF.EmitCallArg( Args, Arg, CGM.getContext().VoidPtrTy);
+         // fall thru
+      case 0 :
+         return( Marker);
       }
-      return( Marker);
+   
+      // undeclared method, with multiple arguments, assume they are all
+      // id ...
+      RD = CreateOnTheFlyRecordDecl( Expr);
    }
    
 

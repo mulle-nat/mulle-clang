@@ -960,7 +960,7 @@ namespace {
       }
       llvm::ConstantInt *HashIvarConstantForString( std::string s)
       {
-         return( HashSelConstantForString( s));
+         return( _HashConstantForString( s, 0x0)); // here we don't care
       }
       
       /// CreateMetadataVar - Create a global variable with internal
@@ -1557,7 +1557,7 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
          sprintf( buf, "MULLE_OBJC_FASTCLASSHASH_%d", i);
          if( GetMacroDefinitionUnsignedIntegerValue( PP, buf, &value))
          {
-            fastclassids[ i]     = value >> 32;
+            fastclassids[ i]     = value; // >> 32;
             fastclassids_defined = true;
 
             if( _trace_fastids)
@@ -5600,9 +5600,41 @@ llvm::Value *CGObjCMulleRuntime::EmitNSAutoreleasePoolClassRef(CodeGenFunction &
 #pragma mark -
 #pragma mark Hash Selectors, ClassIDs and friends
 
+
+
+#define FNV1_32_PRIME             0x01000193
+#define MULLE_OBJC_FNV1_32_INIT   0x811c9dc5
+
+static uint32_t   mulle_objc_chained_fnv1_32( void *buf, size_t len, uint32_t hash)
+{
+   unsigned char   *s;
+   unsigned char   *sentinel;
+   
+   s        = (unsigned char *) buf;
+   sentinel = &s[ len];
+
+    /*
+     * FNV-1 hash each octet in the buffer
+     */
+    while( s < sentinel)
+    {
+	hash *= FNV1_32_PRIME;
+	hash ^= (uint32_t) *s++;
+    }
+
+    return( hash);
+}
+
+
+static inline uint32_t   mulle_objc_fnv1_32( void *buf, size_t len)
+{
+   return( mulle_objc_chained_fnv1_32( buf, len, MULLE_OBJC_FNV1_32_INIT));
+}
+
+
+#if 0
 uint64_t   CGObjCCommonMulleRuntime::UniqueidHashForString( std::string s, uint64_t first_valid, unsigned WordSizeInBytes)
 {
-   std::string           name;
    llvm::MD5             MD5Ctx;
    llvm::MD5::MD5Result  hash;
    uint64_t              value;
@@ -5631,6 +5663,30 @@ uint64_t   CGObjCCommonMulleRuntime::UniqueidHashForString( std::string s, uint6
 
    return( value);
 }
+#else
+uint64_t   CGObjCCommonMulleRuntime::UniqueidHashForString( std::string s, uint64_t first_valid, unsigned WordSizeInBytes)
+{
+   uint64_t   value;
+   char       *c_str;
+   
+   c_str = (char *) s.c_str();
+   value = (uint64_t) mulle_objc_fnv1_32( (void *) c_str, s.length());
+//   fprintf( stderr, "%s = %08lx\n", c_str, (long) value);
+   
+   if( value < first_valid || (first_valid && value == (uint64_t) -1))
+   {
+      // FAIL! FIX
+      std::string  fail;
+      
+      fail.append("congratulations, your string \"");
+      fail.append( s);
+      fail.append( "\" hashes badly (rare and precious, please tweet it @mulle_nat, then rename it).");
+      llvm_unreachable( fail.c_str());
+   }
+
+   return( value);
+}
+#endif
 
 
 llvm::ConstantInt *CGObjCCommonMulleRuntime::__HashConstantForString( std::string s, uint64_t first_valid)

@@ -898,12 +898,13 @@ void Parser::ParseObjCPropertyAttribute(ObjCDeclSpec &DS) {
     {
       //  check that we know it, could also issue a warning maybe ?
       if( ! (II->isStr("readonly") ||
-          II->isStr("assign") ||
-          II->isStr("retain") ||
-          II->isStr("copy") ||
-          II->isStr("nonatomic") ||
-          II->isStr("getter") ||
-          II->isStr("setter")))
+             II->isStr("assign") ||
+             II->isStr("retain") ||
+             II->isStr("copy") ||
+             II->isStr("nonnull") ||
+             II->isStr("nonatomic") ||
+             II->isStr("getter") ||
+             II->isStr("setter")))
       {
         Diag(Tok, diag::err_mulle_objc_no_support_for_property_modifier)
           << II->getNameStart();

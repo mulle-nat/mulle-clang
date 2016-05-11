@@ -3412,11 +3412,10 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
             
             if( ! CalleeInfo.getCalleeDecl() || (MD && ! MD->getParamDecl()))
 	    {
-               // promote all non pointers to long and make them pointers
+               // promote all non pointers to uintptr_t and make them pointers
 	       if( ! V->getType()->isPointerTy())
 	       {
-                  // is this right ?
-                  V = Builder.CreateSExt( V, ConvertType( getContext().LongTy));
+                  V = Builder.CreateSExt( V, ConvertType( getContext().getUIntPtrType()));
 	          V = Builder.CreateIntToPtr( V, ArgInfo.getCoerceToType());
 	       }
 	    }

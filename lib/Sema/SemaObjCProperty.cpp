@@ -194,6 +194,13 @@ Decl *Sema::ActOnProperty(Scope *S, SourceLocation AtLoc,
                       // default is readwrite!
                       !(Attributes & ObjCDeclSpec::DQ_PR_readonly));
 
+  // @mulle-objc@ >>>language: property is always nonatomic
+  if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+  {
+     Attributes |= ObjCDeclSpec::DQ_PR_nonatomic;
+  }
+  // @mulle-objc@ <<< language: property is always nonatomic
+  
   // Proceed with constructing the ObjCPropertyDecls.
   ObjCContainerDecl *ClassDecl = cast<ObjCContainerDecl>(CurContext);
   ObjCPropertyDecl *Res = nullptr;
@@ -676,13 +683,6 @@ ObjCPropertyDecl *Sema::CreatePropertyDecl(Scope *S,
    
   tmp = AttributesAsWritten;
    
-  // @mulle-objc@ language: make nonatomic the property default, this creates less warnings
-  if( LangOpts.ObjCRuntime.hasMulleMetaABI())
-  {
-     if( ! (tmp & (ObjCPropertyDecl::OBJC_PR_nonatomic | ObjCPropertyDecl::OBJC_PR_atomic)))
-        tmp |= ObjCPropertyDecl::OBJC_PR_nonatomic;
-  }
-
   PDecl->setPropertyAttributesAsWritten(
                           makePropertyAttributesAsWritten(tmp));
 
@@ -716,15 +716,6 @@ ObjCPropertyDecl *Sema::CreatePropertyDecl(Scope *S,
   if (isAssign)
     PDecl->setPropertyAttributes(ObjCPropertyDecl::OBJC_PR_assign);
 
-  // @mulle-objc@ language: make nonatomic the default for properties, this creates less warnings
-  if( LangOpts.ObjCRuntime.hasMulleMetaABI())
-  {
-     if( Attributes & ObjCDeclSpec::DQ_PR_atomic)
-        PDecl->setPropertyAttributes(ObjCPropertyDecl::OBJC_PR_atomic);
-     else
-        PDecl->setPropertyAttributes(ObjCPropertyDecl::OBJC_PR_nonatomic);
-  }
-  else
   // In the semantic attributes, one of nonatomic or atomic is always set.
   if (Attributes & ObjCDeclSpec::DQ_PR_nonatomic)
     PDecl->setPropertyAttributes(ObjCPropertyDecl::OBJC_PR_nonatomic);

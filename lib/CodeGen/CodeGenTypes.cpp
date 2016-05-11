@@ -397,7 +397,7 @@ llvm::Type *CodeGenTypes::ConvertType(QualType T) {
          ResultType = llvm::Type::getInt8Ty(getLLVMContext());
      break;
     case BuiltinType::ObjCSel:
-      // @mulle-objc@ uniqueid: sel: change type to intptr_t
+      // @mulle-objc@ uniqueid: sel: change type to uint32_t
       //                        "Class" itself is in Objective-C still an id
       //  need something like @classid()
       //

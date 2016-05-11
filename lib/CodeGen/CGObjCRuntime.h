@@ -180,6 +180,10 @@ public:
                                                            const ObjCMethodDecl *method,
                                                            const ObjCMessageExpr *Expr);
 
+   virtual CGObjCRuntimeLifetimeMarker   ConvertToMetaABIArgsIfNeeded( CodeGenFunction &CGF,
+                                                                       const ObjCMethodDecl *method,
+                                                                       CallArgList &Args);
+   
   /// @mulle-objc@ MetaABI: callback in special cases to create param decl
    virtual CodeGen::RValue  EmitFastEnumeratorCall( CodeGen::CodeGenFunction &CGF,
                                                     ReturnValueSlot ReturnSlot,

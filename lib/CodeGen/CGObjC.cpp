@@ -105,9 +105,23 @@ CodeGenFunction::EmitObjCBoxedExpr(const ObjCBoxedExpr *E) {
     Args.add(EmitAnyExpr(SubExpr), ArgQT);
   }
 
+  // @mulle-objc@ >> MetaABI: boxed args code Part 1
+  CGObjCRuntimeLifetimeMarker   Marker;
+   
+  Marker = Runtime.ConvertToMetaABIArgsIfNeeded( *this, BoxingMethod, Args);
+   
+  // @mulle-objc@ << MetaABI: boxed args code
+
   RValue result = Runtime.GenerateMessageSend(
       *this, ReturnValueSlot(), BoxingMethod->getReturnType(), Sel, Receiver,
       Args, ClassDecl, BoxingMethod);
+   
+   //
+   // @mulle-objc@ MetaABI: tell optimizer the lifetime is done for this alloca
+   //
+   if( Marker.SizeV)  // leaks probably, coz alloced
+      EmitLifetimeEnd( Marker.SizeV, Marker.Addr);
+   
   return Builder.CreateBitCast(result.getScalarVal(), 
                                ConvertType(E->getType()));
 }
@@ -181,15 +195,21 @@ llvm::Value *CodeGenFunction::EmitObjCCollectionLiteral(const Expr *E,
   }
   
   // Generate the argument list.
-  CallArgList Args;  
+  CallArgList Args;
+   
   ObjCMethodDecl::param_const_iterator PI = MethodWithObjects->param_begin();
   const ParmVarDecl *argDecl = *PI++;
   QualType ArgQT = argDecl->getType().getUnqualifiedType();
-  Args.add(RValue::get(Objects.getPointer()), ArgQT);
+  
+    // @mulle-objc@ >> MetaABI: literal args code, fix original code 1
+  Address firstObject = Builder.CreateConstArrayGEP(Objects, 0, getPointerSize());
+  Args.add(RValue::get(firstObject.getPointer()), ArgQT);
   if (DLE) {
     argDecl = *PI++;
     ArgQT = argDecl->getType().getUnqualifiedType();
-    Args.add(RValue::get(Keys.getPointer()), ArgQT);
+    // @mulle-objc@ >> MetaABI: literal args code, fix original code 2
+    Address firstKey = Builder.CreateConstArrayGEP(Keys, 0, getPointerSize());
+    Args.add(RValue::get(firstKey.getPointer()), ArgQT);
   }
   argDecl = *PI;
   ArgQT = argDecl->getType().getUnqualifiedType();
@@ -207,6 +227,13 @@ llvm::Value *CodeGenFunction::EmitObjCCollectionLiteral(const Expr *E,
   CGObjCRuntime &Runtime = CGM.getObjCRuntime();
   llvm::Value *Receiver = Runtime.GetClass(*this, Class);
 
+  // @mulle-objc@ >> MetaABI: literal args code Part 1
+  CGObjCRuntimeLifetimeMarker   Marker;
+   
+  Marker = Runtime.ConvertToMetaABIArgsIfNeeded( *this, MethodWithObjects, Args);
+   
+  // @mulle-objc@ << MetaABI: literal args code
+
   // Generate the message send.
   RValue result = Runtime.GenerateMessageSend(
       *this, ReturnValueSlot(), MethodWithObjects->getReturnType(), Sel,
@@ -220,6 +247,12 @@ llvm::Value *CodeGenFunction::EmitObjCCollectionLiteral(const Expr *E,
     EmitARCIntrinsicUse(NeededObjects);
   }
 
+   //
+   // @mulle-objc@ MetaABI: tell optimizer the lifetime is done for this alloca
+   //
+   if( Marker.SizeV)  // leaks probably, coz alloced
+      EmitLifetimeEnd( Marker.SizeV, Marker.Addr);
+   
   return Builder.CreateBitCast(result.getScalarVal(), 
                                ConvertType(E->getType()));
 }

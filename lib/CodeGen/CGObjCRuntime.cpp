@@ -409,6 +409,18 @@ CGObjCRuntimeLifetimeMarker   CGObjCRuntime::GenerateCallArgs( CodeGenFunction &
 }
 
 
+CGObjCRuntimeLifetimeMarker   CGObjCRuntime::ConvertToMetaABIArgsIfNeeded( CodeGenFunction &CGF,
+                                                                           const ObjCMethodDecl *method,
+                                                                           CallArgList &Args)
+{
+   CGObjCRuntimeLifetimeMarker  Marker;
+   
+   Marker.SizeV = nullptr;
+   Marker.Addr  = nullptr;
+   return( Marker);
+}
+
+
 CodeGen::RValue  CGObjCRuntime::EmitFastEnumeratorCall( CodeGen::CodeGenFunction &CGF,
                                                        ReturnValueSlot ReturnSlot,
                                                        QualType ResultType,

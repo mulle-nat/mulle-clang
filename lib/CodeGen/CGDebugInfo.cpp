@@ -448,11 +448,15 @@ llvm::DIType *CGDebugInfo::CreateType(const BuiltinType *BT) {
     ObjTy =
         DBuilder.createStructType(TheCU, "objc_object", getOrCreateMainFile(),
                                   0, 0, 0, 0, nullptr, llvm::DINodeArray());
-
+    llvm::DINodeArray Elements;
+     
     DBuilder.replaceArrays(
         ObjTy,
+                           Elements);
+#if 0
         DBuilder.getOrCreateArray(&*DBuilder.createMemberType(
             ObjTy, "isa", getOrCreateMainFile(), 0, Size, 0, 0, 0, ISATy)));
+#endif
     return ObjTy;
   }
   case BuiltinType::ObjCSel: {

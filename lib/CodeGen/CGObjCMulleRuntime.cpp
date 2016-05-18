@@ -2755,8 +2755,7 @@ RecordDecl  *CGObjCMulleRuntime::CreateVariadicOnTheFlyRecordDecl( Selector Sel,
    }
    
    /* 
-    * Now copy over remaining variadic arguments. Arguments have been
-    * already promoted (bummer)
+    * Now copy over remaining variadic arguments. 
     */
    for (unsigned i = FieldNo, e = Exprs.size(); i != e; ++i)
    {
@@ -2767,9 +2766,9 @@ RecordDecl  *CGObjCMulleRuntime::CreateVariadicOnTheFlyRecordDecl( Selector Sel,
       sprintf( buf, "param_%d", i);
       FieldName = buf;
 
-      arg  = Exprs[ i];
+      arg  = Exprs[ i];  // already promoted!
       type = arg->getType();
-      
+ 
       IdentifierInfo  *FieldID = &Context->Idents.get( FieldName);
       FD = FieldDecl::Create(  *Context, RD2,
                                SourceLocation(), SourceLocation(),
@@ -3954,7 +3953,7 @@ void  CGObjCCommonMulleRuntime::SetPropertyInfoToEmit( const ObjCPropertyDecl *P
 
    Prop[ 5] =  type->hasPointerRepresentation() && ! is_nonnull ? Prop[ 4] : zeroSel;
    
-   fprintf( stderr, "%s %s has %s clearer\n",  type->hasPointerRepresentation() ? "pointer" : "nonpointer", PD->getIdentifier()->getNameStart(),  Prop[ 5] == zeroSel  ? "no" : "a");
+//   fprintf( stderr, "%s %s has %s clearer\n",  type->hasPointerRepresentation() ? "pointer" : "nonpointer", PD->getIdentifier()->getNameStart(),  Prop[ 5] == zeroSel  ? "no" : "a");
 }
 
 
@@ -4434,6 +4433,8 @@ llvm::Constant *CGObjCMulleRuntime::GetMethodConstant(const ObjCMethodDecl *MD) 
    
    // every method remembers if it's been written in aaomode
    bits  = CGM.getLangOpts().ObjCAllocsAutoreleasedObjects ? 0x4 : 0x0;
+   // remember if it is variadic
+   bits |= MD->isVariadic() ? 0x8 : 0x0;
    // also remember method family (nice for checking if it's init or something)
    bits |= MD->getMethodFamily() << 16;
    
@@ -4600,7 +4601,7 @@ llvm::Constant *CGObjCMulleRuntime::EmitLoadInfoList(Twine Name,
    llvm::Constant   *Values[8];
    
    if( ! runtime_version)
-      llvm_unreachable( "Missing runtime header in compilation, can not emit loadinfo");
+      llvm_unreachable( "Missing #include <mulle_objc_runtime/mulle_objc_runtime.h> in compilation, can not emit loadinfo");
    
    //
    // should get these values from the header
@@ -4770,6 +4771,9 @@ void CGObjCMulleRuntime::EmitSynchronizedStmt(CodeGenFunction &CGF,
                                      const ObjCAtSynchronizedStmt &S) {
    return EmitTryOrSynchronizedStmt(CGF, S);
 }
+
+#pragma mark -
+#pragma mark Fragile Exception Helper
 
 namespace {
    struct PerformFragileFinally final : EHScopeStack::Cleanup {
@@ -4985,6 +4989,9 @@ llvm::FunctionType *FragileHazards::GetAsmFnType() {
    return llvm::FunctionType::get(CGF.VoidTy, tys, false);
 }
 
+
+#pragma mark -
+#pragma mark Objective-C setjmp-longjmp (sjlj) Exception Handling
 
 /*
  

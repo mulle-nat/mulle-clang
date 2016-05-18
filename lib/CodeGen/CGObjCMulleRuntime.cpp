@@ -91,8 +91,8 @@ namespace {
          // be called a lot.
          switch( optLevel)
          {
-         default : name = "mulle_objc_object_inline_constant_selector_call"; break;
-         case 1  : name = "mulle_objc_object_constant_selector_call"; break;
+         default : name = "mulle_objc_object_inline_constant_methodid_call"; break;
+         case 1  : name = "mulle_objc_object_constant_methodid_call"; break;
          case -1 :
          case 0  : name = "mulle_objc_object_call"; break;
          }
@@ -116,8 +116,8 @@ namespace {
          // be called a lot.
          switch( optLevel)
          {
-         default : name = "mulle_objc_object_inline_constant_selector_call"; break;
-         case 1  : name = "mulle_objc_object_constant_selector_call"; break;
+         default : name = "mulle_objc_object_inline_constant_methodid_call"; break;
+         case 1  : name = "mulle_objc_object_constant_methodid_call"; break;
          case -1 :
          case 0  : name = "mulle_objc_object_call"; break;
          }

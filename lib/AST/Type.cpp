@@ -1618,9 +1618,11 @@ bool Type::hasIntegerRepresentation() const {
 /// \returns true if the type is considered an integral type, false otherwise.
 bool Type::isIntegralType(ASTContext &Ctx) const {
   if (const BuiltinType *BT = dyn_cast<BuiltinType>(CanonicalType))
-    return BT->getKind() >= BuiltinType::Bool &&
-           BT->getKind() <= BuiltinType::Int128;
+    return ((BT->getKind() >= BuiltinType::Bool &&
+            BT->getKind() <= BuiltinType::Int128) ||
+            BT->getKind() == BuiltinType::ObjCSel); // @mulle-objc@ uniqueid: ObjCSel is integral
 
+     
   // Complete enum types are integral in C.
   if (!Ctx.getLangOpts().CPlusPlus)
     if (const EnumType *ET = dyn_cast<EnumType>(CanonicalType))
@@ -1632,8 +1634,9 @@ bool Type::isIntegralType(ASTContext &Ctx) const {
 
 bool Type::isIntegralOrUnscopedEnumerationType() const {
   if (const BuiltinType *BT = dyn_cast<BuiltinType>(CanonicalType))
-    return BT->getKind() >= BuiltinType::Bool &&
-           BT->getKind() <= BuiltinType::Int128;
+    return(( BT->getKind() >= BuiltinType::Bool &&
+            BT->getKind() <= BuiltinType::Int128) ||
+            BT->getKind() == BuiltinType::ObjCSel);  // @mulle-objc@ uniqueid: ObjCSel is integral
 
   // Check for a complete enum type; incomplete enum types are not properly an
   // enumeration type in the sense required here.
@@ -1739,8 +1742,9 @@ bool Type::hasSignedIntegerRepresentation() const {
 /// decl which has an unsigned representation
 bool Type::isUnsignedIntegerType() const {
   if (const BuiltinType *BT = dyn_cast<BuiltinType>(CanonicalType)) {
-    return BT->getKind() >= BuiltinType::Bool &&
-           BT->getKind() <= BuiltinType::UInt128;
+    return(( BT->getKind() >= BuiltinType::Bool &&
+             BT->getKind() <= BuiltinType::UInt128) ||
+             BT->getKind() == BuiltinType::ObjCSel);  // @mulle-objc@ uniqueid: ObjCSel is unsigned
   }
 
   if (const EnumType *ET = dyn_cast<EnumType>(CanonicalType)) {
@@ -1755,8 +1759,9 @@ bool Type::isUnsignedIntegerType() const {
 
 bool Type::isUnsignedIntegerOrEnumerationType() const {
   if (const BuiltinType *BT = dyn_cast<BuiltinType>(CanonicalType)) {
-    return BT->getKind() >= BuiltinType::Bool &&
-    BT->getKind() <= BuiltinType::UInt128;
+    return(( BT->getKind() >= BuiltinType::Bool &&
+             BT->getKind() <= BuiltinType::UInt128) ||
+             BT->getKind() == BuiltinType::ObjCSel);  // @mulle-objc@ uniqueid: ObjCSel is unsigned
   }
   
   if (const EnumType *ET = dyn_cast<EnumType>(CanonicalType)) {
@@ -1807,8 +1812,9 @@ bool Type::isRealType() const {
 
 bool Type::isArithmeticType() const {
   if (const BuiltinType *BT = dyn_cast<BuiltinType>(CanonicalType))
-    return BT->getKind() >= BuiltinType::Bool &&
-           BT->getKind() <= BuiltinType::LongDouble;
+    return(( BT->getKind() >= BuiltinType::Bool &&
+             BT->getKind() <= BuiltinType::LongDouble) ||
+             BT->getKind() == BuiltinType::ObjCSel);  // @mulle-objc@ uniqueid: ObjCSel is arithmetic
   if (const EnumType *ET = dyn_cast<EnumType>(CanonicalType))
     // GCC allows forward declaration of enum types (forbid by C99 6.7.2.3p2).
     // If a body isn't seen by the time we get here, return false.

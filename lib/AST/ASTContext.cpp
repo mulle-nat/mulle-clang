@@ -1666,10 +1666,15 @@ TypeInfo ASTContext::getTypeInfoImpl(const Type *T) const {
       break;
     case BuiltinType::ObjCId:
     case BuiltinType::ObjCClass:
-    case BuiltinType::ObjCSel:
-      Width = Target->getPointerWidth(0); 
+      Width = Target->getPointerWidth(0);
       Align = Target->getPointerAlign(0);
       break;
+    // @mulle-objc@ uniqueid: -> change SEL to IntWidth, IntAlign
+    case BuiltinType::ObjCSel:
+      Width = Target->getIntWidth();
+      Align = Target->getIntAlign();
+      break;
+    // @mulle-objc@ uniqueid: <-
     case BuiltinType::OCLSampler:
       // Samplers are modeled as integers.
       Width = Target->getIntWidth();
@@ -4687,6 +4692,8 @@ unsigned ASTContext::getIntegerRank(const Type *T) const {
     return 3 + (getIntWidth(ShortTy) << 3);
   case BuiltinType::Int:
   case BuiltinType::UInt:
+ // @mulle-objc@ uniqueid: add BuiltinType::ObjCSel after BuiltinType::UInt
+  case BuiltinType::ObjCSel:
     return 4 + (getIntWidth(IntTy) << 3);
   case BuiltinType::Long:
   case BuiltinType::ULong:
@@ -5456,10 +5463,11 @@ static char getObjCEncodingForPrimitiveKind(const ASTContext *C,
     case BuiltinType::Half:
       // FIXME: potentially need @encodes for these!
       return ' ';
-
+          
+   // @mulle-objc@ uniqueid: return ':' for ObjCSel (superflous?)
+    case BuiltinType::ObjCSel:    return ':';
     case BuiltinType::ObjCId:
     case BuiltinType::ObjCClass:
-    case BuiltinType::ObjCSel:
       llvm_unreachable("@encoding ObjC primitive type");
 
     // OpenCL and placeholder types don't need @encodings.
@@ -5554,6 +5562,14 @@ void ASTContext::getObjCEncodingForTypeImpl(QualType T, std::string& S,
   case Type::Enum:
     if (FD && FD->isBitField())
       return EncodeBitField(this, S, T, FD);
+
+    // @mulle-objc@ uniqueid: -> @encode( SEL)
+    if (T->isObjCSelType()) {
+       S += ':';
+       return;
+    }
+    // @mulle-objc@ uniqueid: <-
+        
     if (const BuiltinType *BT = dyn_cast<BuiltinType>(CT))
       S += getObjCEncodingForPrimitiveKind(this, BT->getKind());
     else
@@ -6081,7 +6097,7 @@ TypedefDecl *ASTContext::getObjCSelDecl() const {
   if (!ObjCSelDecl) {
     // @mulle-objc@ uniqueid: change SEL type to uint32_t
     QualType T = getLangOpts().ObjCRuntime.hasMulleMetaABI()
-                     ? getIntTypeForBitwidth(32, false)
+                     ? ObjCBuiltinSelTy
                      : getPointerType(ObjCBuiltinSelTy);
     ObjCSelDecl = buildImplicitTypedef(T, "SEL");
   }
@@ -6102,7 +6118,7 @@ NamedDecl *ASTContext::getObjCProtocolDecl() const {
   if (!ObjCProtocolClassDecl) {
     if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
     {
-      QualType T = getLangOpts().ObjCRuntime.hasMulleMetaABI() ? getIntTypeForBitwidth(32, false)
+      QualType T = getLangOpts().ObjCRuntime.hasMulleMetaABI() ? ObjCBuiltinSelTy
                                                                : getPointerType(ObjCBuiltinSelTy);
       ObjCProtocolClassDecl = buildImplicitTypedef(T, "PROTOCOL");
     }

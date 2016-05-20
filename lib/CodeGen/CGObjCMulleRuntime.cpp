@@ -1254,7 +1254,7 @@ namespace {
 
       void   EmitVoidPtrExpression( CodeGenFunction &CGF,
                                     CallArgList &Args,
-                                    const Expr::Expr  *Arg);
+                                    const clang::Expr::Expr  *Arg);
       
       void  PushCallArgsIntoRecord( CodeGenFunction &CGF,
                                     RecordDecl *RD,
@@ -2661,8 +2661,8 @@ RecordDecl  *CGObjCMulleRuntime::CreateOnTheFlyRecordDecl( const ObjCMessageExpr
 
    for (unsigned i = 0, e = Expr->getNumArgs(); i != e; ++i)
    {
-      FieldDecl         *FD;
-      const Expr::Expr  *arg;
+      FieldDecl                *FD;
+      const clang::Expr::Expr  *arg;
       
       sprintf( buf, "param_%d", i);
       FieldName = buf;
@@ -2759,9 +2759,9 @@ RecordDecl  *CGObjCMulleRuntime::CreateVariadicOnTheFlyRecordDecl( Selector Sel,
     */
    for (unsigned i = FieldNo, e = Exprs.size(); i != e; ++i)
    {
-      FieldDecl         *FD;
-      const Expr::Expr  *arg;
-      QualType          type;
+      FieldDecl                *FD;
+      const clang::Expr::Expr  *arg;
+      QualType                 type;
       
       sprintf( buf, "param_%d", i);
       FieldName = buf;
@@ -3003,7 +3003,7 @@ void  CGObjCMulleRuntime::PushArgumentsIntoRecord( CodeGenFunction &CGF,
 
 void   CGObjCMulleRuntime::EmitVoidPtrExpression( CodeGenFunction &CGF,
                                                   CallArgList &Args,
-                                                  const Expr::Expr *Arg)
+                                                  const clang::Expr::Expr *Arg)
 {
    
    if( Arg->isIntegerConstantExpr(CGM.getContext()))
@@ -3133,7 +3133,7 @@ CGObjCRuntimeLifetimeMarker  CGObjCMulleRuntime::GenerateCallArgs( CodeGenFuncti
       switch( Expr->getNumArgs())
       {
       case 1 :
-         EmitVoidPtrExpression( CGF, Args, const_cast<Expr::Expr *>( Expr->getArg( 0)));
+         EmitVoidPtrExpression( CGF, Args, const_cast<clang::Expr::Expr *>( Expr->getArg( 0)));
          // fall thru
       case 0 :
          return( Marker);

@@ -1254,7 +1254,7 @@ namespace {
 
       void   EmitVoidPtrExpression( CodeGenFunction &CGF,
                                     CallArgList &Args,
-                                    const clang::Expr::Expr  *Arg);
+                                    const Expr  *Arg);
       
       void  PushCallArgsIntoRecord( CodeGenFunction &CGF,
                                     RecordDecl *RD,
@@ -2627,7 +2627,7 @@ RecordDecl  *CGObjCMulleRuntime::CreateMetaABIRecordDecl( Selector sel,
 
 
 
-RecordDecl  *CGObjCMulleRuntime::CreateOnTheFlyRecordDecl( const ObjCMessageExpr *Expr)
+RecordDecl  *CGObjCMulleRuntime::CreateOnTheFlyRecordDecl( const ObjCMessageExpr *Method)
 {
    ASTContext   *Context;
    StringRef    FieldName;
@@ -2635,7 +2635,7 @@ RecordDecl  *CGObjCMulleRuntime::CreateOnTheFlyRecordDecl( const ObjCMessageExpr
    char         buf[ 32];
    
    Context = &CGM.getContext();
-   sprintf( buf, "generic.args_%d", Expr->getNumArgs());
+   sprintf( buf, "generic.args_%d", Method->getNumArgs());
    RecordName = buf;
    
    IdentifierInfo  *RecordID = &Context->Idents.get( RecordName);
@@ -2646,7 +2646,7 @@ RecordDecl  *CGObjCMulleRuntime::CreateOnTheFlyRecordDecl( const ObjCMessageExpr
    OnTheFlyDeclContext =
       ObjCMethodDecl::Create( *Context,
                               SourceLocation(), SourceLocation(),
-                              Expr->getSelector(),
+                              Method->getSelector(),
                               QualType(),
                               ReturnTInfo,
                               Context->getTranslationUnitDecl(),
@@ -2659,17 +2659,17 @@ RecordDecl  *CGObjCMulleRuntime::CreateOnTheFlyRecordDecl( const ObjCMessageExpr
    // (DeclContext *) CGF.CurFuncDecl is a hack
    RecordDecl  *RD = RecordDecl::Create( *Context, TTK_Struct, OnTheFlyDeclContext, SourceLocation(), SourceLocation(), RecordID);
 
-   for (unsigned i = 0, e = Expr->getNumArgs(); i != e; ++i)
+   for (unsigned i = 0, e = Method->getNumArgs(); i != e; ++i)
    {
-      FieldDecl                *FD;
-      const clang::Expr::Expr  *arg;
+      FieldDecl   *FD;
+      const Expr  *arg;
       
       sprintf( buf, "param_%d", i);
       FieldName = buf;
       
       // use expression type, but probably should promote...
       
-      arg = Expr->getArg( i);
+      arg = Method->getArg( i);
       
       IdentifierInfo  *FieldID = &Context->Idents.get( FieldName);
       FD = FieldDecl::Create(  *Context, RD,
@@ -2759,9 +2759,9 @@ RecordDecl  *CGObjCMulleRuntime::CreateVariadicOnTheFlyRecordDecl( Selector Sel,
     */
    for (unsigned i = FieldNo, e = Exprs.size(); i != e; ++i)
    {
-      FieldDecl                *FD;
-      const clang::Expr::Expr  *arg;
-      QualType                 type;
+      FieldDecl   *FD;
+      const Expr  *arg;
+      QualType    type;
       
       sprintf( buf, "param_%d", i);
       FieldName = buf;
@@ -2981,20 +2981,20 @@ LValue  CGObjCMulleRuntime::GenerateMetaABIRecordAlloca( CodeGenFunction &CGF,
 void  CGObjCMulleRuntime::PushArgumentsIntoRecord( CodeGenFunction &CGF,
                                                    RecordDecl *RD,
                                                    LValue Record,
-                                                   const ObjCMessageExpr *Expr)
+                                                   const ObjCMessageExpr *Method)
 {
    unsigned int i = 0;
    
    for( RecordDecl::field_iterator CurField = RD->field_begin(), SentinelField = RD->field_end(); CurField != SentinelField; CurField++)
    {
-      Expr::Expr  *arg;
+      const Expr  *arg;
       FieldDecl   *Field;
       
       Field = *CurField;
-      arg   = const_cast< Expr::Expr *>( Expr->getArg( i));
+      arg   = Method->getArg( i);
       
       LValue LV = CGF.EmitLValueForFieldInitialization( Record, Field);
-      CGF.EmitInitializerForField( Field, LV, arg, None);
+      CGF.EmitInitializerForField( Field, LV, (Expr *) arg, None);
       
       ++i;
    }
@@ -3003,7 +3003,7 @@ void  CGObjCMulleRuntime::PushArgumentsIntoRecord( CodeGenFunction &CGF,
 
 void   CGObjCMulleRuntime::EmitVoidPtrExpression( CodeGenFunction &CGF,
                                                   CallArgList &Args,
-                                                  const clang::Expr::Expr *Arg)
+                                                  const Expr *Arg)
 {
    
    if( Arg->isIntegerConstantExpr(CGM.getContext()))
@@ -3013,7 +3013,7 @@ void   CGObjCMulleRuntime::EmitVoidPtrExpression( CodeGenFunction &CGF,
                                     CGM.getContext().VoidPtrTy,
                                     VK_RValue,
                                     CK_IntegralToPointer,
-                                    (Expr::Expr *) Arg,
+                                    (Expr *) Arg,
                                     NULL,
                                     TInfo,
                                     SourceLocation(),
@@ -3133,7 +3133,7 @@ CGObjCRuntimeLifetimeMarker  CGObjCMulleRuntime::GenerateCallArgs( CodeGenFuncti
       switch( Expr->getNumArgs())
       {
       case 1 :
-         EmitVoidPtrExpression( CGF, Args, const_cast<clang::Expr::Expr *>( Expr->getArg( 0)));
+         EmitVoidPtrExpression( CGF, Args, Expr->getArg( 0));
          // fall thru
       case 0 :
          return( Marker);

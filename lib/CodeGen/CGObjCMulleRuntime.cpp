@@ -1745,10 +1745,9 @@ llvm::ConstantStruct *CGObjCMulleRuntime::CreateNSConstantStringStruct( StringRe
    Fields[1] = llvm::Constant::getNullValue( CGM.VoidPtrTy);
 
    llvm::GlobalValue::LinkageTypes Linkage = llvm::GlobalValue::PrivateLinkage;
-   bool isConstant                         = ! CGM.getLangOpts().WritableStrings;
    llvm::Constant *C                       = llvm::ConstantDataArray::getString(VMContext, S);
    
-   auto *GV = new llvm::GlobalVariable( CGM.getModule(), C->getType(), isConstant,
+   auto *GV = new llvm::GlobalVariable( CGM.getModule(), C->getType(), false,
                                        Linkage, C, ".str");
    GV->setUnnamedAddr( true);
    

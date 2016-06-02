@@ -2667,7 +2667,8 @@ RecordDecl  *CGObjCMulleRuntime::CreateOnTheFlyRecordDecl( const ObjCMessageExpr
       sprintf( buf, "param_%d", i);
       FieldName = buf;
       
-      // use expression type, but probably should promote...
+      // if we create something on the fly, the default promotion should
+      // have already be in affected
       
       arg = Method->getArg( i);
       
@@ -2766,7 +2767,8 @@ RecordDecl  *CGObjCMulleRuntime::CreateVariadicOnTheFlyRecordDecl( Selector Sel,
       sprintf( buf, "param_%d", i);
       FieldName = buf;
 
-      arg  = Exprs[ i];  // already promoted!
+      // variadic expressions should be already promoted!
+      arg  = Exprs[ i];
       type = arg->getType();
  
       IdentifierInfo  *FieldID = &Context->Idents.get( FieldName);

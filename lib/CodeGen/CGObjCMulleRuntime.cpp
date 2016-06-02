@@ -1795,7 +1795,7 @@ ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
    llvm::GlobalVariable   *GV;
    llvm::ConstantStruct   *NSStringHeader = CreateNSConstantStringStruct( Entry.first(), StringLength);
    
-   GV = new llvm::GlobalVariable( CGM.getModule(), NSStringHeader->getType(), true,
+   GV = new llvm::GlobalVariable( CGM.getModule(), NSStringHeader->getType(), false,
                                  llvm::GlobalVariable::PrivateLinkage, NSStringHeader,
                                  "_unnamed_nsstring_header_");
    // FIXME. Fix section.

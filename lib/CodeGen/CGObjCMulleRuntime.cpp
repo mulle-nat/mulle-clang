@@ -1591,7 +1591,7 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
             fastclassids_defined = true;
 
             if( _trace_fastids)
-               fprintf( stderr, "fastclassid #%d = 0x%llx\n", i, (uint64_t) fastclassids[ i]);
+               fprintf( stderr, "fastclassid #%d = 0x%llx\n", i, (long long) fastclassids[ i]);
          }
       }
    }

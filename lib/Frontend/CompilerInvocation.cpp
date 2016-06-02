@@ -1331,6 +1331,7 @@ void CompilerInvocation::setLangDefaults(LangOptions &Opts, InputKind IK,
   {
      Opts.ObjCAllocsAutoreleasedObjects = 1;
      Opts.ObjC1 = Opts.ObjC2 = 1;
+     Opts.C11 = 1;
   }
       
   if (LangStd == LangStandard::lang_unspecified) {

@@ -1526,6 +1526,9 @@ public:
     return getLangOpts().CPlusPlus ? BoolTy : IntTy;
   }
 
+
+  bool   typeNeedsMetaABIAlloca( QualType type);
+
   /// \brief Emit the Objective-CC type encoding for the given type \p T into
   /// \p S.
   ///

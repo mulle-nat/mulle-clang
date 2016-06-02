@@ -4175,7 +4175,7 @@ unsigned int   Sema::metaABIDescription( SmallVector<ParmVarDecl*, 16> &Params,
    unsigned int   desc;
    
    desc = resultType->isVoidType() ? 0 : MetaABIVoidPtrRval;
-   if( typeNeedsMetaABIAlloca( resultType))
+   if( Context.typeNeedsMetaABIAlloca( resultType))
       desc = MetaABIRvalAsStruct;
    
    switch( Params.size())
@@ -4183,7 +4183,7 @@ unsigned int   Sema::metaABIDescription( SmallVector<ParmVarDecl*, 16> &Params,
    case 0 :
       break;
    case 1 :
-      if( typeNeedsMetaABIAlloca( Params[ 0]->getType()))
+      if( Context.typeNeedsMetaABIAlloca( Params[ 0]->getType()))
          desc |= MetaABIParamAsStruct;
       else
          desc |= MetaABIVoidPtrParam;
@@ -4282,29 +4282,6 @@ void   Sema::SetMulleObjCParam( ObjCMethodDecl *ObjCMethod,
    ObjCMethod->setParamDecl( Param);
    // this is implicitly done later in ActOnStartOfObjCMethodDef
    //      IdResolver.AddDecl(Param);  // this adds it to search scope!
-}
-
-
-// ez to remember for rval:
-// 1. if FP it's in _param,
-// 2. if __alignof__(x) > __alignof__( void *), it's in _param
-// 3. if sizeof(x) >sizeof( void *), it's in _param
-
-bool  Sema::typeNeedsMetaABIAlloca( QualType type)
-{
-   if( Context.getTypeSize( type) > Context.getTypeSize( Context.VoidPtrTy))
-      return( true);
-   // should log this, as this is unusual
-   if( Context.getTypeAlign( type) > Context.getTypeAlign( Context.VoidPtrTy))
-      return( true);
-   if( type->isFloatingType())
-      return( true);
-   if( type->isUnionType())
-      return( true);
-   if( type->isStructureOrClassType())
-      return( true);
-   
-   return( false);
 }
 
 

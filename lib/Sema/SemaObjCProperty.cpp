@@ -2255,7 +2255,7 @@ void Sema::ProcessPropertyDecl(ObjCPropertyDecl *property) {
     //
     if( Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
     {
-       if( typeNeedsMetaABIAlloca( resultTy))
+       if( Context.typeNeedsMetaABIAlloca( resultTy))
        {
           SmallVector<ParmVarDecl*, 16> Params;
           SetMulleObjCParam( GetterMethod, property->getSetterName(), &Params, resultTy, Sema::MetaABIRvalAsStruct, Loc);
@@ -2334,7 +2334,7 @@ void Sema::ProcessPropertyDecl(ObjCPropertyDecl *property) {
       //
       if( Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
       {
-         if( typeNeedsMetaABIAlloca( property->getType()))
+         if( Context.typeNeedsMetaABIAlloca( property->getType()))
          {
             SmallVector<ParmVarDecl*, 16> Params;
             Params.push_back(Argument);

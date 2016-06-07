@@ -300,8 +300,14 @@ Decl *Parser::ParseObjCAtInterfaceDeclaration(SourceLocation AtLoc,
                                         EndProtoLoc);
     
     if (Tok.is(tok::l_brace))
-      ParseObjCClassInstanceVariables(CategoryType, tok::objc_private, AtLoc);
-      
+    {
+       // @mulle-objc@ language: no class extensions
+       if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+          Diag(Tok, diag::err_mulle_objc_no_class_extension);
+       else
+       ParseObjCClassInstanceVariables(CategoryType, tok::objc_private, AtLoc);
+    }
+     
     ParseObjCInterfaceDeclList(tok::objc_not_keyword, CategoryType);
 
     return CategoryType;
@@ -752,7 +758,7 @@ void Parser::ParseObjCInterfaceDeclList(tok::ObjCKeywordKind contextKey,
     case tok::objc_property:
       if (!getLangOpts().ObjC2)
         Diag(AtLoc, diag::err_objc_properties_require_objc2);
-
+         
       ObjCDeclSpec OCDS;
       SourceLocation LParenLoc;
       // Parse property attribute list, if any.

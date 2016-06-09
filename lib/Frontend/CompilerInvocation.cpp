@@ -1456,12 +1456,16 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
       const LangStandard &Std = LangStandard::getLangStandardForKind(LangStd);
       switch (IK) {
       case IK_C:
-      // @mulle-objc@ AAM:  .aam filename extension support
-      case IK_ObjC:
-      case IK_ObjCAAM:
       case IK_PreprocessedC:
+         if (!(Std.isC89() || Std.isC99()))
+            Diags.Report(diag::err_drv_argument_not_allowed_with);
+         break;
+         
+      // @mulle-objc@ C11: just allow C11, because the runtime needs it
+      case IK_ObjC:
+      // @mulle-objc@ AAM:  .aam filename extension support
+      case IK_ObjCAAM:
       case IK_PreprocessedObjC:
-         // @mulle-objc@ C11: just allow C11, because the runtime needs it
         if ( !Std.isC11())
           Diags.Report(diag::err_drv_argument_not_allowed_with)
             << A->getAsString(Args) << "C/ObjC";

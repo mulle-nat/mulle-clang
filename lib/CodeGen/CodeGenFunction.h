@@ -1247,7 +1247,11 @@ public:
                               const ObjCPropertyImplDecl *propImpl,
                               llvm::Constant *AtomicHelperFn);
 
+  // @mulle-objc@ ObjC properties: helper function
+  void emitObjCSetterBodyStatement( ObjCIvarRefExpr &ivarRef, QualType argType, Expr *expr);
+
   // @mulle-objc@ MetaABI: write/read return values
+   
   void             EmitMetaABIWriteScalarReturnValue( const Decl *FuncDecl, 
                                                       llvm::Value *ExprResult,
                                                       QualType ExprType);

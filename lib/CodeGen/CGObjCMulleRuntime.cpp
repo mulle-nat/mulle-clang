@@ -1807,7 +1807,7 @@ ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
    llvm::Constant     *C = getConstantGEP( VMContext, GV, 0, 2);
    llvm::GlobalAlias  *GA = llvm::GlobalAlias::create( CCType,
                                                        0,
-                                                       llvm::GlobalVariable::WeakAnyLinkage,
+                                                       llvm::GlobalVariable::PrivateLinkage,
                                                        Twine( "_unnamed_nsstring_"),
                                                        C,
                                                        &CGM.getModule());

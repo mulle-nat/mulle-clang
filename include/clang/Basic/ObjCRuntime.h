@@ -89,7 +89,7 @@ public:
     case MacOSX: return true;
     case GNUstep: return true;
     case ObjFW: return true;
-    // @mulle-objc@ compiler: is not non-fragile, clang inspection for mulle runtime
+    // @mulle-objc@ compiler: is fragile, clang inspection for mulle runtime
     case Mulle: return false;
     case iOS: return true;
     case WatchOS: return true;

@@ -4666,7 +4666,7 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
         I != E; ++I)
    {
       expr = llvm::ConstantExpr::getBitCast( I->getValue(), CGM.VoidPtrTy);
-      LoadStrings.push_back(  expr);
+      LoadStrings.push_back( expr);
    }
 
    if( CGM.getCodeGenOpts().getDebugInfo() >= CodeGenOptions::LimitedDebugInfo)

@@ -946,6 +946,8 @@ def err_mulle_objc_no_nullable : Error<
   "nullable is not supported in Mulle ObjC (everything is nullable by default)">;
 def err_mulle_objc_no_package : Error<
   "@package is not supported in Mulle ObjC">;
+def err_mulle_objc_no_class_extension : Error<
+  "Class extensions are not really supported in Mulle ObjC">;
 def err_mulle_objc_no_cpp_generics : Error<
   "C++ like generics are not supported in Mulle ObjC">;
 def err_mulle_objc_no_support_for_property_modifier  : Error<

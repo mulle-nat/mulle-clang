@@ -441,10 +441,6 @@ llvm::DIType *CGDebugInfo::CreateType(const BuiltinType *BT) {
                                            "objc_class", TheCU,
                                            getOrCreateMainFile(), 0);
 
-    unsigned Size = CGM.getContext().getTypeSize(CGM.getContext().VoidPtrTy);
-
-    auto *ISATy = DBuilder.createPointerType(ClassTy, Size);
-
     ObjTy =
         DBuilder.createStructType(TheCU, "objc_object", getOrCreateMainFile(),
                                   0, 0, 0, 0, nullptr, llvm::DINodeArray());
@@ -453,8 +449,13 @@ llvm::DIType *CGDebugInfo::CreateType(const BuiltinType *BT) {
     DBuilder.replaceArrays(
         ObjTy,
                            Elements);
+   // @mulle-objc@ :: hack out isa
 #if 0
-        DBuilder.getOrCreateArray(&*DBuilder.createMemberType(
+    unsigned Size = CGM.getContext().getTypeSize(CGM.getContext().VoidPtrTy);
+
+    auto *ISATy = DBuilder.createPointerType(ClassTy, Size);
+
+    DBuilder.getOrCreateArray(&*DBuilder.createMemberType(
             ObjTy, "isa", getOrCreateMainFile(), 0, Size, 0, 0, 0, ISATy)));
 #endif
     return ObjTy;

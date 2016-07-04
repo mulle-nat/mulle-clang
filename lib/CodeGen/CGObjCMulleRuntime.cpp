@@ -163,18 +163,52 @@ namespace {
       ///
       /// The messenger used for super calls
       ///
-      llvm::Constant *getMessageSendSuperFn() const {
+      llvm::Constant *getMessageSendSuperFn( int optLevel) const
+      {
+         StringRef    name;
+         switch( optLevel)
+         {
+         default : name = "mulle_objc_object_inline_call_classid"; break;
+         case -1 :
+         case 0  : name = "mulle_objc_object_call_classid"; break;
+         }
+
          llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy, ParamsPtrTy, ClassIDTy  };
-         return CGM.CreateRuntimeFunction(llvm::FunctionType::get(ObjectPtrTy,
-                                                                  params, false),
-                                          "_mulle_objc_object_call_classid");
+         llvm::Constant *C;
+         
+         C  =  CGM.CreateRuntimeFunction(llvm::FunctionType::get(ObjectPtrTy,
+                                                              params, false),
+                                         name,
+                                         llvm::AttributeSet::get(CGM.getLLVMContext(),
+                                                                 llvm::AttributeSet::FunctionIndex,
+                                                                 llvm::Attribute::NonLazyBind));
+
+         
+         return( C);
       }
 
-      llvm::Constant *getMessageSendMetaSuperFn() const {
-         llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy, ParamsPtrTy, ClassIDTy };
-         return CGM.CreateRuntimeFunction(llvm::FunctionType::get(ObjectPtrTy,
-                                                                  params, false),
-                                          "_mulle_objc_class_metacall_classid");
+      llvm::Constant *getMessageSendMetaSuperFn( int optLevel) const
+      {
+         StringRef    name;
+         switch( optLevel)
+         {
+         default : name = "mulle_objc_class_inline_metacall_classid"; break;
+         case -1 :
+         case 0  : name = "mulle_objc_class_metacall_classid"; break;
+         }
+
+         llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy, ParamsPtrTy, ClassIDTy  };
+         llvm::Constant *C;
+         
+         C  =  CGM.CreateRuntimeFunction(llvm::FunctionType::get(ObjectPtrTy,
+                                                              params, false),
+                                         name,
+                                         llvm::AttributeSet::get(CGM.getLLVMContext(),
+                                                                 llvm::AttributeSet::FunctionIndex,
+                                                                 llvm::Attribute::NonLazyBind));
+
+         
+         return( C);
       }
       
       
@@ -260,9 +294,17 @@ namespace {
       
       
       // TODO: use different code for different optlevel, like mulle_objc_uninlined_unfailing_get_or_lookup_class
-      llvm::Constant *getGetRuntimeClassFn() {
+      llvm::Constant *getGetRuntimeClassFn( int optLevel) {
          llvm::Type *params[] = { ClassIDTy };
          llvm::Constant *fn;
+         StringRef    name;
+         switch( optLevel)
+         {
+         default : name = "mulle_objc_inline_unfailing_get_or_lookup_class"; break;
+         case -1 :
+         case 0  : name = "mulle_objc_unfailing_get_or_lookup_class"; break;
+         }
+
          llvm::AttributeSet   attributes = llvm::AttributeSet::get(CGM.getLLVMContext(),
                                                                   llvm::AttributeSet::FunctionIndex,
                                                                   llvm::Attribute::ReadNone);
@@ -272,7 +314,7 @@ namespace {
          fn = CGM.CreateRuntimeFunction(llvm::FunctionType::get( ObjectPtrTy,
 
                                                                   params, false),
-                                          "mulle_objc_unfailing_get_or_lookup_class",
+                                          name,
                                           attributes);
          return( fn);
       }
@@ -1591,7 +1633,7 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
             fastclassids_defined = true;
 
             if( _trace_fastids)
-               fprintf( stderr, "fastclassid #%d = 0x%llx\n", i, (uint64_t) fastclassids[ i]);
+               fprintf( stderr, "fastclassid #%d = 0x%llx\n", i, (long long) fastclassids[ i]);
          }
       }
    }
@@ -1603,12 +1645,12 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
 llvm::Value *CGObjCMulleRuntime::GetClass(CodeGenFunction &CGF,
                                           llvm::Value  *classID)
 {
-   // call mulle_objc_runtime_get_class()
    llvm::Value *rval;
    llvm::Value *classPtr;
    
-   classPtr = CGF.EmitNounwindRuntimeCall(ObjCTypes.getGetRuntimeClassFn(),
-                                          classID, "mulle_objc_unfailing_get_class"); // string what for ??
+   int optLevel = CGM.getLangOpts().OptimizeSize ? -1 : CGM.getCodeGenOpts().OptimizationLevel;
+   classPtr = CGF.EmitNounwindRuntimeCall(ObjCTypes.getGetRuntimeClassFn( optLevel),
+                                          classID, "mulle_objc_unfailing_get_or_lookup_class"); // string what for ??
    rval     = CGF.Builder.CreateBitCast( classPtr, ObjCTypes.ObjectPtrTy);
    return rval;
 }
@@ -1745,10 +1787,9 @@ llvm::ConstantStruct *CGObjCMulleRuntime::CreateNSConstantStringStruct( StringRe
    Fields[1] = llvm::Constant::getNullValue( CGM.VoidPtrTy);
 
    llvm::GlobalValue::LinkageTypes Linkage = llvm::GlobalValue::PrivateLinkage;
-   bool isConstant                         = ! CGM.getLangOpts().WritableStrings;
    llvm::Constant *C                       = llvm::ConstantDataArray::getString(VMContext, S);
    
-   auto *GV = new llvm::GlobalVariable( CGM.getModule(), C->getType(), isConstant,
+   auto *GV = new llvm::GlobalVariable( CGM.getModule(), C->getType(), false,
                                        Linkage, C, ".str");
    GV->setUnnamedAddr( true);
    
@@ -1796,9 +1837,9 @@ ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
    llvm::GlobalVariable   *GV;
    llvm::ConstantStruct   *NSStringHeader = CreateNSConstantStringStruct( Entry.first(), StringLength);
    
-   GV = new llvm::GlobalVariable( CGM.getModule(), NSStringHeader->getType(), true,
+   GV = new llvm::GlobalVariable( CGM.getModule(), NSStringHeader->getType(), false,
                                  llvm::GlobalVariable::PrivateLinkage, NSStringHeader,
-                                 "_unnamed_nsstring_header_");
+                                 "_unnamed_nsstring_header");
    // FIXME. Fix section.
    GV->setSection( "__DATA,__objc_stringobj,regular,no_dead_strip");
    GV->setConstant( false);
@@ -2089,7 +2130,10 @@ CGObjCMulleRuntime::GenerateMessageSendSuper(CodeGen::CodeGenFunction &CGF,
    
    llvm::Constant *Fn;
    
-   Fn = IsClassMessage ? ObjCTypes.getMessageSendMetaSuperFn() : ObjCTypes.getMessageSendSuperFn();
+   int optLevel = CGM.getLangOpts().OptimizeSize ? -1 : CGM.getCodeGenOpts().OptimizationLevel;
+   
+   Fn = IsClassMessage ? ObjCTypes.getMessageSendMetaSuperFn( optLevel)
+                       : ObjCTypes.getMessageSendSuperFn( optLevel);
    return( CommonMessageSend( CGF, Fn, Return, ResultType, Receiver, CallArgs, ActualArgs, Arg0, Method, false));
 }
 
@@ -2668,7 +2712,8 @@ RecordDecl  *CGObjCMulleRuntime::CreateOnTheFlyRecordDecl( const ObjCMessageExpr
       sprintf( buf, "param_%d", i);
       FieldName = buf;
       
-      // use expression type, but probably should promote...
+      // if we create something on the fly, the default promotion should
+      // have already be in affected
       
       arg = Method->getArg( i);
       
@@ -2767,7 +2812,8 @@ RecordDecl  *CGObjCMulleRuntime::CreateVariadicOnTheFlyRecordDecl( Selector Sel,
       sprintf( buf, "param_%d", i);
       FieldName = buf;
 
-      arg  = Exprs[ i];  // already promoted!
+      // variadic expressions should be already promoted!
+      arg  = Exprs[ i];
       type = arg->getType();
  
       IdentifierInfo  *FieldID = &Context->Idents.get( FieldName);
@@ -4666,7 +4712,7 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
         I != E; ++I)
    {
       expr = llvm::ConstantExpr::getBitCast( I->getValue(), CGM.VoidPtrTy);
-      LoadStrings.push_back(  expr);
+      LoadStrings.push_back( expr);
    }
 
    if( CGM.getCodeGenOpts().getDebugInfo() >= CodeGenOptions::LimitedDebugInfo)

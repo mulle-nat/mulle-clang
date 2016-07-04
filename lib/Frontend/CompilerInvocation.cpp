@@ -1350,11 +1350,14 @@ void CompilerInvocation::setLangDefaults(LangOptions &Opts, InputKind IK,
     case IK_Asm:
     case IK_C:
     case IK_PreprocessedC:
+       LangStd = LangStandard::lang_gnu11;
+       break;
     case IK_ObjC:
     // @mulle-objc@ AAM:  .aam filename extension support
     case IK_ObjCAAM:
     case IK_PreprocessedObjC:
-      LangStd = LangStandard::lang_gnu11;
+    // @mulle-objc@ C11 should be standard now
+      LangStd = LangStandard::lang_c11;
       break;
     case IK_CXX:
     case IK_PreprocessedCXX:
@@ -1455,12 +1458,17 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
       const LangStandard &Std = LangStandard::getLangStandardForKind(LangStd);
       switch (IK) {
       case IK_C:
-      // @mulle-objc@ AAM:  .aam filename extension support
-      case IK_ObjC:
-      case IK_ObjCAAM:
       case IK_PreprocessedC:
+         if (!(Std.isC89() || Std.isC99()))
+            Diags.Report(diag::err_drv_argument_not_allowed_with);
+         break;
+         
+      // @mulle-objc@ C11: just allow C11, because the runtime needs it
+      case IK_ObjC:
+      // @mulle-objc@ AAM:  .aam filename extension support
+      case IK_ObjCAAM:
       case IK_PreprocessedObjC:
-        if (!(Std.isC89() || Std.isC99()))
+        if ( !Std.isC11())
           Diags.Report(diag::err_drv_argument_not_allowed_with)
             << A->getAsString(Args) << "C/ObjC";
         break;

@@ -7399,7 +7399,6 @@ public:
                               QualType resultType,
                               unsigned int abiDesc,
                               SourceLocation   Loc);
-    bool            typeNeedsMetaABIAlloca( QualType type);
     bool            isMetaABIAllocaMethod( ObjCMethodDecl *ObjCMethod,
                                           QualType resultType);
        

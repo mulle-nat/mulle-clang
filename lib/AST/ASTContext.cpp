@@ -5420,6 +5420,27 @@ void ASTContext::getObjCEncodingForType(QualType T, std::string& S,
                              false, false, false, NotEncodedT);
 }
 
+// ez to remember for rval:
+// 1. if FP it's in _param,
+// 2. if __alignof__(x) > __alignof__( void *), it's in _param
+// 3. if sizeof(x) >sizeof( void *), it's in _param
+bool   ASTContext::typeNeedsMetaABIAlloca( QualType type)
+{
+   if( getTypeSize( type) > getTypeSize( VoidPtrTy))
+      return( true);
+   // should log this, as this is unusual
+   if( getTypeAlign( type) > getTypeAlign( VoidPtrTy))
+      return( true);
+   if( type->isFloatingType())
+      return( true);
+   if( type->isUnionType())
+      return( true);
+   if( type->isStructureOrClassType())
+      return( true);
+   
+   return( false);
+}
+
 void ASTContext::getObjCEncodingForPropertyType(QualType T,
                                                 std::string& S) const {
   // Encode result type.

@@ -102,6 +102,10 @@ CodeGenFunction::EmitObjCBoxedExpr(const ObjCBoxedExpr *E) {
 
     Args.add(RValue::get(Cast), EncodingQT);
   } else {
+    // @mulle-objc@ >> MetaABI: ugly hack for literals
+    if( ! getContext().typeNeedsMetaABIAlloca( ArgQT))
+        ArgQT =getContext().VoidPtrTy;
+
     Args.add(EmitAnyExpr(SubExpr), ArgQT);
   }
 
@@ -1434,6 +1438,46 @@ static bool UseOptimizedSetter(CodeGenModule &CGM) {
   return CGM.getLangOpts().ObjCRuntime.hasOptimizedSetter();
 }
 
+void CodeGenFunction::emitObjCSetterBodyStatement( ObjCIvarRefExpr &ivarRef, QualType argType, Expr *expr)
+{
+   ImplicitCastExpr argLoad(ImplicitCastExpr::OnStack,
+                            argType.getUnqualifiedType(), CK_LValueToRValue,
+                            expr, VK_RValue);
+   
+   // The property type can differ from the ivar type in some situations with
+   // Objective-C pointer types, we can always bit cast the RHS in these cases.
+   // The following absurdity is just to ensure well-formed IR.
+   CastKind argCK = CK_NoOp;
+   if (ivarRef.getType()->isObjCObjectPointerType()) {
+      if (argLoad.getType()->isObjCObjectPointerType())
+         argCK = CK_BitCast;
+      else if (argLoad.getType()->isBlockPointerType())
+         argCK = CK_BlockPointerToObjCPointerCast;
+      else
+         argCK = CK_CPointerToObjCPointerCast;
+   } else if (ivarRef.getType()->isBlockPointerType()) {
+      if (argLoad.getType()->isBlockPointerType())
+         argCK = CK_BitCast;
+      else
+         argCK = CK_AnyPointerToBlockPointerCast;
+   } else if (ivarRef.getType()->isPointerType()) {
+      argCK = CK_BitCast;
+   }
+   ImplicitCastExpr argCast(ImplicitCastExpr::OnStack,
+                            ivarRef.getType(), argCK, &argLoad,
+                            VK_RValue);
+   Expr *finalArg = &argLoad;
+   if (!getContext().hasSameUnqualifiedType(ivarRef.getType(),
+                                            argLoad.getType()))
+      finalArg = &argCast;
+   
+   
+   BinaryOperator assign(&ivarRef, finalArg, BO_Assign,
+                         ivarRef.getType(), VK_RValue, OK_Ordinary,
+                         SourceLocation(), false);
+   EmitStmt(&assign);
+}
+
 void
 CodeGenFunction::generateObjCSetterBody(const ObjCImplementationDecl *classImpl,
                                         const ObjCPropertyImplDecl *propImpl,
@@ -1576,12 +1620,11 @@ CodeGenFunction::generateObjCSetterBody(const ObjCImplementationDecl *classImpl,
   //
   // this code really should be runtime specific
   //
-  Expr   *expr;
   ParmVarDecl *argDecl = *setterMethod->param_begin();
   QualType argType = argDecl->getType().getNonReferenceType();
   
-   if( getLangOpts().ObjCRuntime.hasMulleMetaABI() && setterMethod->getParamDecl())
-   {
+  if( getLangOpts().ObjCRuntime.hasMulleMetaABI() && setterMethod->getParamDecl())
+  {
       ValueDecl *paramDecl = setterMethod->getParamDecl();
       DeclRefExpr param(paramDecl, false, paramDecl->getType(),
                         VK_LValue, SourceLocation());
@@ -1592,52 +1635,17 @@ CodeGenFunction::generateObjCSetterBody(const ObjCImplementationDecl *classImpl,
       MemberExpr   memberExpr( &param, true, SourceLocation(), FD,
                               memberNameInfo, argType,
                               VK_LValue, OK_Ordinary);
-      expr = &memberExpr;
-   }
-   else
-   {
+      // need this duplicate function, because otherwise memberExpr vanishes
+      emitObjCSetterBodyStatement( ivarRef, argType, &memberExpr);
+  }
+  else
+  {
       ParmVarDecl *argDecl = *setterMethod->param_begin();
       QualType argType = argDecl->getType().getNonReferenceType();
       DeclRefExpr arg(argDecl, false, argType, VK_LValue, SourceLocation());
-      expr = &arg;
-   }
-   
-  ImplicitCastExpr argLoad(ImplicitCastExpr::OnStack,
-                           argType.getUnqualifiedType(), CK_LValueToRValue,
-                           expr, VK_RValue);
-    
-  // The property type can differ from the ivar type in some situations with
-  // Objective-C pointer types, we can always bit cast the RHS in these cases.
-  // The following absurdity is just to ensure well-formed IR.
-  CastKind argCK = CK_NoOp;
-  if (ivarRef.getType()->isObjCObjectPointerType()) {
-    if (argLoad.getType()->isObjCObjectPointerType())
-      argCK = CK_BitCast;
-    else if (argLoad.getType()->isBlockPointerType())
-      argCK = CK_BlockPointerToObjCPointerCast;
-    else
-      argCK = CK_CPointerToObjCPointerCast;
-  } else if (ivarRef.getType()->isBlockPointerType()) {
-     if (argLoad.getType()->isBlockPointerType())
-      argCK = CK_BitCast;
-    else
-      argCK = CK_AnyPointerToBlockPointerCast;
-  } else if (ivarRef.getType()->isPointerType()) {
-    argCK = CK_BitCast;
+      // need this duplicate function, because otherwise arg vanishes
+      emitObjCSetterBodyStatement( ivarRef, argType, &arg);
   }
-  ImplicitCastExpr argCast(ImplicitCastExpr::OnStack,
-                           ivarRef.getType(), argCK, &argLoad,
-                           VK_RValue);
-  Expr *finalArg = &argLoad;
-  if (!getContext().hasSameUnqualifiedType(ivarRef.getType(),
-                                           argLoad.getType()))
-    finalArg = &argCast;
-
-
-  BinaryOperator assign(&ivarRef, finalArg, BO_Assign,
-                        ivarRef.getType(), VK_RValue, OK_Ordinary,
-                        SourceLocation(), false);
-  EmitStmt(&assign);
 }
 
 /// \brief Generate an Objective-C property setter function.

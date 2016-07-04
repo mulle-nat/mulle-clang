@@ -1705,7 +1705,7 @@ llvm::StructType *CGObjCCommonMulleRuntime::CreateNSConstantStringType( void)
                                            SourceLocation(), nullptr,
                                            FieldTypes[i], /*TInfo=*/nullptr,
                                            /*BitWidth=*/nullptr,
-                                           /*Mutable=*/false,
+                                           i == 1,
                                            ICIS_NoInit);
       Field->setAccess(AS_public);
       D->addDecl(Field);
@@ -1801,15 +1801,16 @@ ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
                                  "_unnamed_nsstring_header_");
    // FIXME. Fix section.
    GV->setSection( "__DATA,__objc_stringobj,regular,no_dead_strip");
-   
-   QualType  ConstCharType =  CGM.getContext().getPointerType( CGM.getContext().CharTy.withConst());
-   llvm::Type  *CCType = CGM.getTypes().ConvertTypeForMem( ConstCharType);
+   GV->setConstant( false);
+ 
+   QualType           CharType =  CGM.getContext().getPointerType( CGM.getContext().CharTy);
+   llvm::Type         *CType = CGM.getTypes().ConvertTypeForMem( CharType);
    
    llvm::Constant     *C = getConstantGEP( VMContext, GV, 0, 2);
-   llvm::GlobalAlias  *GA = llvm::GlobalAlias::create( CCType,
+   llvm::GlobalAlias  *GA = llvm::GlobalAlias::create( CType,
                                                        0,
-                                                       llvm::GlobalVariable::WeakAnyLinkage,
-                                                       Twine( "_unnamed_nsstring_"),
+                                                       llvm::GlobalVariable::InternalLinkage,
+                                                       Twine( "_unnamed_nsstring"),
                                                        C,
                                                        &CGM.getModule());
    Entry.second = GA;

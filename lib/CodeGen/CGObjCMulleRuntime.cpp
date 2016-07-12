@@ -767,6 +767,7 @@ namespace {
       // FIXME! May not be needing this after all.
       unsigned ObjCABI;
 
+      int64_t   no_tagged_pointers;
       int64_t   foundation_version;
       int64_t   runtime_version;
       int64_t   user_version;
@@ -1520,7 +1521,8 @@ ObjCTypes(cgm) {
    foundation_version = 1848;   // default for testing
    runtime_version    = 0;      // MUST be set by header, if we emit loadinfo
    user_version       = 0;
-
+   no_tagged_pointers = 0;
+   
    memset( fastclassids, 0, sizeof( fastclassids));
    fastclassids_defined = false;
    _trace_fastids = getenv( "MULLE_CLANG_TRACE_FASTCLASS") ? 1 : 0;  // need compiler flag
@@ -1603,6 +1605,11 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
       {
          foundation_version = major << 20 | minor << 8 | patch;
       }
+   }
+   
+   if( GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_NO_TAGGED_POINTERS", &value))
+   {
+      no_tagged_pointers = 1;
    }
    
    // optional anyway
@@ -1824,12 +1831,200 @@ CGObjCCommonMulleRuntime::GetNSConstantStringMapEntry( const StringLiteral *Lite
    return( GetConstantStringEntry( NSConstantStringMap, Literal, StringLength));
 }
 
+#pragma mark -
+#pragma mark mulle_char5
+
+static int   mulle_char5_encode( int c)
+{
+   switch ( c)
+   {
+      case 0   : return( 0);
+
+      case '.' : return( 1);
+      case '0' : return( 2);
+      case '1' : return( 3);
+      case '2' : return( 4);
+      case 'A' : return( 5);
+      case 'C' : return( 6);
+      case 'E' : return( 7);
+      case 'I' : return( 8);
+
+      case 'L' : return( 9);
+      case 'M' : return( 10);
+      case 'P' : return( 11);
+      case 'R' : return( 12);
+      case 'S' : return( 13);
+      case 'T' : return( 14);
+      case '_' : return( 15);
+      case 'a' : return( 16);
+
+      case 'b' : return( 17);
+      case 'c' : return( 18);
+      case 'd' : return( 19);
+      case 'e' : return( 20);
+      case 'g' : return( 21);
+      case 'i' : return( 22);
+      case 'l' : return( 23);
+      case 'm' : return( 24);
+
+      case 'n' : return( 25);
+      case 'o' : return( 26);
+      case 'p' : return( 27);
+      case 'r' : return( 28);
+      case 's' : return( 29);
+      case 't' : return( 30);
+      case 'u' : return( 31);
+   }
+   return( -1);
+}
+
+
+static int   mulle_char5_is32bit( char *src, size_t len)
+{
+   char   *sentinel;
+
+   if( len > 6)
+      return( 0);
+   
+   sentinel = &src[ len];
+   while( src < sentinel)
+      switch( mulle_char5_encode( *src++))
+      {
+      case 0  : return( 1);   // zero byte, ok fine!
+      case -1 : return( 0);   // invalid char
+      }
+
+   return( 1);
+}
+
+
+static int   mulle_char5_is64bit( char *src, size_t len)
+{
+   char   *sentinel;
+   
+   if( len > 12)
+      return( 0);
+   
+   sentinel = &src[ len];
+   while( src < sentinel)
+      switch( mulle_char5_encode( *src++))
+      {
+      case 0  : return( 1);
+      case -1 : return( 0);
+      }
+   
+   return( 1);
+}
+
+
+uint32_t  mulle_char5_encode32_ascii( char *src, size_t len)
+{
+   char       *s;
+   char       *sentinel;
+   char       c;
+   int        char5;
+   uint32_t   value;
+   
+   value    = 0;
+   sentinel = src;
+   s        = &src[ len];
+   while( s > sentinel)
+   {
+      c = *--s;
+      if( ! c)
+         continue;
+      
+      char5   = mulle_char5_encode( c);
+      assert( char5 > 0 && char5 < 0x20);
+      assert( value << 5 >> 5 == value);  // hope the optimizer doesn't fck up
+      value <<= 5;
+      value  |= char5;
+   }
+   return( value);
+}
+
+
+
+uint64_t  mulle_char5_encode64_ascii( char *src, size_t len)
+{
+   char       *s;
+   char       *sentinel;
+   char       c;
+   int        char5;
+   uint64_t   value;
+   
+   value    = 0;
+   sentinel = src;
+   s        = &src[ len];
+   while( s > sentinel)
+   {
+      c = *--s;
+      if( ! c)
+         continue;
+      
+      char5 = mulle_char5_encode( c);
+      assert( char5 > 0 && char5 < 0x20);
+      assert( value << 5 >> 5 == value);  // hope the optimizer doesn't fck up
+      value <<= 5;
+      value  |= char5;
+   }
+   return( value);
+}
+
 
 ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLiteral *SL)
 {
    unsigned StringLength = 0;
-   llvm::StringMapEntry<llvm::GlobalAlias *> &Entry = GetNSConstantStringMapEntry( SL, StringLength);
    CharUnits Align = CGM.getPointerAlign();
+   
+   //
+   // create a tagged pointer for strings, if the constant matches
+   //
+   if( 0 ) // ! no_tagged_pointers && SL->getKind() == StringLiteral::Ascii)
+   {
+      unsigned WordSizeInBits = CGM.getTarget().getPointerWidth(0);
+      StringRef str = SL->getString();
+
+      StringLength = str.size();
+      if( WordSizeInBits == 32)
+      {
+         if( mulle_char5_is32bit( (char *) str.data(), StringLength))
+         {
+            uint32_t   value;
+            
+            value = mulle_char5_encode32_ascii( (char *) str.data(), StringLength);
+
+            // shift up and tag as string
+            value <<= 2;
+            value |= 0x1;
+            
+            llvm::APInt APValue( 32, value);
+            llvm::Constant  *pointerValue = llvm::Constant::getIntegerValue( CGM.Int32Ty, APValue);
+            llvm::Constant  *pointer = llvm::ConstantExpr::getBitCast( pointerValue, CGM.VoidPtrTy);
+            return ConstantAddress( pointer, Align);
+         }
+      }
+      else
+      {
+         if( mulle_char5_is64bit( (char *) str.data(), StringLength))
+         {
+            uint32_t   value;
+            
+            value = mulle_char5_encode64_ascii( (char *) str.data(), StringLength);
+            
+            // shift up and tag as string
+            value <<= 2;
+            value |= 0x1;
+            
+            llvm::APInt APValue( 64, value);
+            llvm::Constant  *pointerValue = llvm::Constant::getIntegerValue( CGM.Int64Ty, APValue);
+            llvm::Constant  *pointer = llvm::ConstantExpr::getBitCast( pointerValue, CGM.VoidPtrTy);
+            return ConstantAddress( pointer, Align);
+         }
+      }
+   }
+   
+   llvm::StringMapEntry<llvm::GlobalAlias *> &Entry = GetNSConstantStringMapEntry( SL, StringLength);
    
    if (auto *C = Entry.second)
       return ConstantAddress( C, Align);
@@ -4662,14 +4857,17 @@ llvm::Constant *CGObjCMulleRuntime::EmitLoadInfoList(Twine Name,
    optLevel  = CGM.getLangOpts().OptimizeSize ? -1 : CGM.getCodeGenOpts().OptimizationLevel;
    optLevel &= 0x7;
    
-   unsigned int   aaomode;
+   unsigned int   bits;
    
-   aaomode   = CGM.getLangOpts().ObjCAllocsAutoreleasedObjects;
-   
+   bits  = optLevel << 16;
+   bits |= no_tagged_pointers ? 0x4 : 0x0;
+   bits |= CGM.getLangOpts().ObjCAllocsAutoreleasedObjects ? 0x2 : 0;
+   bits |= 1;  // sorted
+
    //
-   // memorize aoomodea nd optLevel too, might come in useful
+   // memorize some compilation context
    //
-   Values[3] = llvm::ConstantInt::get(ObjCTypes.IntTy, (optLevel << 16) | (aaomode << 1) | 1);     // bits, 1 == sorted
+   Values[3] = llvm::ConstantInt::get(ObjCTypes.IntTy, bits);
    Values[4] = ClassList;
    Values[5] = CategoryList;
    Values[6] = StringList;

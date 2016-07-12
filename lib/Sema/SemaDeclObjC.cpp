@@ -4416,7 +4416,7 @@ Decl *Sema::ActOnMethodDeclaration(
   // other good stuff.
   if( getLangOpts().ObjCAllocsAutoreleasedObjects)
   {
-     switch( Sel.getMethodFamily())
+     switch( (int) Sel.getMethodFamily())
      {
      case ObjCMethodFamily::OMF_alloc       :
      case ObjCMethodFamily::OMF_new         :

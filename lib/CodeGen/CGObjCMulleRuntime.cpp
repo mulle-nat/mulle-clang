@@ -1974,18 +1974,17 @@ uint64_t  mulle_char5_encode64_ascii( char *src, size_t len)
 
 ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLiteral *SL)
 {
-   unsigned StringLength = 0;
    CharUnits Align = CGM.getPointerAlign();
+   StringRef str = SL->getString();
+   unsigned StringLength = str.size();
    
    //
    // create a tagged pointer for strings, if the constant matches
    //
-   if( 0 ) // ! no_tagged_pointers && SL->getKind() == StringLiteral::Ascii)
+   if( ! no_tagged_pointers && SL->getKind() == StringLiteral::Ascii)
    {
       unsigned WordSizeInBits = CGM.getTarget().getPointerWidth(0);
-      StringRef str = SL->getString();
 
-      StringLength = str.size();
       if( WordSizeInBits == 32)
       {
          if( mulle_char5_is32bit( (char *) str.data(), StringLength))
@@ -2000,7 +1999,7 @@ ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
             
             llvm::APInt APValue( 32, value);
             llvm::Constant  *pointerValue = llvm::Constant::getIntegerValue( CGM.Int32Ty, APValue);
-            llvm::Constant  *pointer = llvm::ConstantExpr::getBitCast( pointerValue, CGM.VoidPtrTy);
+            llvm::Constant  *pointer = llvm::ConstantExpr::getIntToPtr( pointerValue, CGM.VoidPtrTy);
             return ConstantAddress( pointer, Align);
          }
       }
@@ -2008,17 +2007,17 @@ ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
       {
          if( mulle_char5_is64bit( (char *) str.data(), StringLength))
          {
-            uint32_t   value;
+            uint64_t   value;
             
             value = mulle_char5_encode64_ascii( (char *) str.data(), StringLength);
             
             // shift up and tag as string
-            value <<= 2;
+            value <<= 3;
             value |= 0x1;
             
             llvm::APInt APValue( 64, value);
             llvm::Constant  *pointerValue = llvm::Constant::getIntegerValue( CGM.Int64Ty, APValue);
-            llvm::Constant  *pointer = llvm::ConstantExpr::getBitCast( pointerValue, CGM.VoidPtrTy);
+            llvm::Constant  *pointer = llvm::ConstantExpr::getIntToPtr( pointerValue, CGM.VoidPtrTy);
             return ConstantAddress( pointer, Align);
          }
       }

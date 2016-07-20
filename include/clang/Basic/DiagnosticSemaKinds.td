@@ -5559,7 +5559,7 @@ def note_objc_circular_container_declared_here : Note<"'%0' declared here">;
 // @mulle-objc@ compiler: error message definitions
 def error_mulle_aam_ivar_access : Error<"in AAM instance variables such as %0 are not accessible">, AccessControl;
 def err_mulle_aam_unsupported_method_family : Error<
-"in AAM method %0 can not be written, use a non AAM category">;
+"in AAM method %0 can not be defined, use a non AAM category">;
 def err_mulle_aam_illegal_explicit_message : Error<
 "in AAM method %0 is not available">;
 def err_mulle_aam_illegal_retained_message : Error<

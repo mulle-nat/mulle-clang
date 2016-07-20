@@ -1182,6 +1182,27 @@ ExprResult Sema::ParseObjCSelectorExpression(Selector Sel,
       !getSourceManager().isInSystemHeader(Method->getLocation()))
     ReferencedSelectors.insert(std::make_pair(Sel, AtLoc));
 
+  // @mulle-objc@ AAM:  check that family is compatible
+  // the params are what is used for syntax checks and all the
+  // other good stuff.
+  if( getLangOpts().ObjCAllocsAutoreleasedObjects)
+  {
+     switch( (int) Sel.getMethodFamily())
+     {
+     case OMF_alloc       :
+     case OMF_dealloc     :
+     case OMF_new         :
+     case OMF_copy        :
+     case OMF_mutableCopy :
+     case OMF_autorelease :
+     case OMF_release     :
+     case OMF_retain      :
+     case OMF_retainCount :
+         Diag (AtLoc, diag::err_mulle_aam_unsupported_method_family) <<
+            Sel << SourceRange(LParenLoc, RParenLoc);
+     }
+  }
+
   // In ARC, forbid the user from using @selector for 
   // retain/release/autorelease/dealloc/retainCount.
   if (getLangOpts().ObjCAutoRefCount) {

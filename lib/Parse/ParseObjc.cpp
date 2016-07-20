@@ -3298,6 +3298,11 @@ Parser::ParseObjCMessageExpressionBody(SourceLocation LBracLoc,
           Diag( Loc, diag::warn_mulle_aam_rename_selector) << s << "instantiate";
           selIdent = &PP.getIdentifierTable().get( "instantiate");
        }
+       else if( s == "new")
+       {
+          Diag( Loc, diag::warn_mulle_aam_rename_selector) << s << "instantiatedObject";
+          selIdent = &PP.getIdentifierTable().get( "instantiatedObject");
+       }
        else if( s == "copy")
        {
           Diag( Loc, diag::warn_mulle_aam_rename_selector) << s << "immutableInstance";

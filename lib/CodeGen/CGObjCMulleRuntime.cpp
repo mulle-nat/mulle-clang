@@ -6685,7 +6685,7 @@ void CGObjCCommonMulleRuntime::GetNameForMethod(const ObjCMethodDecl *D,
                                        SmallVectorImpl<char> &Name) {
    llvm::raw_svector_ostream OS(Name);
    assert (CD && "Missing container decl in GetNameForMethod");
-   OS << '\01' << (D->isInstanceMethod() ? '-' : '+')
+   OS << /* '\01' << */ (D->isInstanceMethod() ? '-' : '+')
    << '[' << CD->getName();
    if (const ObjCCategoryImplDecl *CID =
        dyn_cast<ObjCCategoryImplDecl>(D->getDeclContext()))

@@ -4426,7 +4426,7 @@ Decl *Sema::ActOnMethodDeclaration(
      case ObjCMethodFamily::OMF_release     :
      case ObjCMethodFamily::OMF_retain      :
      case ObjCMethodFamily::OMF_retainCount :
-         Diag(ObjCMethod->getLocation(), diag::err_mulle_aao_unsupported_method_family)
+         Diag(ObjCMethod->getLocation(), diag::err_mulle_aam_unsupported_method_family)
             << ObjCMethod->getDeclName();
      }
   }

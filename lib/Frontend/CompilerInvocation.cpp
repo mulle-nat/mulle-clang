@@ -1548,7 +1548,7 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
         Diags.Report(diag::err_drv_unknown_objc_runtime) << value;
     }
     
-    if (Args.hasArg(OPT_fobjc_aao))
+    if (Args.hasArg(OPT_fobjc_aam))
       Opts.ObjCAllocsAutoreleasedObjects = 1;
 
     if (Args.hasArg(OPT_fobjc_gc_only))

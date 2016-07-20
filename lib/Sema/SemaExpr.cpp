@@ -2519,7 +2519,7 @@ Sema::LookupInObjCMethod(LookupResult &Lookup, Scope *S, CXXScopeSpec &SS,
        // @mulle-objc@ AAM:  In AAM ivars are just not available
       if ( getLangOpts().ObjCAllocsAutoreleasedObjects)
       {
-         Diag(Loc, diag::error_mulle_aao_ivar_access) << IV->getDeclName();
+         Diag(Loc, diag::error_mulle_aam_ivar_access) << IV->getDeclName();
          return ExprError();
       }
 

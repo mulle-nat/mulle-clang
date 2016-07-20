@@ -2448,7 +2448,7 @@ ExprResult Sema::BuildClassMessage(TypeSourceInfo *ReceiverTypeInfo,
   // @mulle-objc@ AAM:  check class selectors
   if( getLangOpts().ObjCAllocsAutoreleasedObjects)
   {
-     CheckSelectorForAAOmode( Sel, Method, ReceiverType, SelLoc, ReceiverTypeInfo->getTypeLoc().getSourceRange());
+     CheckSelectorForAAM( Sel, Method, ReceiverType, SelLoc, ReceiverTypeInfo->getTypeLoc().getSourceRange());
   }
    
   DiagnoseCStringFormatDirectiveInObjCAPI(*this, Method, Sel, Args, NumArgs);
@@ -2522,17 +2522,17 @@ static bool  hasEnding (std::string const &fullString, std::string const &ending
 
 
 // @mulle-objc@ AAM:  check that selectors conform
-int   Sema::CheckSelectorForAAOmode( Selector Sel,
-                                     ObjCMethodDecl *Method,
-                                     QualType ReceiverType,
-                                     SourceLocation SelLoc,
-                                     SourceRange RecRange)
+int   Sema::CheckSelectorForAAM( Selector Sel,
+                                 ObjCMethodDecl *Method,
+                                 QualType ReceiverType,
+                                 SourceLocation SelLoc,
+                                 SourceRange RecRange)
 {
    if( Method)
    {
       if (Method->hasAttr<NSReturnsRetainedAttr>())
       {
-         Diag(SelLoc, diag::err_mulle_aao_illegal_retained_message)
+         Diag(SelLoc, diag::err_mulle_aam_illegal_retained_message)
          << Sel << RecRange;
       }
       
@@ -2543,7 +2543,7 @@ int   Sema::CheckSelectorForAAOmode( Selector Sel,
          const ParmVarDecl *ParamDecl = (*i);
          if (ParamDecl->hasAttr<NSConsumedAttr>())
          {
-            Diag(SelLoc, diag::err_mulle_aao_illegal_consumed_message)
+            Diag(SelLoc, diag::err_mulle_aam_illegal_consumed_message)
             << Sel << RecRange;
             break;
          }
@@ -2560,7 +2560,7 @@ int   Sema::CheckSelectorForAAOmode( Selector Sel,
          
       case OMF_None:
          if( Sel.getAsString() == "zone")
-            Diag(SelLoc, diag::err_mulle_aao_illegal_explicit_message)
+            Diag(SelLoc, diag::err_mulle_aam_illegal_explicit_message)
             << Sel << RecRange;
          break;
          
@@ -2568,7 +2568,7 @@ int   Sema::CheckSelectorForAAOmode( Selector Sel,
       case OMF_copy:
       case OMF_mutableCopy:
          if( hasEnding( Sel.getAsString(), "WithZone:"))
-            Diag(SelLoc, diag::err_mulle_aao_illegal_explicit_message)
+            Diag(SelLoc, diag::err_mulle_aam_illegal_explicit_message)
             << Sel << RecRange;
          break;
          
@@ -2580,7 +2580,7 @@ int   Sema::CheckSelectorForAAOmode( Selector Sel,
       case OMF_retain:
       case OMF_release:
       case OMF_autorelease:
-         Diag(SelLoc, diag::err_mulle_aao_illegal_explicit_message)
+         Diag(SelLoc, diag::err_mulle_aam_illegal_explicit_message)
          << Sel << RecRange;
          break;
          
@@ -3047,7 +3047,7 @@ ExprResult Sema::BuildInstanceMessage(Expr *Receiver,
   if( getLangOpts().ObjCAllocsAutoreleasedObjects)
   {
      // if 1, it's a performSelector variant
-     if( CheckSelectorForAAOmode( Sel, Method, ReceiverType, SelLoc, RecRange))
+     if( CheckSelectorForAAM( Sel, Method, ReceiverType, SelLoc, RecRange))
      {
         ObjCSelectorExpr *SelExp;
         
@@ -3063,7 +3063,7 @@ ExprResult Sema::BuildInstanceMessage(Expr *Receiver,
               SelMethod = LookupFactoryMethodInGlobalPool(ArgSel,
                                                           SelExp->getSourceRange());
            if (SelMethod)
-              CheckSelectorForAAOmode( ArgSel, SelMethod, ReceiverType, SelLoc, RecRange);
+              CheckSelectorForAAM( ArgSel, SelMethod, ReceiverType, SelLoc, RecRange);
         }
      }
   }

@@ -3295,17 +3295,17 @@ Parser::ParseObjCMessageExpressionBody(SourceLocation LBracLoc,
        s = selIdent->getName();
        if( s == "alloc")
        {
-          Diag( Loc, diag::warn_mulle_aao_rename_selector) << s << "instantiate";
+          Diag( Loc, diag::warn_mulle_aam_rename_selector) << s << "instantiate";
           selIdent = &PP.getIdentifierTable().get( "instantiate");
        }
        else if( s == "copy")
        {
-          Diag( Loc, diag::warn_mulle_aao_rename_selector) << s << "immutableInstance";
+          Diag( Loc, diag::warn_mulle_aam_rename_selector) << s << "immutableInstance";
           selIdent = &PP.getIdentifierTable().get( "immutableInstance");
        }
        else if( s == "mutableCopy")
        {
-          Diag( Loc, diag::warn_mulle_aao_rename_selector) << s << "mutableInstance";
+          Diag( Loc, diag::warn_mulle_aam_rename_selector) << s << "mutableInstance";
           selIdent = &PP.getIdentifierTable().get( "mutableInstance");
        }
     }

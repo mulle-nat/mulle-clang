@@ -209,9 +209,9 @@ def note_mt_message : Note<"[rewriter] %0">;
 
 
 // @mulle-objc@ AAM:  warn when renaming selectors
-def warn_mulle_aao_rename_selector : Warning<
+def warn_mulle_aam_rename_selector : Warning<
 "in AAM method calls to '%0' are actually calls to '%1'">,
-InGroup<AAORenaming>;
+InGroup<AAMRenaming>;
 
 
 // ARCMigrate

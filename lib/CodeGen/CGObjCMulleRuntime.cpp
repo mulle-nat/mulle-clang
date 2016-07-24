@@ -1521,7 +1521,7 @@ ObjCTypes(cgm) {
    foundation_version = 1848;   // default for testing
    runtime_version    = 0;      // MUST be set by header, if we emit loadinfo
    user_version       = 0;
-   no_tagged_pointers = 0;
+   no_tagged_pointers = CGM.getLangOpts().ObjCDisableTaggedPointers;
    
    memset( fastclassids, 0, sizeof( fastclassids));
    fastclassids_defined = false;
@@ -1549,9 +1549,13 @@ bool  CGObjCMulleRuntime::GetMacroDefinitionUnsignedIntegerValue( clang::Preproc
    if( ! definition)
       return( 0);
    
+   // default: 1 if just defined
    info = definition.getMacroInfo();
    if( ! info->getNumTokens())
-      return( 0);
+   {
+      *value = 1;
+      return( 1);
+   }
    
    token = &info->getReplacementToken( 0);
    if( token->getKind() != tok::numeric_constant)
@@ -1607,9 +1611,10 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
       }
    }
    
+   // possibly make this a #pragma sometime
    if( GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_NO_TAGGED_POINTERS", &value))
    {
-      no_tagged_pointers = 1;
+      no_tagged_pointers = value;
    }
    
    // optional anyway
@@ -1985,6 +1990,8 @@ ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
    {
       unsigned WordSizeInBits = CGM.getTarget().getPointerWidth(0);
 
+      fprintf( stderr, "Create tagged pointer for \"%.*s\"\n", (int) StringLength, (char *) str.data());
+      
       if( WordSizeInBits == 32)
       {
          if( mulle_char5_is32bit( (char *) str.data(), StringLength))

@@ -1548,6 +1548,10 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
         Diags.Report(diag::err_drv_unknown_objc_runtime) << value;
     }
     
+    // @mulle-objc@: handle AAM and TPS options
+    if( Args.hasArg( OPT_fno_objc_tps))
+      Opts.ObjCDisableTaggedPointers = 1;
+    
     if( Args.hasArg( OPT_fobjc_aam))
       Opts.ObjCAllocsAutoreleasedObjects = 1;
     else if (Args.hasArg(OPT_fobjc_gc_only))

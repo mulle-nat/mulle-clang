@@ -4570,6 +4570,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
 
   // @mulle-objc@ Forward compiler flags for MulleObjC
   Args.AddLastArg(CmdArgs, options::OPT_fobjc_aam);
+  Args.AddLastArg(CmdArgs, options::OPT_fobjc_tps);
 
   // Forward flags for OpenMP
   if (Args.hasFlag(options::OPT_fopenmp, options::OPT_fopenmp_EQ,

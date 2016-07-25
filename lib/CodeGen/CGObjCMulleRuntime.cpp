@@ -1977,6 +1977,86 @@ uint64_t  mulle_char5_encode64_ascii( char *src, size_t len)
 }
 
 
+int   mulle_char7_is32bit( char *src, size_t len)
+{
+   char   *sentinel;
+
+   if( len > 4)
+      return( 0);
+   
+   sentinel = &src[ len];
+   while( src < sentinel)
+      if( *src++ & 0x80)
+         return( 0);   // invalid char
+
+   return( 1);
+}
+
+
+int   mulle_char7_is64bit( char *src, size_t len)
+{
+   char   *sentinel;
+   
+   if( len > 8)
+      return( 0);
+   
+   sentinel = &src[ len];
+   while( src < sentinel)
+      if( *src++ & 0x80)
+         return( 0);   // invalid char
+   
+   return( 1);
+}
+
+
+uint32_t  mulle_char7_encode32_ascii( char *src, size_t len)
+{
+   char       *s;
+   char       *sentinel;
+   int        char7;
+   uint32_t   value;
+   
+   value    = 0;
+   sentinel = src;
+   s        = &src[ len];
+   while( s > sentinel)
+   {
+      char7 = *--s;
+      if( ! char7)
+         continue;
+      
+      assert( ! (char7 & 0x80));
+      value <<= 7;
+      value  |= char7;
+   }
+   return( value);
+}
+
+
+uint64_t  mulle_char7_encode64_ascii( char *src, size_t len)
+{
+   char       *s;
+   char       *sentinel;
+   int        char7;
+   uint64_t   value;
+   
+   value    = 0;
+   sentinel = src;
+   s        = &src[ len];
+   while( s > sentinel)
+   {
+      char7 = *--s;
+      if( ! char7)
+         continue;
+      
+      assert( ! (char7 & 0x80));
+      value <<= 7;
+      value  |= char7;
+   }
+   return( value);
+}
+
+
 ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLiteral *SL)
 {
    CharUnits Align = CGM.getPointerAlign();
@@ -1990,41 +2070,64 @@ ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
    {
       unsigned WordSizeInBits = CGM.getTarget().getPointerWidth(0);
 
-      fprintf( stderr, "Create tagged pointer for \"%.*s\"\n", (int) StringLength, (char *) str.data());
-      
       if( WordSizeInBits == 32)
       {
-         if( mulle_char5_is32bit( (char *) str.data(), StringLength))
-         {
-            uint32_t   value;
-            
-            value = mulle_char5_encode32_ascii( (char *) str.data(), StringLength);
+         uint32_t   value;
 
-            // shift up and tag as string
+         value = 0;
+         if( mulle_char7_is32bit( (char *) str.data(), StringLength))
+         {
+            value = mulle_char7_encode32_ascii( (char *) str.data(), StringLength);
             value <<= 2;
-            value |= 0x1;
-            
+            value |= 0x3;
+         }
+         else
+            if( mulle_char5_is32bit( (char *) str.data(), StringLength))
+            {
+               value = mulle_char5_encode32_ascii( (char *) str.data(), StringLength);
+               
+               // shift up and tag as string
+               value <<= 2;
+               value |= 0x1;
+            }
+         
+         if( value)
+         {
             llvm::APInt APValue( 32, value);
             llvm::Constant  *pointerValue = llvm::Constant::getIntegerValue( CGM.Int32Ty, APValue);
             llvm::Constant  *pointer = llvm::ConstantExpr::getIntToPtr( pointerValue, CGM.VoidPtrTy);
+            //fprintf( stderr, "Created tagged 32 bit pointer for \"%.*s\"\n", (int) StringLength, (char *) str.data());
+         
             return ConstantAddress( pointer, Align);
          }
       }
       else
       {
-         if( mulle_char5_is64bit( (char *) str.data(), StringLength))
+         uint64_t   value;
+         
+         value = 0;
+         if( mulle_char7_is64bit( (char *) str.data(), StringLength))
          {
-            uint64_t   value;
-            
-            value = mulle_char5_encode64_ascii( (char *) str.data(), StringLength);
-            
-            // shift up and tag as string
+            value = mulle_char7_encode64_ascii( (char *) str.data(), StringLength);
             value <<= 3;
-            value |= 0x1;
-            
+            value |= 0x3;
+         }
+         else
+            if( mulle_char5_is64bit( (char *) str.data(), StringLength))
+            {
+               value = mulle_char5_encode64_ascii( (char *) str.data(), StringLength);
+               
+               // shift up and tag as string
+               value <<= 3;
+               value |= 0x1;
+            }
+         
+         if( value)
+         {
             llvm::APInt APValue( 64, value);
             llvm::Constant  *pointerValue = llvm::Constant::getIntegerValue( CGM.Int64Ty, APValue);
             llvm::Constant  *pointer = llvm::ConstantExpr::getIntToPtr( pointerValue, CGM.VoidPtrTy);
+            //fprintf( stderr, "Created tagged 64 bit pointer for \"%.*s\"\n", (int) StringLength, (char *) str.data());
             return ConstantAddress( pointer, Align);
          }
       }
@@ -2056,6 +2159,7 @@ ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
                                                        C,
                                                        &CGM.getModule());
    Entry.second = GA;
+   //   fprintf( stderr, "Created constant string for \"%.*s\"\n", (int) StringLength, (char *) str.data());
    return ConstantAddress( GA, Align);
 }
 

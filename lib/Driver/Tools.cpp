@@ -4553,6 +4553,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   Args.AddLastArg(CmdArgs, options::OPT_femit_all_decls);
   Args.AddLastArg(CmdArgs, options::OPT_fheinous_gnu_extensions);
   Args.AddLastArg(CmdArgs, options::OPT_fno_operator_names);
+  
   // Emulated TLS is enabled by default on Android, and can be enabled manually
   // with -femulated-tls.
   bool EmulatedTLSDefault = Triple.isAndroid();
@@ -4566,6 +4567,10 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   }
   Args.AddLastArg(CmdArgs, options::OPT_fdiagnostics_show_template_tree);
   Args.AddLastArg(CmdArgs, options::OPT_fno_elide_type);
+
+  // @mulle-objc@ Forward compiler flags for MulleObjC
+  Args.AddLastArg(CmdArgs, options::OPT_fobjc_aam);
+  Args.AddLastArg(CmdArgs, options::OPT_fobjc_tps);
 
   // Forward flags for OpenMP
   if (Args.hasFlag(options::OPT_fopenmp, options::OPT_fopenmp_EQ,

@@ -5557,14 +5557,14 @@ def warn_objc_circular_container : Warning<
 def note_objc_circular_container_declared_here : Note<"'%0' declared here">;
 
 // @mulle-objc@ compiler: error message definitions
-def error_mulle_aao_ivar_access : Error<"in AAM instance variables such as %0 are not accessible">, AccessControl;
-def err_mulle_aao_unsupported_method_family : Error<
-"in AAM method %0 can not be written, use a non AAO category">;
-def err_mulle_aao_illegal_explicit_message : Error<
+def error_mulle_aam_ivar_access : Error<"in AAM instance variables such as %0 are not accessible">, AccessControl;
+def err_mulle_aam_unsupported_method_family : Error<
+"in AAM method %0 can not be defined, use a non AAM category">;
+def err_mulle_aam_illegal_explicit_message : Error<
 "in AAM method %0 is not available">;
-def err_mulle_aao_illegal_retained_message : Error<
+def err_mulle_aam_illegal_retained_message : Error<
 "in AAM method %0 is not available, because it returns a retained object">;
-def err_mulle_aao_illegal_consumed_message : Error<
+def err_mulle_aam_illegal_consumed_message : Error<
 "in AAM method %0 is not available, because it needs a retained argument">;
 def err_mulle_objc_runtime_function_missing : Error<
 "the mulle-objc runtime function %0 has not been declared yet">;

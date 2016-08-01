@@ -163,18 +163,52 @@ namespace {
       ///
       /// The messenger used for super calls
       ///
-      llvm::Constant *getMessageSendSuperFn() const {
+      llvm::Constant *getMessageSendSuperFn( int optLevel) const
+      {
+         StringRef    name;
+         switch( optLevel)
+         {
+         default : name = "mulle_objc_object_inline_call_classid"; break;
+         case -1 :
+         case 0  : name = "mulle_objc_object_call_classid"; break;
+         }
+
          llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy, ParamsPtrTy, ClassIDTy  };
-         return CGM.CreateRuntimeFunction(llvm::FunctionType::get(ObjectPtrTy,
-                                                                  params, false),
-                                          "_mulle_objc_object_call_classid");
+         llvm::Constant *C;
+         
+         C  =  CGM.CreateRuntimeFunction(llvm::FunctionType::get(ObjectPtrTy,
+                                                              params, false),
+                                         name,
+                                         llvm::AttributeSet::get(CGM.getLLVMContext(),
+                                                                 llvm::AttributeSet::FunctionIndex,
+                                                                 llvm::Attribute::NonLazyBind));
+
+         
+         return( C);
       }
 
-      llvm::Constant *getMessageSendMetaSuperFn() const {
-         llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy, ParamsPtrTy, ClassIDTy };
-         return CGM.CreateRuntimeFunction(llvm::FunctionType::get(ObjectPtrTy,
-                                                                  params, false),
-                                          "_mulle_objc_class_metacall_classid");
+      llvm::Constant *getMessageSendMetaSuperFn( int optLevel) const
+      {
+         StringRef    name;
+         switch( optLevel)
+         {
+         default : name = "mulle_objc_class_inline_metacall_classid"; break;
+         case -1 :
+         case 0  : name = "mulle_objc_class_metacall_classid"; break;
+         }
+
+         llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy, ParamsPtrTy, ClassIDTy  };
+         llvm::Constant *C;
+         
+         C  =  CGM.CreateRuntimeFunction(llvm::FunctionType::get(ObjectPtrTy,
+                                                              params, false),
+                                         name,
+                                         llvm::AttributeSet::get(CGM.getLLVMContext(),
+                                                                 llvm::AttributeSet::FunctionIndex,
+                                                                 llvm::Attribute::NonLazyBind));
+
+         
+         return( C);
       }
       
       
@@ -260,9 +294,17 @@ namespace {
       
       
       // TODO: use different code for different optlevel, like mulle_objc_uninlined_unfailing_get_or_lookup_class
-      llvm::Constant *getGetRuntimeClassFn() {
+      llvm::Constant *getGetRuntimeClassFn( int optLevel) {
          llvm::Type *params[] = { ClassIDTy };
          llvm::Constant *fn;
+         StringRef    name;
+         switch( optLevel)
+         {
+         default : name = "mulle_objc_inline_unfailing_get_or_lookup_class"; break;
+         case -1 :
+         case 0  : name = "mulle_objc_unfailing_get_or_lookup_class"; break;
+         }
+
          llvm::AttributeSet   attributes = llvm::AttributeSet::get(CGM.getLLVMContext(),
                                                                   llvm::AttributeSet::FunctionIndex,
                                                                   llvm::Attribute::ReadNone);
@@ -272,7 +314,7 @@ namespace {
          fn = CGM.CreateRuntimeFunction(llvm::FunctionType::get( ObjectPtrTy,
 
                                                                   params, false),
-                                          "mulle_objc_unfailing_get_or_lookup_class",
+                                          name,
                                           attributes);
          return( fn);
       }
@@ -725,6 +767,7 @@ namespace {
       // FIXME! May not be needing this after all.
       unsigned ObjCABI;
 
+      int64_t   no_tagged_pointers;
       int64_t   foundation_version;
       int64_t   runtime_version;
       int64_t   user_version;
@@ -1478,7 +1521,8 @@ ObjCTypes(cgm) {
    foundation_version = 1848;   // default for testing
    runtime_version    = 0;      // MUST be set by header, if we emit loadinfo
    user_version       = 0;
-
+   no_tagged_pointers = CGM.getLangOpts().ObjCDisableTaggedPointers;
+   
    memset( fastclassids, 0, sizeof( fastclassids));
    fastclassids_defined = false;
    _trace_fastids = getenv( "MULLE_CLANG_TRACE_FASTCLASS") ? 1 : 0;  // need compiler flag
@@ -1505,9 +1549,13 @@ bool  CGObjCMulleRuntime::GetMacroDefinitionUnsignedIntegerValue( clang::Preproc
    if( ! definition)
       return( 0);
    
+   // default: 1 if just defined
    info = definition.getMacroInfo();
    if( ! info->getNumTokens())
-      return( 0);
+   {
+      *value = 1;
+      return( 1);
+   }
    
    token = &info->getReplacementToken( 0);
    if( token->getKind() != tok::numeric_constant)
@@ -1563,6 +1611,12 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
       }
    }
    
+   // possibly make this a #pragma sometime
+   if( GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_NO_TAGGED_POINTERS", &value))
+   {
+      no_tagged_pointers = value;
+   }
+   
    // optional anyway
    if( ! user_version)
    {
@@ -1603,12 +1657,12 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
 llvm::Value *CGObjCMulleRuntime::GetClass(CodeGenFunction &CGF,
                                           llvm::Value  *classID)
 {
-   // call mulle_objc_runtime_get_class()
    llvm::Value *rval;
    llvm::Value *classPtr;
    
-   classPtr = CGF.EmitNounwindRuntimeCall(ObjCTypes.getGetRuntimeClassFn(),
-                                          classID, "mulle_objc_unfailing_get_class"); // string what for ??
+   int optLevel = CGM.getLangOpts().OptimizeSize ? -1 : CGM.getCodeGenOpts().OptimizationLevel;
+   classPtr = CGF.EmitNounwindRuntimeCall(ObjCTypes.getGetRuntimeClassFn( optLevel),
+                                          classID, "mulle_objc_unfailing_get_or_lookup_class"); // string what for ??
    rval     = CGF.Builder.CreateBitCast( classPtr, ObjCTypes.ObjectPtrTy);
    return rval;
 }
@@ -1705,7 +1759,7 @@ llvm::StructType *CGObjCCommonMulleRuntime::CreateNSConstantStringType( void)
                                            SourceLocation(), nullptr,
                                            FieldTypes[i], /*TInfo=*/nullptr,
                                            /*BitWidth=*/nullptr,
-                                           /*Mutable=*/false,
+                                           i == 1,
                                            ICIS_NoInit);
       Field->setAccess(AS_public);
       D->addDecl(Field);
@@ -1782,12 +1836,304 @@ CGObjCCommonMulleRuntime::GetNSConstantStringMapEntry( const StringLiteral *Lite
    return( GetConstantStringEntry( NSConstantStringMap, Literal, StringLength));
 }
 
+#pragma mark -
+#pragma mark mulle_char5
+
+static int   mulle_char5_encode( int c)
+{
+   switch ( c)
+   {
+      case 0   : return( 0);
+
+      case '.' : return( 1);
+      case '0' : return( 2);
+      case '1' : return( 3);
+      case '2' : return( 4);
+      case 'A' : return( 5);
+      case 'C' : return( 6);
+      case 'E' : return( 7);
+      case 'I' : return( 8);
+
+      case 'L' : return( 9);
+      case 'M' : return( 10);
+      case 'P' : return( 11);
+      case 'R' : return( 12);
+      case 'S' : return( 13);
+      case 'T' : return( 14);
+      case '_' : return( 15);
+      case 'a' : return( 16);
+
+      case 'b' : return( 17);
+      case 'c' : return( 18);
+      case 'd' : return( 19);
+      case 'e' : return( 20);
+      case 'g' : return( 21);
+      case 'i' : return( 22);
+      case 'l' : return( 23);
+      case 'm' : return( 24);
+
+      case 'n' : return( 25);
+      case 'o' : return( 26);
+      case 'p' : return( 27);
+      case 'r' : return( 28);
+      case 's' : return( 29);
+      case 't' : return( 30);
+      case 'u' : return( 31);
+   }
+   return( -1);
+}
+
+
+static int   mulle_char5_is32bit( char *src, size_t len)
+{
+   char   *sentinel;
+
+   if( len > 6)
+      return( 0);
+   
+   sentinel = &src[ len];
+   while( src < sentinel)
+      switch( mulle_char5_encode( *src++))
+      {
+      case 0  : return( 1);   // zero byte, ok fine!
+      case -1 : return( 0);   // invalid char
+      }
+
+   return( 1);
+}
+
+
+static int   mulle_char5_is64bit( char *src, size_t len)
+{
+   char   *sentinel;
+   
+   if( len > 12)
+      return( 0);
+   
+   sentinel = &src[ len];
+   while( src < sentinel)
+      switch( mulle_char5_encode( *src++))
+      {
+      case 0  : return( 1);
+      case -1 : return( 0);
+      }
+   
+   return( 1);
+}
+
+
+uint32_t  mulle_char5_encode32_ascii( char *src, size_t len)
+{
+   char       *s;
+   char       *sentinel;
+   char       c;
+   int        char5;
+   uint32_t   value;
+   
+   value    = 0;
+   sentinel = src;
+   s        = &src[ len];
+   while( s > sentinel)
+   {
+      c = *--s;
+      if( ! c)
+         continue;
+      
+      char5   = mulle_char5_encode( c);
+      assert( char5 > 0 && char5 < 0x20);
+      assert( value << 5 >> 5 == value);  // hope the optimizer doesn't fck up
+      value <<= 5;
+      value  |= char5;
+   }
+   return( value);
+}
+
+
+
+uint64_t  mulle_char5_encode64_ascii( char *src, size_t len)
+{
+   char       *s;
+   char       *sentinel;
+   char       c;
+   int        char5;
+   uint64_t   value;
+   
+   value    = 0;
+   sentinel = src;
+   s        = &src[ len];
+   while( s > sentinel)
+   {
+      c = *--s;
+      if( ! c)
+         continue;
+      
+      char5 = mulle_char5_encode( c);
+      assert( char5 > 0 && char5 < 0x20);
+      assert( value << 5 >> 5 == value);  // hope the optimizer doesn't fck up
+      value <<= 5;
+      value  |= char5;
+   }
+   return( value);
+}
+
+
+int   mulle_char7_is32bit( char *src, size_t len)
+{
+   char   *sentinel;
+
+   if( len > 4)
+      return( 0);
+   
+   sentinel = &src[ len];
+   while( src < sentinel)
+      if( *src++ & 0x80)
+         return( 0);   // invalid char
+
+   return( 1);
+}
+
+
+int   mulle_char7_is64bit( char *src, size_t len)
+{
+   char   *sentinel;
+   
+   if( len > 8)
+      return( 0);
+   
+   sentinel = &src[ len];
+   while( src < sentinel)
+      if( *src++ & 0x80)
+         return( 0);   // invalid char
+   
+   return( 1);
+}
+
+
+uint32_t  mulle_char7_encode32_ascii( char *src, size_t len)
+{
+   char       *s;
+   char       *sentinel;
+   int        char7;
+   uint32_t   value;
+   
+   value    = 0;
+   sentinel = src;
+   s        = &src[ len];
+   while( s > sentinel)
+   {
+      char7 = *--s;
+      if( ! char7)
+         continue;
+      
+      assert( ! (char7 & 0x80));
+      value <<= 7;
+      value  |= char7;
+   }
+   return( value);
+}
+
+
+uint64_t  mulle_char7_encode64_ascii( char *src, size_t len)
+{
+   char       *s;
+   char       *sentinel;
+   int        char7;
+   uint64_t   value;
+   
+   value    = 0;
+   sentinel = src;
+   s        = &src[ len];
+   while( s > sentinel)
+   {
+      char7 = *--s;
+      if( ! char7)
+         continue;
+      
+      assert( ! (char7 & 0x80));
+      value <<= 7;
+      value  |= char7;
+   }
+   return( value);
+}
+
 
 ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLiteral *SL)
 {
-   unsigned StringLength = 0;
-   llvm::StringMapEntry<llvm::GlobalAlias *> &Entry = GetNSConstantStringMapEntry( SL, StringLength);
    CharUnits Align = CGM.getPointerAlign();
+   StringRef str = SL->getString();
+   unsigned StringLength = str.size();
+   
+   //
+   // create a tagged pointer for strings, if the constant matches
+   //
+   if( ! no_tagged_pointers && SL->getKind() == StringLiteral::Ascii)
+   {
+      unsigned WordSizeInBits = CGM.getTarget().getPointerWidth(0);
+
+      if( WordSizeInBits == 32)
+      {
+         uint32_t   value;
+
+         value = 0;
+         if( mulle_char7_is32bit( (char *) str.data(), StringLength))
+         {
+            value = mulle_char7_encode32_ascii( (char *) str.data(), StringLength);
+            value <<= 2;
+            value |= 0x3;
+         }
+         else
+            if( mulle_char5_is32bit( (char *) str.data(), StringLength))
+            {
+               value = mulle_char5_encode32_ascii( (char *) str.data(), StringLength);
+               
+               // shift up and tag as string
+               value <<= 2;
+               value |= 0x1;
+            }
+         
+         if( value)
+         {
+            llvm::APInt APValue( 32, value);
+            llvm::Constant  *pointerValue = llvm::Constant::getIntegerValue( CGM.Int32Ty, APValue);
+            llvm::Constant  *pointer = llvm::ConstantExpr::getIntToPtr( pointerValue, CGM.VoidPtrTy);
+            //fprintf( stderr, "Created tagged 32 bit pointer for \"%.*s\"\n", (int) StringLength, (char *) str.data());
+         
+            return ConstantAddress( pointer, Align);
+         }
+      }
+      else
+      {
+         uint64_t   value;
+         
+         value = 0;
+         if( mulle_char7_is64bit( (char *) str.data(), StringLength))
+         {
+            value = mulle_char7_encode64_ascii( (char *) str.data(), StringLength);
+            value <<= 3;
+            value |= 0x3;
+         }
+         else
+            if( mulle_char5_is64bit( (char *) str.data(), StringLength))
+            {
+               value = mulle_char5_encode64_ascii( (char *) str.data(), StringLength);
+               
+               // shift up and tag as string
+               value <<= 3;
+               value |= 0x1;
+            }
+         
+         if( value)
+         {
+            llvm::APInt APValue( 64, value);
+            llvm::Constant  *pointerValue = llvm::Constant::getIntegerValue( CGM.Int64Ty, APValue);
+            llvm::Constant  *pointer = llvm::ConstantExpr::getIntToPtr( pointerValue, CGM.VoidPtrTy);
+            //fprintf( stderr, "Created tagged 64 bit pointer for \"%.*s\"\n", (int) StringLength, (char *) str.data());
+            return ConstantAddress( pointer, Align);
+         }
+      }
+   }
+   
+   llvm::StringMapEntry<llvm::GlobalAlias *> &Entry = GetNSConstantStringMapEntry( SL, StringLength);
    
    if (auto *C = Entry.second)
       return ConstantAddress( C, Align);
@@ -1797,21 +2143,23 @@ ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
    
    GV = new llvm::GlobalVariable( CGM.getModule(), NSStringHeader->getType(), false,
                                  llvm::GlobalVariable::PrivateLinkage, NSStringHeader,
-                                 "_unnamed_nsstring_header_");
+                                 "_unnamed_nsstring_header");
    // FIXME. Fix section.
    GV->setSection( "__DATA,__objc_stringobj,regular,no_dead_strip");
-   
-   QualType  ConstCharType =  CGM.getContext().getPointerType( CGM.getContext().CharTy.withConst());
-   llvm::Type  *CCType = CGM.getTypes().ConvertTypeForMem( ConstCharType);
+   GV->setConstant( false);
+ 
+   QualType           CharType =  CGM.getContext().getPointerType( CGM.getContext().CharTy);
+   llvm::Type         *CType = CGM.getTypes().ConvertTypeForMem( CharType);
    
    llvm::Constant     *C = getConstantGEP( VMContext, GV, 0, 2);
-   llvm::GlobalAlias  *GA = llvm::GlobalAlias::create( CCType,
+   llvm::GlobalAlias  *GA = llvm::GlobalAlias::create( CType,
                                                        0,
-                                                       llvm::GlobalVariable::WeakAnyLinkage,
-                                                       Twine( "_unnamed_nsstring_"),
+                                                       llvm::GlobalVariable::InternalLinkage,
+                                                       Twine( "_unnamed_nsstring"),
                                                        C,
                                                        &CGM.getModule());
    Entry.second = GA;
+   //   fprintf( stderr, "Created constant string for \"%.*s\"\n", (int) StringLength, (char *) str.data());
    return ConstantAddress( GA, Align);
 }
 
@@ -2087,7 +2435,10 @@ CGObjCMulleRuntime::GenerateMessageSendSuper(CodeGen::CodeGenFunction &CGF,
    
    llvm::Constant *Fn;
    
-   Fn = IsClassMessage ? ObjCTypes.getMessageSendMetaSuperFn() : ObjCTypes.getMessageSendSuperFn();
+   int optLevel = CGM.getLangOpts().OptimizeSize ? -1 : CGM.getCodeGenOpts().OptimizationLevel;
+   
+   Fn = IsClassMessage ? ObjCTypes.getMessageSendMetaSuperFn( optLevel)
+                       : ObjCTypes.getMessageSendSuperFn( optLevel);
    return( CommonMessageSend( CGF, Fn, Return, ResultType, Receiver, CallArgs, ActualArgs, Arg0, Method, false));
 }
 
@@ -4616,14 +4967,17 @@ llvm::Constant *CGObjCMulleRuntime::EmitLoadInfoList(Twine Name,
    optLevel  = CGM.getLangOpts().OptimizeSize ? -1 : CGM.getCodeGenOpts().OptimizationLevel;
    optLevel &= 0x7;
    
-   unsigned int   aaomode;
+   unsigned int   bits;
    
-   aaomode   = CGM.getLangOpts().ObjCAllocsAutoreleasedObjects;
-   
+   bits  = optLevel << 16;
+   bits |= no_tagged_pointers ? 0x4 : 0x0;
+   bits |= CGM.getLangOpts().ObjCAllocsAutoreleasedObjects ? 0x2 : 0;
+   bits |= 1;  // sorted
+
    //
-   // memorize aoomodea nd optLevel too, might come in useful
+   // memorize some compilation context
    //
-   Values[3] = llvm::ConstantInt::get(ObjCTypes.IntTy, (optLevel << 16) | (aaomode << 1) | 1);     // bits, 1 == sorted
+   Values[3] = llvm::ConstantInt::get(ObjCTypes.IntTy, bits);
    Values[4] = ClassList;
    Values[5] = CategoryList;
    Values[6] = StringList;
@@ -4666,7 +5020,7 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
         I != E; ++I)
    {
       expr = llvm::ConstantExpr::getBitCast( I->getValue(), CGM.VoidPtrTy);
-      LoadStrings.push_back(  expr);
+      LoadStrings.push_back( expr);
    }
 
    if( CGM.getCodeGenOpts().getDebugInfo() >= CodeGenOptions::LimitedDebugInfo)
@@ -6442,7 +6796,7 @@ void CGObjCCommonMulleRuntime::GetNameForMethod(const ObjCMethodDecl *D,
                                        SmallVectorImpl<char> &Name) {
    llvm::raw_svector_ostream OS(Name);
    assert (CD && "Missing container decl in GetNameForMethod");
-   OS << '\01' << (D->isInstanceMethod() ? '-' : '+')
+   OS << /* '\01' << */ (D->isInstanceMethod() ? '-' : '+')
    << '[' << CD->getName();
    if (const ObjCCategoryImplDecl *CID =
        dyn_cast<ObjCCategoryImplDecl>(D->getDeclContext()))

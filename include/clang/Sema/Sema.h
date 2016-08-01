@@ -7515,11 +7515,11 @@ public:
                                        StringRef Name);
 
   // @mulle-objc@ AAM:  check that selectors conform
-  int   CheckSelectorForAAOmode( Selector Sel,
-                                 ObjCMethodDecl *Method,
-                                 QualType ReceiverType,
-                                 SourceLocation SelLoc,
-                                 SourceRange RecRange);
+  int   CheckSelectorForAAM( Selector Sel,
+                             ObjCMethodDecl *Method,
+                             QualType ReceiverType,
+                             SourceLocation SelLoc,
+                             SourceRange RecRange);
        
   ExprResult ActOnInstanceMessage(Scope *S,
                                   Expr *Receiver,

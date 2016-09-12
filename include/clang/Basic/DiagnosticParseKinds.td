@@ -27,6 +27,8 @@ def err_msasm_unable_to_create_target : Error<
   "MS-style inline assembly is not available: %0">;
 def err_gnu_inline_asm_disabled : Error<
   "GNU-style inline assembly is disabled">;
+def err_asm_goto_not_supported_yet : Error<
+  "'asm goto' constructs are not supported yet">;
 }
 
 let CategoryName = "Parse Issue" in {
@@ -83,7 +85,7 @@ def err_enumerator_list_missing_comma : Error<
 def err_enumerator_unnamed_no_def : Error<
   "unnamed enumeration must be a definition">;
 def ext_cxx11_enum_fixed_underlying_type : Extension<
-  "enumeration types with a fixed underlying type are a C++11 extension">, 
+  "enumeration types with a fixed underlying type are a C++11 extension">,
   InGroup<CXX11>;
 def ext_c_enum_fixed_underlying_type : Extension<
   "enumeration types with a fixed underlying type are a Microsoft extension">,
@@ -98,7 +100,7 @@ def ext_alignof_expr : ExtWarn<
   "%0 applied to an expression is a GNU extension">, InGroup<GNUAlignofExpression>;
 
 def warn_microsoft_dependent_exists : Warning<
-  "dependent %select{__if_not_exists|__if_exists}0 declarations are ignored">, 
+  "dependent %select{__if_not_exists|__if_exists}0 declarations are ignored">,
   InGroup<DiagGroup<"microsoft-exists">>;
 def warn_microsoft_qualifiers_ignored : Warning<
   "qualifiers after comma in declarator list are ignored">,
@@ -131,14 +133,14 @@ def ext_gnu_conditional_expr : Extension<
   "use of GNU ?: conditional expression extension, omitting middle operand">, InGroup<GNUConditionalOmittedOperand>;
 def ext_gnu_empty_initializer : Extension<
   "use of GNU empty initializer extension">, InGroup<GNUEmptyInitializer>;
-def ext_gnu_array_range : Extension<"use of GNU array range extension">, 
+def ext_gnu_array_range : Extension<"use of GNU array range extension">,
   InGroup<GNUDesignator>;
 def ext_gnu_missing_equal_designator : ExtWarn<
-  "use of GNU 'missing =' extension in designator">, 
+  "use of GNU 'missing =' extension in designator">,
   InGroup<GNUDesignator>;
 def err_expected_equal_designator : Error<"expected '=' or another designator">;
 def ext_gnu_old_style_field_designator : ExtWarn<
-  "use of GNU old-style field designator extension">, 
+  "use of GNU old-style field designator extension">,
   InGroup<GNUDesignator>;
 def ext_gnu_case_range : Extension<"use of GNU case range extension">,
   InGroup<GNUCaseRange>;
@@ -165,13 +167,13 @@ def err_unexpected_semi : Error<"unexpected ';' before %0">;
 def err_expected_fn_body : Error<
   "expected function body after function declarator">;
 def warn_attribute_on_function_definition : Warning<
-  "GCC does not allow %0 attribute in this position on a function definition">, 
+  "GCC does not allow %0 attribute in this position on a function definition">,
   InGroup<GccCompat>;
 def warn_gcc_attribute_location : Warning<
-  "GCC does not allow an attribute in this position on a function declaration">, 
+  "GCC does not allow an attribute in this position on a function declaration">,
   InGroup<GccCompat>;
 def warn_attribute_no_decl : Warning<
-  "attribute %0 ignored, because it is not attached to a declaration">, 
+  "attribute %0 ignored, because it is not attached to a declaration">,
   InGroup<IgnoredAttributes>;
 def err_expected_method_body : Error<"expected method body">;
 def err_declspec_after_virtspec : Error<
@@ -305,7 +307,7 @@ def warn_cxx98_compat_decltype : Warning<
 def err_unexpected_scope_on_base_decltype : Error<
   "unexpected namespace scope prior to decltype">;
 def err_expected_class_name : Error<"expected class name">;
-def err_expected_class_name_not_template : 
+def err_expected_class_name_not_template :
   Error<"'typename' is redundant; base classes are implicitly types">;
 def err_unspecified_vla_size_with_static : Error<
   "'static' may not be used with an unspecified variable length array size">;
@@ -381,7 +383,7 @@ def warn_arc_bridge_cast_nonarc : Warning<
   "'%0' casts have no effect when not using ARC">,
   InGroup<DiagGroup<"arc-bridge-casts-disallowed-in-nonarc">>;
 }
-  
+
 def err_objc_illegal_visibility_spec : Error<
   "illegal visibility specification">;
 def err_objc_illegal_interface_qual : Error<"illegal interface qualifier">;
@@ -510,6 +512,11 @@ def err_function_is_not_record : Error<
   "unexpected %0 in function call; perhaps remove the %0?">;
 def err_super_in_using_declaration : Error<
   "'__super' cannot be used with a using declaration">;
+def ext_constexpr_if : ExtWarn<
+  "constexpr if is a C++1z extension">, InGroup<CXX1z>;
+def warn_cxx14_compat_constexpr_if : Warning<
+  "constexpr if is incompatible with C++ standards before C++1z">,
+  DefaultIgnore, InGroup<CXXPre1zCompat>;
 
 // C++ derived classes
 def err_dup_virtual : Error<"duplicate 'virtual' in base specifier">;
@@ -553,6 +560,14 @@ def err_cxx11_attribute_forbids_ellipsis : Error<
   "attribute '%0' cannot be used as an attribute pack">;
 def err_cxx11_attribute_repeated : Error<
   "attribute %0 cannot appear multiple times in an attribute specifier">;
+def warn_cxx14_compat_using_attribute_ns : Warning<
+  "default scope specifier for attributes is incompatible with C++ standards "
+  "before C++1z">, InGroup<CXXPre1zCompat>, DefaultIgnore;
+def ext_using_attribute_ns : ExtWarn<
+  "default scope specifier for attributes is a C++1z extension">,
+  InGroup<CXX1z>;
+def err_using_attribute_ns_conflict : Error<
+  "attribute with scope specifier cannot follow default scope specifier">;
 def err_attributes_not_allowed : Error<"an attribute list cannot appear here">;
 def err_l_square_l_square_not_attribute : Error<
   "C++11 only allows consecutive left square brackets when "
@@ -643,7 +658,7 @@ def warn_cxx98_compat_extern_template : Warning<
 def warn_static_inline_explicit_inst_ignored : Warning<
   "ignoring '%select{static|inline}0' keyword on explicit template "
   "instantiation">, InGroup<DiagGroup<"static-inline-explicit-instantiation">>;
-  
+
 // Constructor template diagnostics.
 def err_out_of_line_constructor_template_id : Error<
   "out-of-line constructor for %0 cannot have template arguments">;
@@ -662,7 +677,7 @@ def err_expected_type_name_after_typename : Error<
   "expected an identifier or template-id after '::'">;
 def err_explicit_spec_non_template : Error<
   "explicit %select{specialization|instantiation}0 of non-template %1 %2">;
-  
+
 def err_default_template_template_parameter_not_template : Error<
   "default template argument for a template template parameter must be a class "
   "template">;
@@ -766,6 +781,9 @@ def warn_cxx98_compat_lambda : Warning<
 def err_lambda_missing_parens : Error<
   "lambda requires '()' before %select{'mutable'|return type|"
   "attribute specifier}0">;
+// C++1z lambda expressions
+def err_expected_star_this_capture : Error<
+  "expected 'this' following '*' in lambda capture list">;
 
 // Availability attribute
 def err_expected_version : Error<
@@ -776,8 +794,8 @@ def warn_expected_consistent_version_separator : Warning<
 def err_zero_version : Error<
   "version number must have non-zero major, minor, or sub-minor version">;
 def err_availability_expected_platform : Error<
-  "expected a platform name, e.g., 'macosx'">;
-  
+  "expected a platform name, e.g., 'macos'">;
+
 // objc_bridge_related attribute
 def err_objcbridge_related_expected_related_class : Error<
   "expected a related ObjectiveC class name, e.g., 'NSColor'">;
@@ -795,6 +813,21 @@ def err_availability_redundant : Error<
 def warn_availability_and_unavailable : Warning<
   "'unavailable' availability overrides all other availability information">,
   InGroup<Availability>;
+
+// @available(...)
+def err_avail_query_expected_condition : Error<
+  "expected an availability condition here">;
+def err_avail_query_expected_platform_name : Error<
+  "expected a platform name here">;
+
+def err_avail_query_unrecognized_platform_name : Error<
+  "unrecognized platform name %0">;
+def err_availability_query_wildcard_required: Error<
+  "must handle potential future platforms with '*'">;
+def err_availability_query_repeated_platform: Error<
+  "version for '%0' already specified">;
+def err_availability_query_repeated_star : Error<
+  "'*' query has already been specified">;
 
 // Type safety attributes
 def err_type_safety_unknown_flag : Error<
@@ -879,7 +912,7 @@ def warn_pragma_init_seg_unsupported_target : Warning<
 // - #pragma fp_contract
 def err_pragma_fp_contract_scope : Error<
   "'#pragma fp_contract' can only appear at file scope or at the start of a "
-  "compound statement">; 
+  "compound statement">;
 // - #pragma comment
 def err_pragma_comment_malformed : Error<
   "pragma comment requires parenthesized identifier and optional string">;
@@ -902,6 +935,9 @@ def err_pragma_optimize_invalid_argument : Error<
 def err_pragma_optimize_extra_argument : Error<
   "unexpected extra argument '%0' to '#pragma clang optimize'">;
 
+def err_opencl_unroll_hint_on_non_loop : Error<
+  "OpenCL only supports 'opencl_unroll_hint' attribute on for, while, and do statements">;
+
 // OpenCL EXTENSION pragma (OpenCL 1.1 [9.1])
 def warn_pragma_expected_colon : Warning<
   "missing ':' after %0 - ignoring">, InGroup<IgnoredPragmas>;
@@ -909,10 +945,16 @@ def warn_pragma_expected_enable_disable : Warning<
   "expected 'enable' or 'disable' - ignoring">, InGroup<IgnoredPragmas>;
 def warn_pragma_unknown_extension : Warning<
   "unknown OpenCL extension %0 - ignoring">, InGroup<IgnoredPragmas>;
+def warn_pragma_unsupported_extension : Warning<
+  "unsupported OpenCL extension %0 - ignoring">, InGroup<IgnoredPragmas>;
+def warn_pragma_extension_is_core : Warning<
+  "OpenCL extension %0 is core feature or supported optional core feature - ignoring">, InGroup<DiagGroup<"pedantic-core-features">>, DefaultIgnore;
 
-// OpenCL error
+// OpenCL errors.
 def err_opencl_taking_function_address_parser : Error<
   "taking address of function is not allowed">;
+def err_opencl_logical_exclusive_or : Error<
+  "^^ is a reserved operator in OpenCL">;
 
 // OpenMP support.
 def warn_pragma_omp_ignored : Warning<
@@ -934,12 +976,22 @@ def err_omp_immediate_directive : Error<
   "'#pragma omp %0' %select{|with '%2' clause }1cannot be an immediate substatement">;
 def err_omp_expected_identifier_for_critical : Error<
   "expected identifier specifying the name of the 'omp critical' directive">;
+def err_omp_expected_reduction_identifier : Error<
+  "expected identifier or one of the following operators: '+', '-', '*', '&', '|', '^', '&&', or '||'">;
+def err_omp_decl_in_declare_simd : Error<
+  "function declaration is expected after 'declare simd' directive">;
 def err_omp_unknown_map_type : Error<
   "incorrect map type, expected one of 'to', 'from', 'tofrom', 'alloc', 'release', or 'delete'">;
 def err_omp_unknown_map_type_modifier : Error<
   "incorrect map type modifier, expected 'always'">;
 def err_omp_map_type_missing : Error<
   "missing map type">;
+def err_omp_declare_simd_inbranch_notinbranch : Error<
+  "unexpected '%0' clause, '%1' is specified already">;
+def err_expected_end_declare_target : Error<
+  "expected '#pragma omp end declare target'">;
+def err_omp_declare_target_unexpected_clause: Error<
+  "unexpected '%0' clause, only 'to' or 'link' clauses expected">;
 
 // Mulle ObjC support.
 def err_mulle_objc_no_nullable : Error<
@@ -955,12 +1007,12 @@ def err_mulle_objc_no_support_for_property_modifier  : Error<
 // Pragma loop support.
 def err_pragma_loop_missing_argument : Error<
   "missing argument; expected %select{an integer value|"
-  "'enable', %select{'assume_safety'|'full'}1 or 'disable'}0">;
+  "'enable'%select{|, 'full'}1%select{|, 'assume_safety'}2 or 'disable'}0">;
 def err_pragma_loop_invalid_option : Error<
   "%select{invalid|missing}0 option%select{ %1|}0; expected vectorize, "
-  "vectorize_width, interleave, interleave_count, unroll, or unroll_count">;
+  "vectorize_width, interleave, interleave_count, unroll, unroll_count, or distribute">;
 def err_pragma_invalid_keyword : Error<
-  "invalid argument; expected 'enable', %select{'assume_safety'|'full'}0 or 'disable'">;
+  "invalid argument; expected 'enable'%select{|, 'full'}0%select{|, 'assume_safety'}1 or 'disable'">;
 
 // Pragma unroll support.
 def warn_pragma_unroll_cuda_value_in_parens : Warning<

@@ -2186,12 +2186,13 @@ CodeGen::RValue   CGObjCMulleRuntime::CommonFunctionCall(CodeGen::CodeGenFunctio
    if (CGM.ReturnSlotInterferesWithArgs( FI))
       nullReturn.init( CGF, Arg0);
    
-   // FIXME: nat changed this in release_39 witout a clue
-   const CGFunctionInfo &argsInfo =
-   CGM.getTypes().arrangeFreeFunctionCall( ActualArgs,
-                                           cast<FunctionType>(FnResultType.getTypePtr()),
-                                           false);
-   RValue rvalue = CGF.EmitCall( argsInfo, Fn, Return, ActualArgs, Method);
+   const CGFunctionInfo &signature =
+   CGM.getTypes().arrangeObjCMessageSendSignature(Method, ActualArgs[0].Ty);
+   
+   const CGFunctionInfo &signatureForCall =
+   CGM.getTypes().arrangeCall(signature, ActualArgs);
+
+   RValue rvalue = CGF.EmitCall( signatureForCall, Fn, Return, ActualArgs, Method);
    
    RValue param = ActualArgs.size() >= 3 ? ActualArgs[ 2].RV : rvalue; // rvalue is just bogus, wont be used then
    
@@ -2344,10 +2345,11 @@ CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction
    }
    
    // FIXME: nat changed this in release_39 witout a clue
-   const CGFunctionInfo &argsInfo =
-   CGM.getTypes().arrangeFreeFunctionCall( ActualArgs,
-                                          cast<FunctionType>(TmpResultType.getTypePtr()),
-                                          false);
+   const CGFunctionInfo &signature =
+   CGM.getTypes().arrangeObjCMessageSendSignature(Method, ActualArgs[0].Ty);
+   
+   const CGFunctionInfo &signatureForCall =
+   CGM.getTypes().arrangeCall(signature, ActualArgs);
 
    /* if the method -release hasn't been declared yet, then
       we emit a void function call, but the compiler expects id 
@@ -2359,7 +2361,7 @@ CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction
                                 Return,
                                 ResultType,
                                 TmpResultType,
-                                argsInfo,
+                                signatureForCall,
                                 Receiver,
                                 CallArgs,
                                 ActualArgs,

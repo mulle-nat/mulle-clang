@@ -16,7 +16,7 @@
 // very future proof. Then stuff got started thrown out and tweaked to taste.
 // - OK, this is cargo cult programming :)
 //
-// Most of the code isn't really used. Whenever this reaches
+// A lot of the code isn't really used. Whenever this reaches
 // a state of usefulness, unused stuff should get thrown out eventually.
 // It's also certainly not my preferred coding style.
 //
@@ -333,8 +333,8 @@ namespace {
          Params.push_back(Ctx.BoolTy);
          llvm::FunctionType *FTy =
          Types.GetFunctionType(Types.arrangeLLVMFunctionInfo(
-                                                             IdType, false, false, Params, FunctionType::ExtInfo(),
-                                                             RequiredArgs::All));
+                                                             IdType, false, false, Params, FunctionType::ExtInfo(), {},
+                                                              RequiredArgs::All));
          return CGM.CreateRuntimeFunction(FTy, "mulle_objc_object_get_property_value");
       }
       
@@ -353,7 +353,7 @@ namespace {
          Params.push_back(Ctx.BoolTy);
          llvm::FunctionType *FTy =
          Types.GetFunctionType(Types.arrangeLLVMFunctionInfo(
-                                                             Ctx.VoidTy, false, false, Params, FunctionType::ExtInfo(),
+                                                             Ctx.VoidTy, false, false, Params, FunctionType::ExtInfo(), {},
                                                              RequiredArgs::All));
          return CGM.CreateRuntimeFunction(FTy, "mulle_objc_object_set_property_value");
       }
@@ -381,7 +381,7 @@ namespace {
          Params.push_back(Ctx.getPointerDiffType()->getCanonicalTypeUnqualified());
          llvm::FunctionType *FTy =
          Types.GetFunctionType(Types.arrangeLLVMFunctionInfo(
-                                                             Ctx.VoidTy, false, false, Params, FunctionType::ExtInfo(),
+                                                             Ctx.VoidTy, false, false, Params, FunctionType::ExtInfo(), {},
                                                              RequiredArgs::All));
          const char *name;
          if (atomic && copy)
@@ -411,7 +411,7 @@ namespace {
          Params.push_back(Ctx.BoolTy);
          llvm::FunctionType *FTy =
          Types.GetFunctionType(Types.arrangeLLVMFunctionInfo(
-                                                             Ctx.VoidTy, false, false, Params, FunctionType::ExtInfo(),
+                                                             Ctx.VoidTy, false, false, Params, FunctionType::ExtInfo(), {},
                                                              RequiredArgs::All));
          return CGM.CreateRuntimeFunction(FTy, "mulle_objc_copy_struct");
       }
@@ -431,7 +431,7 @@ namespace {
          llvm::FunctionType *FTy =
          Types.GetFunctionType(Types.arrangeLLVMFunctionInfo(Ctx.VoidTy, false, false,
                                                              Params,
-                                                             FunctionType::ExtInfo(),
+                                                             FunctionType::ExtInfo(), {},
                                                              RequiredArgs::All));
          return CGM.CreateRuntimeFunction(FTy, "mulle_objc_copy_cpp_object_atomic");
       }
@@ -444,7 +444,7 @@ namespace {
          Params.push_back(Ctx.getCanonicalParamType(Ctx.getObjCIdType()));
          llvm::FunctionType *FTy =
          Types.GetFunctionType(Types.arrangeLLVMFunctionInfo(
-                                                             Ctx.VoidTy, false, false, Params, FunctionType::ExtInfo(),
+                                                             Ctx.VoidTy, false, false, Params, FunctionType::ExtInfo(), {},
                                                              RequiredArgs::All));
          return CGM.CreateRuntimeFunction(FTy, "mulle_objc_enumeration_mutation");
       }
@@ -1373,7 +1373,7 @@ namespace {
       llvm::ConstantStruct *CreateNSConstantStringStruct( StringRef S, unsigned StringLength) override;
       /// GetClassGlobal - Return the global variable for the Objective-C
       /// class of the given name.
-      llvm::GlobalVariable *GetClassGlobal(const std::string &Name,
+      llvm::GlobalVariable *GetClassGlobal(StringRef Name,
                                            bool Weak = false) override {
          llvm_unreachable("CGObjCMulleRuntime::GetClassGlobal");
       }
@@ -1803,7 +1803,8 @@ llvm::ConstantStruct *CGObjCMulleRuntime::CreateNSConstantStringStruct( StringRe
    
    auto *GV = new llvm::GlobalVariable( CGM.getModule(), C->getType(), false,
                                        Linkage, C, ".str");
-   GV->setUnnamedAddr( true);
+   // FIXME: release_39 used to be true, now its Global:
+   GV->setUnnamedAddr( llvm::GlobalValue::UnnamedAddr::Global);
    
    // Don't enforce the target's minimum global alignment, since the only use
    // of the string is via this class initializer.
@@ -2185,11 +2186,11 @@ CodeGen::RValue   CGObjCMulleRuntime::CommonFunctionCall(CodeGen::CodeGenFunctio
    if (CGM.ReturnSlotInterferesWithArgs( FI))
       nullReturn.init( CGF, Arg0);
    
+   // FIXME: nat changed this in release_39 witout a clue
    const CGFunctionInfo &argsInfo =
-   CGM.getTypes().arrangeFreeFunctionCall( FnResultType,
-                                           ActualArgs,
-                                           FunctionType::ExtInfo(),
-                                           RequiredArgs::All);
+   CGM.getTypes().arrangeFreeFunctionCall( ActualArgs,
+                                           cast<FunctionType>(FnResultType.getTypePtr()),
+                                           false);
    RValue rvalue = CGF.EmitCall( argsInfo, Fn, Return, ActualArgs, Method);
    
    RValue param = ActualArgs.size() >= 3 ? ActualArgs[ 2].RV : rvalue; // rvalue is just bogus, wont be used then
@@ -2342,11 +2343,11 @@ CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction
       return( CommonMessageSend( CGF, Fn, Return, ResultType, Receiver, CallArgs, ActualArgs, Arg0, Method, Fn == nullptr));
    }
    
+   // FIXME: nat changed this in release_39 witout a clue
    const CGFunctionInfo &argsInfo =
-   CGM.getTypes().arrangeFreeFunctionCall( TmpResultType,
-                                           ActualArgs,
-                                           FunctionType::ExtInfo(),
-                                           RequiredArgs::All);
+   CGM.getTypes().arrangeFreeFunctionCall( ActualArgs,
+                                          cast<FunctionType>(TmpResultType.getTypePtr()),
+                                          false);
 
    /* if the method -release hasn't been declared yet, then
       we emit a void function call, but the compiler expects id 
@@ -5023,7 +5024,7 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
       LoadStrings.push_back( expr);
    }
 
-   if( CGM.getCodeGenOpts().getDebugInfo() >= CodeGenOptions::LimitedDebugInfo)
+   if( CGM.getCodeGenOpts().getDebugInfo() >= clang::codegenoptions::LimitedDebugInfo)
    {
       for (llvm::StringMap<llvm::ConstantInt *>::const_iterator
            I = DefinedHashes.begin(), E = DefinedHashes.end();

@@ -457,7 +457,7 @@ CodeGenTypes::arrangeObjCMessageSendSignature(const ObjCMethodDecl *MD,
    else
    {
   // FIXME: Kill copy?
-      for (const auto *I : MD->params()) {
+      for (const auto *I : MD->parameters()) {
          argTys.push_back(Context.getCanonicalParamType(I->getType()));
       }
       callConv = getCallingConventionForDecl( MD, IsWindows);
@@ -481,7 +481,7 @@ CodeGenTypes::arrangeObjCMessageSendSignature(const ObjCMethodDecl *MD,
   // @mulle-objc@ MetaABI: fix returnType to void * (Part II)
   return arrangeLLVMFunctionInfo(
       GetReturnType(MD->getReturnType()), /*instanceMethod=*/false,
-      /*chainCall=*/false, argTys, einfo, required);
+      /*chainCall=*/false, argTys, einfo, {}, required);
 }
 
 const CGFunctionInfo &
@@ -493,7 +493,6 @@ CodeGenTypes::arrangeUnprototypedObjCMessageSend(QualType returnType,
   return arrangeLLVMFunctionInfo(
       GetReturnType(returnType), /*instanceMethod=*/false,
       /*chainCall=*/false, argTypes, einfo, {}, RequiredArgs::All);
->>>>>>> release_39
 }
 
 const CGFunctionInfo &

@@ -179,7 +179,7 @@ void CodeGenModule::createObjCRuntime() {
    
   // @mulle-objc@ compiler: add ObjCRuntime::Mulle to runtimes
   case ObjCRuntime::Mulle:
-    ObjCRuntime = CreateMulleObjCRuntime(*this);
+    ObjCRuntime.reset( CreateMulleObjCRuntime(*this));
     return;
   }
   llvm_unreachable("bad runtime kind");

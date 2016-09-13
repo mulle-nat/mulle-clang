@@ -276,12 +276,18 @@ namespace {
       Builder->EmitTentativeDefinition(D);
     }
 
+    /// @mulle-objc@ compiler: pass through Parser to ObjCRuntime when finished
+    void ParserDidFinish( Parser *P) override {
+       CGM().ParserDidFinish( P);
+    }
+     
     void HandleVTable(CXXRecordDecl *RD) override {
       if (Diags.hasErrorOccurred())
         return;
 
       Builder->EmitVTable(RD);
     }
+
   };
 }
 

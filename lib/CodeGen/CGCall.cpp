@@ -480,7 +480,7 @@ CodeGenTypes::arrangeObjCMessageSendSignature(const ObjCMethodDecl *MD,
 
   // @mulle-objc@ MetaABI: fix returnType to void * (Part II)
   return arrangeLLVMFunctionInfo(
-      GetReturnType(MD->getReturnType()), /*instanceMethod=*/false,
+      GetReturnType( returnType), /*instanceMethod=*/false,
       /*chainCall=*/false, argTys, einfo, {}, required);
 }
 
@@ -489,7 +489,49 @@ CodeGenTypes::arrangeUnprototypedObjCMessageSend(QualType returnType,
                                                  const CallArgList &args) {
   auto argTypes = getArgTypesForCall(Context, args);
   FunctionType::ExtInfo einfo;
+   
+  // @mulle-objc@ MetaABI: check that unprototyped send is compatible
+  // with arguments, else output an error
+  //
+  if( Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+  {
+     // make return value a pointer value
+     if( returnType->isVoidType())
+        returnType = Context.VoidTy;
+     else
+        returnType = Context.VoidPtrTy;
+     
+     // fix calling convention
+     CallingConv callConv;
 
+     callConv = Context.getDefaultCallingConvention( false, false);
+     einfo    = einfo.withCallingConv( callConv);
+     
+     // check that we have at most one argument which fits
+     SmallVector<CanQualType, 16> argTys;
+     
+     argTys.push_back( Context.getCanonicalParamType( argTypes[ 0]));
+     argTys.push_back( Context.getCanonicalParamType( Context.getObjCSelType()));
+     
+     switch( argTypes.size())
+     {
+     case 2 :
+         break;
+     case 3 :
+        if( ! Context.typeNeedsMetaABIAlloca( argTypes[ 2]))
+        {
+           argTys.push_back( Context.getCanonicalParamType( Context.getCanonicalParamType( Context.VoidPtrTy)));
+           break;
+        }
+     default:
+        llvm_unreachable( "called a non-metabi compatible method w/o a prototype");
+     }
+
+
+     return arrangeLLVMFunctionInfo( GetReturnType(returnType), /*instanceMethod=*/false,
+                                     /*chainCall=*/false, argTys, einfo, {}, RequiredArgs::All);
+  }
+   
   return arrangeLLVMFunctionInfo(
       GetReturnType(returnType), /*instanceMethod=*/false,
       /*chainCall=*/false, argTypes, einfo, {}, RequiredArgs::All);
@@ -698,7 +740,9 @@ CodeGenTypes::arrangeCall(const CGFunctionInfo &signature,
 
   auto argTypes = getArgTypesForCall(Context, args);
 
-  assert(signature.getRequiredArgs().allowsOptionalArgs());
+  // @mulle-objc@: next assert trips us up, because we send another
+  // callarg when doing super calls
+  // assert(signature.getRequiredArgs().allowsOptionalArgs());
   return arrangeLLVMFunctionInfo(signature.getReturnType(),
                                  signature.isInstanceMethod(),
                                  signature.isChainCall(),

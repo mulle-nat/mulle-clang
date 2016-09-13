@@ -2186,13 +2186,9 @@ CodeGen::RValue   CGObjCMulleRuntime::CommonFunctionCall(CodeGen::CodeGenFunctio
    if (CGM.ReturnSlotInterferesWithArgs( FI))
       nullReturn.init( CGF, Arg0);
    
-   const CGFunctionInfo &signature =
-   CGM.getTypes().arrangeObjCMessageSendSignature(Method, ActualArgs[0].Ty);
-   
-   const CGFunctionInfo &signatureForCall =
-   CGM.getTypes().arrangeCall(signature, ActualArgs);
+   MessageSendInfo MSI = getMessageSendInfo( Method, ActualArgs[0].Ty, ActualArgs);
 
-   RValue rvalue = CGF.EmitCall( signatureForCall, Fn, Return, ActualArgs, Method);
+   RValue rvalue = CGF.EmitCall( MSI.CallInfo, Fn, Return, ActualArgs, Method);
    
    RValue param = ActualArgs.size() >= 3 ? ActualArgs[ 2].RV : rvalue; // rvalue is just bogus, wont be used then
    
@@ -2254,6 +2250,9 @@ CodeGen::RValue CGObjCMulleRuntime::CommonMessageSend(CodeGen::CodeGenFunction &
       */
    }
 
+   fprintf( stderr, "#CallArgs %ld\n", CallArgs.size());
+   fprintf( stderr, "#ActualArgs %ld\n", ActualArgs.size());
+   
    MessageSendInfo MSI = getMessageSendInfo( Method, ResultType, ActualArgs);
    
    return( CommonFunctionCall( CGF,
@@ -2345,11 +2344,7 @@ CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction
    }
    
    // FIXME: nat changed this in release_39 witout a clue
-   const CGFunctionInfo &signature =
-   CGM.getTypes().arrangeObjCMessageSendSignature(Method, ActualArgs[0].Ty);
-   
-   const CGFunctionInfo &signatureForCall =
-   CGM.getTypes().arrangeCall(signature, ActualArgs);
+   MessageSendInfo MSI = getMessageSendInfo( Method, ActualArgs[0].Ty, ActualArgs);
 
    /* if the method -release hasn't been declared yet, then
       we emit a void function call, but the compiler expects id 
@@ -2361,7 +2356,7 @@ CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction
                                 Return,
                                 ResultType,
                                 TmpResultType,
-                                signatureForCall,
+                                MSI.CallInfo,
                                 Receiver,
                                 CallArgs,
                                 ActualArgs,

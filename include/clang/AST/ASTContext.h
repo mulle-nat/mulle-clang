@@ -1546,7 +1546,7 @@ public:
     return getLangOpts().CPlusPlus ? BoolTy : IntTy;
   }
 
-
+  /// @mulle-objc@ : MetaABI Helper
   bool   typeNeedsMetaABIAlloca( QualType type);
 
   /// \brief Emit the Objective-CC type encoding for the given type \p T into

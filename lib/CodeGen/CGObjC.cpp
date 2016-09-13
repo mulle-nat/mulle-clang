@@ -467,8 +467,8 @@ RValue CodeGenFunction::EmitObjCMessageExpr(const ObjCMessageExpr *E,
   
   CallArgList Args;
 
-  // @mulle-objc@ MetaABI: added a patchpoint in EmitObjCMessageExprfor GenerateCallArgs
-  // take arguments, push it into one big struct
+  // @mulle-objc@ MetaABI: added a patchpoint in EmitObjCMessageExpr
+  // for GenerateCallArgs. take arguments, push it into one big struct
   // Emit this argument
   //
   CGObjCRuntimeLifetimeMarker   Marker;

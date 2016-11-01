@@ -5,7 +5,6 @@
 This is an Objective-C compiler based on clang 3.9, written for the [mulle-objc](//www.mulle-kybernetik.com/weblog/2015/mulle_objc_a_new_objective_c_.html)
 runtime.
 
-
 > See [README.txt](README.txt) for more information about clang
 
 The compiler can be used to:
@@ -125,6 +124,24 @@ defined in the runtime.
 * `mulle_objc_exception_try_exit`
 * `mulle_objc_exception_extract`
 * `mulle_objc_exception_match`
+
+## Install
+
+On OS X and Linux you can use
+[homebrew](//brew.sh), respectively
+[linuxbrew](//linuxbrew.sh)
+to install the library:
+
+```
+brew tap codeon-gmbh/software
+brew install mulle-clang
+```
+
+Otherwise read:
+
+* [How to Build](BUILD_MULLE_CLANG.md)
+
+
 
 ## Author
 

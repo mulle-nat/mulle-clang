@@ -727,6 +727,7 @@ const CGFunctionInfo &CodeGenTypes::arrangeNullaryFunction() {
 const CGFunctionInfo &
 CodeGenTypes::arrangeCall(const CGFunctionInfo &signature,
                           const CallArgList &args) {
+   //  fprintf( stderr, "%ld vs %ld\n", (long) signature.arg_size(), (long) args.size());
   assert(signature.arg_size() <= args.size());
   if (signature.arg_size() == args.size())
     return signature;
@@ -4025,6 +4026,7 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
       }
     }
 
+//  fprintf( stderr, "%ld vs %ld\n", (long) IRCallArgs.size(), (long) IRFuncTy->getNumParams());
   assert(IRCallArgs.size() == IRFuncTy->getNumParams() || IRFuncTy->isVarArg());
   for (unsigned i = 0; i < IRCallArgs.size(); ++i) {
     // Inalloca argument can have different type.

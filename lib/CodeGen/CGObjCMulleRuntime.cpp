@@ -1194,6 +1194,9 @@ namespace {
                                                     StringRef name,
                                                     uint64_t *value);
 
+      const CGFunctionInfo   &GenerateFunctionInfo( QualType arg0Ty,
+                                                    QualType rvalTy);
+
       CodeGen::RValue CommonFunctionCall(CodeGen::CodeGenFunction &CGF,
                                          llvm::Constant *Fn,
                                          ReturnValueSlot Return,
@@ -2186,9 +2189,7 @@ CodeGen::RValue   CGObjCMulleRuntime::CommonFunctionCall(CodeGen::CodeGenFunctio
    if (CGM.ReturnSlotInterferesWithArgs( FI))
       nullReturn.init( CGF, Arg0);
    
-   MessageSendInfo MSI = getMessageSendInfo( Method, ActualArgs[0].Ty, ActualArgs);
-
-   RValue rvalue = CGF.EmitCall( MSI.CallInfo, Fn, Return, ActualArgs, Method);
+   RValue rvalue = CGF.EmitCall( FI, Fn, Return, ActualArgs, Method);
    
    RValue param = ActualArgs.size() >= 3 ? ActualArgs[ 2].RV : rvalue; // rvalue is just bogus, wont be used then
    
@@ -2250,8 +2251,8 @@ CodeGen::RValue CGObjCMulleRuntime::CommonMessageSend(CodeGen::CodeGenFunction &
       */
    }
 
-   fprintf( stderr, "#CallArgs %ld\n", CallArgs.size());
-   fprintf( stderr, "#ActualArgs %ld\n", ActualArgs.size());
+   // fprintf( stderr, "#CallArgs %ld\n", CallArgs.size());
+   // fprintf( stderr, "#ActualArgs %ld\n", ActualArgs.size());
    
    MessageSendInfo MSI = getMessageSendInfo( Method, ResultType, ActualArgs);
    
@@ -2268,6 +2269,34 @@ CodeGen::RValue CGObjCMulleRuntime::CommonMessageSend(CodeGen::CodeGenFunction &
                               Method));
 }
 
+
+const CGFunctionInfo   &CGObjCMulleRuntime::GenerateFunctionInfo( QualType arg0Ty,
+                                                                  QualType rvalTy)
+{
+   FunctionType::ExtInfo   einfo;
+   CallingConv             callConv;
+   
+   callConv = CGM.getContext().getDefaultCallingConvention( false, false);
+  // @mulle-objc@ MetaABI: message signature: fix call convention
+   einfo = einfo.withCallingConv( callConv);
+
+  RequiredArgs required = RequiredArgs::All;
+  SmallVector<CanQualType, 16> argTys;
+
+  argTys.push_back( CGM.getContext().getCanonicalParamType( arg0Ty));
+
+  // @mulle-objc@ MetaABI: fix returnType to void * (Part II)
+   CodeGen::CodeGenTypes &Types = CGM.getTypes();
+   
+   const CGFunctionInfo &CallInfo = Types.arrangeLLVMFunctionInfo(
+      rvalTy->getCanonicalTypeUnqualified().getUnqualifiedType(),
+      /*instanceMethod=*/false,
+      /*chainCall=*/false, argTys, einfo, {}, required);   /* if the method -release hasn't been declared yet, then
+      we emit a void function call, but the compiler expects id 
+      back. (and crashes) Fake it up with a bogus NULL return.
+   */
+   return( CallInfo);
+}
 
 
 /// Generate code for a message send expression.
@@ -2316,6 +2345,7 @@ CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction
                TmpResultType = CGF.getContext().VoidTy;
                break;
             }
+            
             if( selName == "retain")
             {
                Fn            = ObjCTypes.getMessageSendRetainFn();
@@ -2334,42 +2364,44 @@ CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction
          while( 0);
       }
    }
-   
+
    if( Fn == nullptr)  // regular method send call
    {
       selID = EmitSelector(CGF, Sel);
       ActualArgs.add(RValue::get( selID), CGF.getContext().getObjCSelType());
       ActualArgs.addFrom( CallArgs);
-      return( CommonMessageSend( CGF, Fn, Return, ResultType, Receiver, CallArgs, ActualArgs, Arg0, Method, Fn == nullptr));
+      return( CommonMessageSend( CGF,
+                                 Fn,
+                                 Return,
+                                 ResultType,
+                                 Receiver,
+                                 CallArgs,
+                                 ActualArgs,
+                                 Arg0,
+                                 Method,
+                                 true));
    }
    
-   // FIXME: nat changed this in release_39 witout a clue
-   MessageSendInfo MSI = getMessageSendInfo( Method, ActualArgs[0].Ty, ActualArgs);
-
-   /* if the method -release hasn't been declared yet, then
-      we emit a void function call, but the compiler expects id 
-      back. (and crashes) Fake it up with a bogus NULL return.
-   */
    CodeGen::RValue   rvalue;
+   
+   const CGFunctionInfo &CallInfo = GenerateFunctionInfo( ActualArgs[0].Ty, TmpResultType);
+   const CGFunctionInfo &SignatureForCall = CGM.getTypes().arrangeCall( CallInfo, ActualArgs);
+   
    rvalue  = CommonFunctionCall( CGF,
-                                Fn,
-                                Return,
-                                ResultType,
-                                TmpResultType,
-                                MSI.CallInfo,
-                                Receiver,
-                                CallArgs,
-                                ActualArgs,
-                                Arg0,
-                                nullptr);
+                                 Fn,
+                                 Return,
+                                 ResultType,
+                                 TmpResultType,
+                                 SignatureForCall,
+                                 Receiver,
+                                 CallArgs,
+                                 ActualArgs,
+                                 Arg0,
+                                 nullptr);
    
    if( ResultType != TmpResultType)
-   {
       if( TmpResultType == CGF.getContext().VoidTy)
-      {
          rvalue = RValue::get( llvm::Constant::getNullValue( ObjCTypes.ObjectPtrTy));
-      }
-   }
    
    return( rvalue);
 }

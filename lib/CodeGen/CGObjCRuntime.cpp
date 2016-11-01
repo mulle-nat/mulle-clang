@@ -360,11 +360,11 @@ CGObjCRuntime::getMessageSendInfo(const ObjCMethodDecl *method,
     const CGFunctionInfo &signature =
       CGM.getTypes().arrangeObjCMessageSendSignature(method, callArgs[0].Ty);
 
-    llvm::PointerType *signatureType =
-      CGM.getTypes().GetFunctionType(signature)->getPointerTo();
-
     const CGFunctionInfo &signatureForCall =
       CGM.getTypes().arrangeCall(signature, callArgs);
+
+    llvm::PointerType *signatureType =
+      CGM.getTypes().GetFunctionType(signature)->getPointerTo();
 
     return MessageSendInfo(signatureForCall, signatureType);
   }

@@ -6,7 +6,6 @@ This is an Objective-C compiler based on clang 3.9, written for the [mulle-objc]
 runtime.
 
 
-
 > See [README.txt](README.txt) for more information about clang
 
 The compiler can be used to:
@@ -21,10 +20,7 @@ have been some changes, that could affect other runtimes.
 
 ## Operation
 
-The compiler compiles for the **mulle-objc** runtime by default, if no flags
-are given and the compiled source is Objective-C. When compiling for
-**mulle-objc** the compiler will use the [meta-ABI](//www.mulle-kybernetik.com/weblog/2015/mulle_objc_meta_call_convention.html) for all method calls. The resultant `.o`
-files should be linkable like any other compiled C code.
+The compiler compiles Objective-C source for the **mulle-objc** runtime by default. When compiling for **mulle-objc** the compiler will use the [meta-ABI](//www.mulle-kybernetik.com/weblog/2015/mulle_objc_meta_call_convention.html) for all method calls. The resultant `.o` files should be linkable like any other compiled C code.
 
 
 ### AAM - Always Autorelease Mode

@@ -188,10 +188,19 @@ void Sema::Initialize() {
     if (IdResolver.begin(Class) == IdResolver.end())
       PushOnScopeChains(Context.getObjCClassDecl(), TUScope);
 
-    // Create the built-in forward declaratino for 'Protocol'.
+    // Create the built-in forward declaration for 'Protocol'.
+    if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+    {
+       DeclarationName PROTOCOL = &Context.Idents.get("PROTOCOL");
+       if (IdResolver.begin(PROTOCOL) == IdResolver.end())
+         PushOnScopeChains(Context.getObjCProtocolDecl(), TUScope);
+    }
+    else
+    {
     DeclarationName Protocol = &Context.Idents.get("Protocol");
     if (IdResolver.begin(Protocol) == IdResolver.end())
       PushOnScopeChains(Context.getObjCProtocolDecl(), TUScope);
+    }
   }
 
   // Create the internal type for the *StringMakeConstantString builtins.

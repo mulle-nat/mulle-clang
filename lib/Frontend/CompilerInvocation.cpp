@@ -1287,6 +1287,8 @@ static InputKind ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       .Case("cuda", IK_CUDA)
       .Case("c++", IK_CXX)
       .Case("objective-c", IK_ObjC)
+      // @mulle-objc@ AAM:  .aam filename extension support
+      .Case("objective-c-aam", IK_ObjCAAM)
       .Case("objective-c++", IK_ObjCXX)
       .Case("cpp-output", IK_PreprocessedC)
       .Case("assembler-with-cpp", IK_Asm)
@@ -1482,6 +1484,14 @@ void CompilerInvocation::setLangDefaults(LangOptions &Opts, InputKind IK,
              IK == IK_PreprocessedObjC ||
              IK == IK_PreprocessedObjCXX) {
     Opts.ObjC1 = Opts.ObjC2 = 1;
+
+  }
+
+   // @mulle-objc@ AAM:  .aam filename extension support
+  if( IK == IK_ObjCAAM)
+  {
+     Opts.ObjCAllocsAutoreleasedObjects = 1;
+     Opts.ObjC1 = Opts.ObjC2 = 1;
   }
 
   if (LangStd == LangStandard::lang_unspecified) {
@@ -1501,13 +1511,18 @@ void CompilerInvocation::setLangDefaults(LangOptions &Opts, InputKind IK,
     case IK_Asm:
     case IK_C:
     case IK_PreprocessedC:
-    case IK_ObjC:
-    case IK_PreprocessedObjC:
       // The PS4 uses C99 as the default C standard.
       if (T.isPS4())
         LangStd = LangStandard::lang_gnu99;
       else
         LangStd = LangStandard::lang_gnu11;
+       break;
+    case IK_ObjC:
+    // @mulle-objc@ AAM:  .aam filename extension support
+    case IK_ObjCAAM:
+    case IK_PreprocessedObjC:
+    // @mulle-objc@ C11 should be standard now
+      LangStd = LangStandard::lang_c11;
       break;
     case IK_CXX:
     case IK_PreprocessedCXX:
@@ -1626,10 +1641,17 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
       const LangStandard &Std = LangStandard::getLangStandardForKind(LangStd);
       switch (IK) {
       case IK_C:
-      case IK_ObjC:
       case IK_PreprocessedC:
+         if (!(Std.isC89() || Std.isC99()))
+            Diags.Report(diag::err_drv_argument_not_allowed_with);
+         break;
+
+      // @mulle-objc@ C11: just allow C11, because the runtime needs it
+      case IK_ObjC:
+      // @mulle-objc@ AAM:  .aam filename extension support
+      case IK_ObjCAAM:
       case IK_PreprocessedObjC:
-        if (!(Std.isC89() || Std.isC99()))
+        if ( !Std.isC11())
           Diags.Report(diag::err_drv_argument_not_allowed_with)
             << A->getAsString(Args) << "C/ObjC";
         break;
@@ -1727,7 +1749,13 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
         Diags.Report(diag::err_drv_unknown_objc_runtime) << value;
     }
 
-    if (Args.hasArg(OPT_fobjc_gc_only))
+    // @mulle-objc@: handle AAM and TPS options
+    if( Args.hasArg( OPT_fno_objc_tps))
+      Opts.ObjCDisableTaggedPointers = 1;
+
+    if( Args.hasArg( OPT_fobjc_aam))
+      Opts.ObjCAllocsAutoreleasedObjects = 1;
+    else if (Args.hasArg(OPT_fobjc_gc_only))
       Opts.setGC(LangOptions::GCOnly);
     else if (Args.hasArg(OPT_fobjc_gc))
       Opts.setGC(LangOptions::HybridGC);

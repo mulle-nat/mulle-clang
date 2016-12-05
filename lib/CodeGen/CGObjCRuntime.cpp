@@ -360,11 +360,11 @@ CGObjCRuntime::getMessageSendInfo(const ObjCMethodDecl *method,
     const CGFunctionInfo &signature =
       CGM.getTypes().arrangeObjCMessageSendSignature(method, callArgs[0].Ty);
 
-    llvm::PointerType *signatureType =
-      CGM.getTypes().GetFunctionType(signature)->getPointerTo();
-
     const CGFunctionInfo &signatureForCall =
       CGM.getTypes().arrangeCall(signature, callArgs);
+
+    llvm::PointerType *signatureType =
+      CGM.getTypes().GetFunctionType(signature)->getPointerTo();
 
     return MessageSendInfo(signatureForCall, signatureType);
   }
@@ -378,3 +378,51 @@ CGObjCRuntime::getMessageSendInfo(const ObjCMethodDecl *method,
     CGM.getTypes().GetFunctionType(argsInfo)->getPointerTo();
   return MessageSendInfo(argsInfo, signatureType);
 }
+
+//
+// @mulle-objc@ MetaABI: to generate LLVM method argument list
+//   this is done differently in mulle-objc so this little code
+//   snippet is placed into the runtime
+//
+CGObjCRuntimeLifetimeMarker   CGObjCRuntime::GenerateCallArgs( CodeGenFunction &CGF,
+                                                               CallArgList &Args,
+                                                               const ObjCMethodDecl *method,
+                                                               const ObjCMessageExpr *Expr)
+{
+   CGObjCRuntimeLifetimeMarker  Marker;
+   CGF.EmitCallArgs( Args, method, Expr->arguments());
+   
+   Marker.SizeV = nullptr;
+   Marker.Addr  = nullptr;
+   return( Marker);
+}
+
+
+CGObjCRuntimeLifetimeMarker   CGObjCRuntime::ConvertToMetaABIArgsIfNeeded( CodeGenFunction &CGF,
+                                                                           const ObjCMethodDecl *method,
+                                                                           CallArgList &Args)
+{
+   CGObjCRuntimeLifetimeMarker  Marker;
+   
+   Marker.SizeV = nullptr;
+   Marker.Addr  = nullptr;
+   return( Marker);
+}
+
+
+CodeGen::RValue  CGObjCRuntime::EmitFastEnumeratorCall( CodeGen::CodeGenFunction &CGF,
+                                                       ReturnValueSlot ReturnSlot,
+                                                       QualType ResultType,
+                                                       Selector Sel,
+                                                       llvm::Value *Receiver,
+                                                       llvm::Value *StatePtr,
+                                                       QualType StateTy,
+                                                       llvm::Value *ItemsPtr,
+                                                       QualType ItemsTy,
+                                                       llvm::Value *Count,
+                                                       QualType CountTy)
+
+{
+   return( RValue::get( Receiver));  // bogus, this code is never used
+}
+

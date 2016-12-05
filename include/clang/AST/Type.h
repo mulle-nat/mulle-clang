@@ -2070,7 +2070,7 @@ public:
   QualType desugar() const { return QualType(this, 0); }
 
   bool isInteger() const {
-    return getKind() >= Bool && getKind() <= Int128;
+     return((getKind() >= Bool && getKind() <= Int128) || getKind() == ObjCSel); // @mulle-objc@ uniqueid: ObjCSel is integer
   }
 
   bool isSignedInteger() const {
@@ -2078,7 +2078,7 @@ public:
   }
 
   bool isUnsignedInteger() const {
-    return getKind() >= Bool && getKind() <= UInt128;
+    return((getKind() >= Bool && getKind() <= UInt128) || getKind() == ObjCSel);  // @mulle-objc@ uniqueid: ObjCSel is unsigned
   }
 
   bool isFloatingPoint() const {
@@ -5586,6 +5586,10 @@ inline bool Type::isObjCClassType() const {
   return false;
 }
 inline bool Type::isObjCSelType() const {
+   // @mulle-objc@ uniqueid: -> hack type check for SEL
+  if( isSpecificBuiltinType(BuiltinType::ObjCSel))
+     return( true);
+   // @mulle-objc@ uniqueid: <-
   if (const PointerType *OPT = getAs<PointerType>())
     return OPT->getPointeeType()->isSpecificBuiltinType(BuiltinType::ObjCSel);
   return false;
@@ -5701,8 +5705,10 @@ extern bool IsEnumDeclScoped(EnumDecl *);
 
 inline bool Type::isIntegerType() const {
   if (const BuiltinType *BT = dyn_cast<BuiltinType>(CanonicalType))
-    return BT->getKind() >= BuiltinType::Bool &&
-           BT->getKind() <= BuiltinType::Int128;
+    return(( BT->getKind() >= BuiltinType::Bool &&
+             BT->getKind() <= BuiltinType::Int128) ||
+             BT->getKind() == BuiltinType::ObjCSel);  // @mulle-objc@ uniqueid: ObjCSel is integer
+   
   if (const EnumType *ET = dyn_cast<EnumType>(CanonicalType)) {
     // Incomplete enum types are not treated as integer types.
     // FIXME: In C++, enum types are never integer types.
@@ -5714,8 +5720,9 @@ inline bool Type::isIntegerType() const {
 
 inline bool Type::isScalarType() const {
   if (const BuiltinType *BT = dyn_cast<BuiltinType>(CanonicalType))
-    return BT->getKind() > BuiltinType::Void &&
-           BT->getKind() <= BuiltinType::NullPtr;
+    return ((BT->getKind() > BuiltinType::Void &&
+            BT->getKind() <= BuiltinType::NullPtr) ||
+            BT->getKind() == BuiltinType::ObjCSel);  // @mulle-objc@ uniqueid: ObjCSel is scalar
   if (const EnumType *ET = dyn_cast<EnumType>(CanonicalType))
     // Enums are scalar types, but only if they are defined.  Incomplete enums
     // are not treated as scalar types.
@@ -5729,8 +5736,10 @@ inline bool Type::isScalarType() const {
 
 inline bool Type::isIntegralOrEnumerationType() const {
   if (const BuiltinType *BT = dyn_cast<BuiltinType>(CanonicalType))
-    return BT->getKind() >= BuiltinType::Bool &&
-           BT->getKind() <= BuiltinType::Int128;
+    return ((BT->getKind() >= BuiltinType::Bool &&
+           BT->getKind() <= BuiltinType::Int128) ||
+           BT->getKind() == BuiltinType::ObjCSel);  // @mulle-objc@ uniqueid: ObjCSel is integral
+
 
   // Check for a complete enum type; incomplete enum types are not properly an
   // enumeration type in the sense required here.

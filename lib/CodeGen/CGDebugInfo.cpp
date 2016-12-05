@@ -490,18 +490,23 @@ llvm::DIType *CGDebugInfo::CreateType(const BuiltinType *BT) {
                                            "objc_class", TheCU,
                                            getOrCreateMainFile(), 0);
 
+    ObjTy =
+        DBuilder.createStructType(TheCU, "objc_object", getOrCreateMainFile(),
+                                  0, 0, 0, 0, nullptr, llvm::DINodeArray());
+    llvm::DINodeArray Elements;
+     
+    DBuilder.replaceArrays(
+        ObjTy,
+                           Elements);
+   // @mulle-objc@ :: hack out isa
+#if 0
     unsigned Size = CGM.getContext().getTypeSize(CGM.getContext().VoidPtrTy);
 
     auto *ISATy = DBuilder.createPointerType(ClassTy, Size);
 
-    ObjTy =
-        DBuilder.createStructType(TheCU, "objc_object", getOrCreateMainFile(),
-                                  0, 0, 0, 0, nullptr, llvm::DINodeArray());
-
-    DBuilder.replaceArrays(
-        ObjTy,
-        DBuilder.getOrCreateArray(&*DBuilder.createMemberType(
+    DBuilder.getOrCreateArray(&*DBuilder.createMemberType(
             ObjTy, "isa", getOrCreateMainFile(), 0, Size, 0, 0, 0, ISATy)));
+#endif
     return ObjTy;
   }
   case BuiltinType::ObjCSel: {

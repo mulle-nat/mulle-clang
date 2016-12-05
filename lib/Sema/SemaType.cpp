@@ -3459,6 +3459,10 @@ static void checkNullabilityConsistency(TypeProcessingState &state,
                                         SourceLocation pointerLoc) {
   Sema &S = state.getSema();
 
+  // @mulle-objc@ compiler: nullability completeness is not objective-c like
+  if( S.Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+     return;
+   
   // Determine which file we're performing consistency checking for.
   FileID file = getNullabilityCompletenessCheckFileID(S, pointerLoc);
   if (file.isInvalid())
@@ -3570,6 +3574,9 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
       FileNullability &fileNullability = S.NullabilityMap[file];
 
       // If we haven't seen any type nullability before, now we have.
+      // @mulle-objc@ compiler: nullability completeness is not objective-c like
+      if( ! S.Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+      {
       if (!fileNullability.SawTypeNullability) {
         if (fileNullability.PointerLoc.isValid()) {
           S.Diag(fileNullability.PointerLoc, diag::warn_nullability_missing)
@@ -3577,6 +3584,7 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
         }
 
         fileNullability.SawTypeNullability = true;
+      }
       }
     }
   }
@@ -5817,6 +5825,9 @@ bool Sema::checkNullabilityTypeSpecifier(QualType &type,
   FileID file = getNullabilityCompletenessCheckFileID(*this, nullabilityLoc);
   if (!file.isInvalid()) {
     FileNullability &fileNullability = NullabilityMap[file];
+    // @mulle-objc@ compiler: nullability completeness is not objective-c like
+    if( ! Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+    {
     if (!fileNullability.SawTypeNullability) {
       // If we have already seen a pointer declarator without a nullability
       // annotation, complain about it.
@@ -5826,6 +5837,7 @@ bool Sema::checkNullabilityTypeSpecifier(QualType &type,
       }
 
       fileNullability.SawTypeNullability = true;
+    }
     }
   }
 

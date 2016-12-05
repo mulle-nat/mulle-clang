@@ -66,6 +66,8 @@ enum InputKind {
   IK_C,
   IK_CXX,
   IK_ObjC,
+  // @mulle-objc@ AAM:  .aam filename extension support
+  IK_ObjCAAM,
   IK_ObjCXX,
   IK_PreprocessedC,
   IK_PreprocessedCXX,

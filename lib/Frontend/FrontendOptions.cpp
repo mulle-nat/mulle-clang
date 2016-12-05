@@ -20,6 +20,8 @@ InputKind FrontendOptions::getInputKindForExtension(StringRef Extension) {
     .Case("ii", IK_PreprocessedCXX)
     .Case("cui", IK_PreprocessedCuda)
     .Case("m", IK_ObjC)
+     // @mulle-objc@ AAM:  .aam filename extension support
+    .Case("aam", IK_ObjCAAM)
     .Case("mi", IK_PreprocessedObjC)
     .Cases("mm", "M", IK_ObjCXX)
     .Case("mii", IK_PreprocessedObjCXX)

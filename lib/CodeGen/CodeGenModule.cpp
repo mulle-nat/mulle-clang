@@ -3850,7 +3850,14 @@ void CodeGenModule::EmitTopLevelDecl(Decl *D) {
   // Objective-C Decls
 
   // Forward declarations, no (immediate) code generation.
-  case Decl::ObjCInterface:
+  // @mulle-objc@: forward declarations to runtime
+  case Decl::ObjCInterface: {
+     auto *OID = cast<ObjCInterfaceDecl>(D);
+     ObjCRuntime->GenerateForwardClass(OID);
+     break;
+  }
+  // @mulle-objc@: forward declarations to runtime end
+
   case Decl::ObjCCategory:
     break;
 

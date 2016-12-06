@@ -410,6 +410,14 @@ CGObjCRuntimeLifetimeMarker   CGObjCRuntime::ConvertToMetaABIArgsIfNeeded( CodeG
 }
 
 
+void   CGObjCRuntime::GenerateForwardClass(const ObjCInterfaceDecl *OID)
+{
+   // do nothing
+}
+
+// @mulle-objc@ MetaABI: end
+
+
 CodeGen::RValue  CGObjCRuntime::EmitFastEnumeratorCall( CodeGen::CodeGenFunction &CGF,
                                                        ReturnValueSlot ReturnSlot,
                                                        QualType ResultType,

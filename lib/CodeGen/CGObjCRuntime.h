@@ -157,6 +157,11 @@ public:
   /// Generate a class structure for this class.
   virtual void GenerateClass(const ObjCImplementationDecl *OID) = 0;
 
+  /// @mulle-objc@: forward declarations to runtime
+  /// Generate a  forward class for this class.
+  virtual void GenerateForwardClass(const ObjCInterfaceDecl *OID);
+  /// @mulle-objc@: forward declarations to runtime end
+
   /// Register an class alias.
   virtual void RegisterAlias(const ObjCCompatibleAliasDecl *OAD) = 0;
 

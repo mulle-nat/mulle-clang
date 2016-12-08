@@ -1607,6 +1607,10 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
           GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_RUNTIME_VERSION_PATCH", &patch))
       {
          runtime_version = major << 20 | minor << 8 | patch;
+         // since the loadinfo and stuff is hardcoded, the check is also hardcoded
+         
+         if( ! (major == 0 && minor == 2))
+            llvm_unreachable("This compiler is compatible only with mulle_objc_runtime 0.2.x");
       }
    }
 
@@ -2239,6 +2243,11 @@ CodeGen::RValue CGObjCMulleRuntime::CommonMessageSend(CodeGen::CodeGenFunction &
    if( ! Fn)
    {
       int optLevel = CGM.getLangOpts().OptimizeSize ? -1 : CGM.getCodeGenOpts().OptimizationLevel;
+      
+      // tagged pointers bloat the code too much IMO
+      if( optLevel > 1 && ! no_tagged_pointers)
+         optLevel = 1;
+      
       if( ! CallArgs.size())
          Fn = ObjCTypes.getMessageSendNoParamFn( optLevel); // : ObjCTypes.getMessageSendFn0();
       else

@@ -2587,15 +2587,10 @@ CGObjCMulleRuntime::EmitFastEnumeratorCall( CodeGen::CodeGenFunction &CGF,
 static   Expr  *unparenthesizedAndUncastedExpr( Expr *expr)
 {
    CastExpr   *castExpr;
-   ParenExpr  *parenExpr;
 
    for(;;)
    {
-      if( (parenExpr = dyn_cast< ParenExpr>( expr)))
-      {
-         expr = parenExpr->getSubExpr();
-         continue;
-      }
+      expr = expr->IgnoreParens();
 
       if( (castExpr = dyn_cast< CastExpr>( expr)))
       {
@@ -2675,7 +2670,8 @@ class MulleStatementVisitor : public RecursiveASTVisitor<MulleStatementVisitor>
   Stmt               *NextStatement;
   bool               returnFalseIfTainted;
   bool               stopCollectingTaints;
-
+  bool               searchingForAddressOperator;
+  
 public:
   MulleStatementVisitor( ObjCMethodDecl *M, ObjCMessageExpr *C)
   {
@@ -2685,6 +2681,7 @@ public:
      NextStatement = nullptr;
      returnFalseIfTainted = false;
      stopCollectingTaints = false;
+     searchingForAddressOperator = false;
   }
 
   void   getTaintedLoves( std::set<Decl *> *result)
@@ -2701,9 +2698,30 @@ protected:
      taintedLoves.insert( taints->begin(), taints->end());
      returnFalseIfTainted = true;
      stopCollectingTaints = false;
+     searchingForAddressOperator = false;
   }
 
 public:
+   // own function
+   bool  CheckObjCArguments( ObjCMessageExpr *C)
+   {
+      unsigned int  i, n;
+      Expr          *arg;
+      
+      n = C->getNumArgs();
+      for( i = 0; i < n; i++)
+      {
+         arg = unparenthesizedAndUncastedExpr( C->getArg( i));
+         if (const UnaryOperator *uop = dyn_cast<UnaryOperator>(arg))
+            if (uop->getOpcode() == UO_AddrOf)
+            {
+               if( isStatementTainted( uop->getSubExpr()))
+                  return( false);
+            }
+      }
+      return( true);
+   }
+   
    // this is always called and more qualified functions later too with same Stmt
    bool VisitStmt(Stmt *s)
    {
@@ -2855,12 +2873,17 @@ public:
 static bool  param_unused_after_expr( ObjCMethodDecl *Method, ObjCMessageExpr *Expr)
 {
    MulleStatementVisitor   Visitor( Method, Expr);
-
+   bool                    result;
+   
    if( ! Method->getParamDecl())
       return( false);
 
    Stmt *Body = Method->getBody();
-   return( Visitor.TraverseStmt( Body));
+   result = Visitor.TraverseStmt( Body);
+   if( result)
+      result = Visitor.CheckObjCArguments( Expr);
+
+   return( result);
 }
 
 

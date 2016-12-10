@@ -1903,7 +1903,6 @@ static int   mulle_char5_encode_character( int c)
 }
 
 
-
 static int   mulle_char5_is32bit( char *src, size_t len)
 {
    char   *sentinel;
@@ -1967,7 +1966,6 @@ uint32_t  mulle_char5_encode32_ascii( char *src, size_t len)
    }
    return( value);
 }
-
 
 
 uint64_t  mulle_char5_encode64_ascii( char *src, size_t len)
@@ -2249,9 +2247,9 @@ CodeGen::RValue CGObjCMulleRuntime::CommonMessageSend(CodeGen::CodeGenFunction &
    {
       int optLevel = CGM.getLangOpts().OptimizeSize ? -1 : CGM.getCodeGenOpts().OptimizationLevel;
       
-      // tagged pointers bloat the code too much IMO
-      if( optLevel > 1 && ! no_tagged_pointers)
-         optLevel = 1;
+      // tagged pointers bloat the code too much IMO (make decision later)
+      // if( optLevel > 1 && ! no_tagged_pointers)
+      //   optLevel = 1;
       
       if( ! CallArgs.size())
          Fn = ObjCTypes.getMessageSendNoParamFn( optLevel); // : ObjCTypes.getMessageSendFn0();
@@ -3761,7 +3759,7 @@ CGObjCRuntimeLifetimeMarker  CGObjCMulleRuntime::GenerateCallArgs( CodeGenFuncti
    // First see if we even have that (we could be in a C function)
    // only do this when optimizing.
    //
-   if( CGM.getCodeGenOpts().OptimizationLevel != 0)
+   if( CGM.getCodeGenOpts().OptimizationLevel >= 2)
    {
       if( OptimizeReuseParam( CGF, Args, Expr, RD, Record.getAddress(), Marker))
          return( Marker);

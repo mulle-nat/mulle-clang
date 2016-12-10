@@ -770,6 +770,7 @@ namespace {
       int64_t   no_tagged_pointers;
       int64_t   foundation_version;
       int64_t   runtime_version;
+      int64_t   thread_local_runtime;
       int64_t   user_version;
       // @mulle-objc@ uniqueid: make it 32 bit here
       uint32_t  fastclassids[ 32];
@@ -1528,9 +1529,10 @@ CGObjCMulleRuntime::CGObjCMulleRuntime(CodeGen::CodeGenModule &cgm) : CGObjCComm
 ObjCTypes(cgm) {
    ObjCABI = 1;
 
-   foundation_version = 1848;   // default for testing
-   runtime_version    = 0;      // MUST be set by header, if we emit loadinfo
-   user_version       = 0;
+   foundation_version   = 1848;   // default for testing
+   runtime_version      = 0;      // MUST be set by header, if we emit loadinfo
+   user_version         = 0;
+   thread_local_runtime = 0;
    no_tagged_pointers = CGM.getLangOpts().ObjCDisableTaggedPointers;
 
    memset( fastclassids, 0, sizeof( fastclassids));
@@ -1598,7 +1600,7 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
    uint64_t  patch;
    uint64_t  value;
 
-   // it's cool if version isn't defined, when just compiling C stuff
+   // it's cool if versions aren't defined, when just compiling C stuff
    PP = &P->getPreprocessor();
    if( ! runtime_version)
    {
@@ -1606,11 +1608,8 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
           GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_RUNTIME_VERSION_MINOR", &minor) &&
           GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_RUNTIME_VERSION_PATCH", &patch))
       {
-         runtime_version = major << 20 | minor << 8 | patch;
-         // since the loadinfo and stuff is hardcoded, the check is also hardcoded
-         
-         if( ! (major == 0 && minor == 2))
-            llvm_unreachable("This compiler is compatible only with mulle_objc_runtime 0.2.x");
+         runtime_version = (major << 20) | (minor << 8) | patch;
+         // fprintf( stderr, "%d.%d.%d -> 0x%x\n", (int) major, (int)  minor, (int) patch, (int)  runtime_version);
       }
    }
 
@@ -1621,7 +1620,7 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
           GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_FOUNDATION_VERSION_MINOR", &minor) &&
           GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_FOUNDATION_VERSION_PATCH", &patch))
       {
-         foundation_version = major << 20 | minor << 8 | patch;
+         foundation_version = (major << 20) | (minor << 8) | patch;
       }
    }
 
@@ -1631,6 +1630,12 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
       no_tagged_pointers = value;
    }
 
+   // possibly make this a #pragma sometime
+   if( GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_THREAD_LOCAL_RUNTIME", &value))
+   {
+      thread_local_runtime = value;
+   }
+
    // optional anyway
    if( ! user_version)
    {
@@ -1638,7 +1643,7 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
           GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_USER_VERSION_MINOR", &minor) &&
           GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_USER_VERSION_PATCH", &patch))
       {
-         user_version = major << 20 | minor << 8 | patch;
+         user_version = (major << 20) | (minor << 8) | patch;
       }
    }
 
@@ -2663,92 +2668,251 @@ struct find_info   findNextStatementInBody( Stmt *s, Stmt *body)
 
 class MulleStatementVisitor : public RecursiveASTVisitor<MulleStatementVisitor>
 {
+  enum
+  {
+      IsUntaint    = 0x1,
+      IsTaint      = 0x2,
+      IsSupertaint = 0x3,
+  };
   std::set<Decl *>   taintedLoves;
+  std::set<Decl *>   supertaintedLoves;
 
   ObjCMethodDecl     *Method;
   ObjCMessageExpr    *Call;
+  ImplicitParamDecl  *Param;
   Stmt               *NextStatement;
-  bool               returnFalseIfTainted;
+  Stmt               *LastStatement;
+  Stmt               *SkipAfterStatement;
+  bool               skipThisStatement;
+  bool               returnFalseIfAnyTaintReference;
   bool               stopCollectingTaints;
-  bool               searchingForAddressOperator;
+  int                status;
   
 public:
   MulleStatementVisitor( ObjCMethodDecl *M, ObjCMessageExpr *C)
   {
      Method = M;
      Call   = C;
-     taintedLoves.insert( Method->getParamDecl());
+     Param  = Method->getParamDecl();
      NextStatement = nullptr;
-     returnFalseIfTainted = false;
+     LastStatement = nullptr;
+     SkipAfterStatement = nullptr;
+     returnFalseIfAnyTaintReference = false;
      stopCollectingTaints = false;
-     searchingForAddressOperator = false;
+     status = 0;
   }
-
-  void   getTaintedLoves( std::set<Decl *> *result)
+  
+  Stmt  *GetLastStatement( void)
   {
-     result->insert( taintedLoves.begin(), taintedLoves.end());
+     return( LastStatement);
   }
-
+  
+  int   GetStatus( void)
+  {
+      return( status);
+  }
+   
 protected:
-  MulleStatementVisitor( ObjCMethodDecl *M, std::set<Decl *> *taints)
+  MulleStatementVisitor( ObjCMethodDecl *M,
+                        ImplicitParamDecl *P,
+                        std::set<Decl *> *taints,
+                        std::set<Decl *> *supertaints)
   {
      Method = M;
      Call   = nullptr;
+     Param  = P;
      NextStatement = nullptr;
+     LastStatement = nullptr;
+     SkipAfterStatement = nullptr;
      taintedLoves.insert( taints->begin(), taints->end());
-     returnFalseIfTainted = true;
+     supertaintedLoves.insert( supertaints->begin(), supertaints->end());
      stopCollectingTaints = false;
-     searchingForAddressOperator = false;
+     returnFalseIfAnyTaintReference = false;
+     status = 0;
   }
 
 public:
-   // own function
-   bool  CheckObjCArguments( ObjCMessageExpr *C)
-   {
-      unsigned int  i, n;
-      Expr          *arg;
-      
-      n = C->getNumArgs();
-      for( i = 0; i < n; i++)
-      {
-         arg = unparenthesizedAndUncastedExpr( C->getArg( i));
-         if (const UnaryOperator *uop = dyn_cast<UnaryOperator>(arg))
-            if (uop->getOpcode() == UO_AddrOf)
-            {
-               if( isStatementTainted( uop->getSubExpr()))
-                  return( false);
-            }
-      }
-      return( true);
-   }
-   
    // this is always called and more qualified functions later too with same Stmt
    bool VisitStmt(Stmt *s)
    {
-      //fprintf( stderr, "%s %p (%s)\n", s->getStmtClassName(), s, __PRETTY_FUNCTION__);
+      // fprintf( stderr, "%s %p (%s)\n", s->getStmtClassName(), s, __PRETTY_FUNCTION__);
+      
+      skipThisStatement = SkipAfterStatement != nullptr;
+
+      if( SkipAfterStatement == s)
+      {
+         skipThisStatement = true;
+         SkipAfterStatement = nullptr;
+      }
+      
       if( NextStatement == s)
       {
-         returnFalseIfTainted = true;
          stopCollectingTaints = true;
+      }
+      LastStatement = s;
+      
+      return( true);
+   }
+   
+   bool TraverseStmt(Stmt *s)
+   {
+      bool  flag;
+      
+      if( ! s)
+         return( true);
+      
+       // fprintf( stderr, "-> %s %p (%s)\n", s->getStmtClassName(), s, __PRETTY_FUNCTION__);
+
+       flag = RecursiveASTVisitor<MulleStatementVisitor>::TraverseStmt( s);
+
+       // fprintf( stderr, "<- %s %p (%s) (%s) (status=%d)\n", s->getStmtClassName(), s, __PRETTY_FUNCTION__, flag ? "true" : "false", status);
+      if( returnFalseIfAnyTaintReference && status)
+         return( false);
+      return( flag);;
+   }
+
+   bool VisitDeclRefExpr(DeclRefExpr *E)
+   {
+      Decl   *value;
+      
+      if( skipThisStatement)
+         return( true);
+      
+      if( ! E)
+         return( true);
+
+      value = E->getDecl();
+      if( value == Param)
+      {
+         status = IsTaint;
+      }
+      else
+         if( taintedLoves.find( value) != taintedLoves.end())
+         {
+            status = IsTaint;
+         }
+         else
+            if( supertaintedLoves.find( value) != supertaintedLoves.end())
+            {
+               status = IsSupertaint;
+            }
+
+      // fprintf( stderr, "%s %p (%s) status=%d\n", value->getDeclKindName(), value, __PRETTY_FUNCTION__, status);
+
+      return( true);
+   }
+   
+   bool VisitLabelStmt( LabelStmt *s)
+   {
+      //
+      // we bail if we find a label before before the [call]
+      // we could collect labels before the call and check
+      // that the goto doesn't hit any known label
+      //
+      if( skipThisStatement)
+         return( true);
+
+      // fprintf( stderr, "%s %p (%s)\n", s->getStmtClassName(), s, __PRETTY_FUNCTION__);
+      if( ! NextStatement)
+      {
+         // fprintf( stderr, "TAINTED BY LABEL %s %p (%s)\n", s->getStmtClassName(), s, __PRETTY_FUNCTION__);
+         taintedLoves.clear();
+         return( false);
       }
       return( true);
    }
 
-  bool VisitLabelStmt( LabelStmt *s)
-  {
-     //
-     // we bail if we find a label before before the [call]
-     // we could collect labels before the call and check
-     // that the goto doesn't hit any known label
-     //
-     //fprintf( stderr, "%s %p (%s)\n", s->getStmtClassName(), s, __PRETTY_FUNCTION__);
-     if( ! NextStatement)
-     {
-        taintedLoves.clear();
-        return( false);
-     }
-     return( true);
-  }
+   int  isStatementTainted( Stmt *s)
+   {
+      MulleStatementVisitor   SubVisitor( Method, Param, &taintedLoves, &supertaintedLoves);
+      
+      SubVisitor.TraverseStmt( s);
+      SkipAfterStatement = SubVisitor.GetLastStatement();
+   
+      // fprintf( stderr, "%s %p (%s) status=%d\n", s->getStmtClassName(), s, __PRETTY_FUNCTION__, SubVisitor.GetStatus());
+
+      return( SubVisitor.GetStatus());
+   }
+   
+   
+   // &<E>
+   void  checkReferencingExpr( Expr *E)
+   {
+      int    exprStatus;
+      
+      E          = unparenthesizedAndUncastedExpr( E);
+      exprStatus = isStatementTainted( E);
+      
+      // addr turns untaints into taints, and taints into supertaints
+      switch( exprStatus)
+      {
+      case IsUntaint :     status = IsTaint; break;
+      case IsTaint :       status = IsSupertaint; break;
+      case IsSupertaint :  status = IsSupertaint; break;
+      }
+   }
+   
+   // *E, E->x, x[E], E[x]
+   void  checkDereferencingExpr( Expr *E)
+   {
+      int    exprStatus;
+      
+      E          = unparenthesizedAndUncastedExpr( E);
+      exprStatus = isStatementTainted( E);
+      
+      // * turns taints into untaints, supertaints and untaints stay
+      switch( exprStatus)
+      {
+      case IsUntaint :     status = IsUntaint; break;
+      case IsTaint :       status = IsUntaint; break;
+      case IsSupertaint :  status = IsSupertaint; break;
+      }
+   }
+
+   bool VisitMemberExpr( const MemberExpr *E)
+   {
+      if( skipThisStatement)
+         return( true);
+      
+      // fprintf( stderr, "%s %p (%s)\n", E->getStmtClassName(), E, __PRETTY_FUNCTION__);
+
+      checkDereferencingExpr( E->getBase());
+      return( true);
+   }
+   
+   bool VisitArraySubscriptExpr(const ArraySubscriptExpr *E)
+   {
+      if( skipThisStatement)
+         return( true);
+
+      // fprintf( stderr, "%s %p (%s)\n", E->getStmtClassName(), E, __PRETTY_FUNCTION__);
+      
+      checkDereferencingExpr( (Expr *) E->getLHS());
+      checkDereferencingExpr( (Expr *) E->getRHS());
+      return( true);
+   }
+
+   bool VisitUnaryOperator( UnaryOperator *op)
+   {
+      if( skipThisStatement)
+         return( true);
+      
+      // fprintf( stderr, "%s %p (%s)\n", op->getStmtClassName(), op, __PRETTY_FUNCTION__);
+      switch( op->getOpcode())
+      {
+      default :
+         break;
+         
+      case UO_AddrOf :
+         checkReferencingExpr( op->getSubExpr());
+         break;
+
+      case UO_Deref :
+         checkDereferencingExpr( op->getSubExpr());
+         break;
+      }
+      return( true);
+   }
 
    //
    // check if left side is a pointer, check if right side
@@ -2763,8 +2927,12 @@ public:
       Expr         *lhs;
       Expr         *rhs;
       DeclRefExpr  *ref;
-
-     //fprintf( stderr, "%s %p (%s)\n", op->getStmtClassName(), op, __PRETTY_FUNCTION__);
+      int          exprStatus;
+      
+      if( skipThisStatement)
+         return( true);
+      
+      // fprintf( stderr, "%s %p (%s)\n", op->getStmtClassName(), op, __PRETTY_FUNCTION__);
       if( stopCollectingTaints)
          return( true);
 
@@ -2802,48 +2970,57 @@ public:
             // the optimization can't happen
 
             rhs = op->getRHS();
-            if( isStatementTainted( rhs))
-               taintedLoves.insert( value);
+            rhs = unparenthesizedAndUncastedExpr( rhs);
+
+            exprStatus = isStatementTainted( rhs);
+            // if( exprStatus > IsUntaint)
+            //    fprintf( stderr, "TAINT %s %p (%s)\n", rhs->getStmtClassName(), rhs, __PRETTY_FUNCTION__);
+            
+            switch( exprStatus)
+            {
+            case IsUntaint    : break;
+            case IsTaint      : taintedLoves.insert( value); status = IsTaint; break;
+            case IsSupertaint : supertaintedLoves.insert( value); status = IsSupertaint; break;
+            }
          }
       }
       return( true);
    }
-
-   bool  isStatementTainted( Stmt *s)
+   
+   // own function
+   bool  CheckObjCArguments( ObjCMessageExpr *C)
    {
-      MulleStatementVisitor   SubVisitor( Method, &taintedLoves);
-
-      return( ! SubVisitor.TraverseStmt( s));
+      unsigned int  i, n;
+      
+      n = C->getNumArgs();
+      for( i = 0; i < n; i++)
+         if( isStatementTainted( C->getArg( i)) >= IsTaint)
+            return( false);
+      return( true);
    }
-
+   
    bool VisitObjCMessageExpr(ObjCMessageExpr *d)
    {
-      //fprintf( stderr, "%s %p (%s)\n", d->getStmtClassName(), d, __PRETTY_FUNCTION__);
+      if( skipThisStatement)
+         return( true);
+
+      // fprintf( stderr, "[] %s %p (%s)\n", d->getStmtClassName(), d, __PRETTY_FUNCTION__);
 
       if( d == Call)
       {
          struct find_info  info;
 
+         if( ! CheckObjCArguments( d))
+            return( false);
+         
          info = findNextStatementInBody( d, Method->getBody());
          if( info.insideLoop)
             return( false);
+
+         // reset status now
+         status = 0;
+         returnFalseIfAnyTaintReference = true;
          NextStatement = info.next;
-      }
-      return( true);
-   }
-
-   bool VisitDeclRefExpr(DeclRefExpr *d)
-   {
-      ValueDecl   *value;
-
-      //fprintf( stderr, "%s %p (%s)\n", d->getStmtClassName(), d, __PRETTY_FUNCTION__);
-
-      value = d->getDecl();
-      // lol @ c++ sets
-      if( taintedLoves.find( value) != taintedLoves.end())
-      {
-         if( returnFalseIfTainted)
-            return( false);
       }
       return( true);
    }
@@ -2860,7 +3037,7 @@ public:
 // 2. we can therefore rule out that anything in _param intentionally points
 //    into param
 // 3. Run through the whole function until we encounter the MesssageExpr,
-//    collect  variables that may alias our _param in the meantime. If we hit a
+//    collect variables that may alias our _param in the meantime. If we hit a
 //    label we return false (currently)
 // 4. Find the next statement after MesssageExpr
 // 5. Continue with the regular callbacks until this statement hits
@@ -2870,20 +3047,26 @@ public:
 // 6. We reach the end, we return true
 //
 
+// What is a alias or a taint ?
+//   anything that is not a 'taint' or an 'untaint' is 'ok'
+//   _param on it's own is a  'taint' e.g.   : _param (duh)
+//   dereference of  'taint' is an 'untaint' : *_param, _param->x, _param[ 0]
+//   address_ot a untaint is a 'taint'       : &_param->x
+//   address_of a 'taint' is a 'supertaint'  : &_param
+//   dereference of a 'supertaint' is also a 'supertaint' (don't care no more) : *&_param
+//   assignment of a 'taint' to a variable makes this variable a 'taint'
+//   assignment of a 'supertaint' to a variable makes this variable a 'supertaint'
+//
+
 static bool  param_unused_after_expr( ObjCMethodDecl *Method, ObjCMessageExpr *Expr)
 {
    MulleStatementVisitor   Visitor( Method, Expr);
-   bool                    result;
    
    if( ! Method->getParamDecl())
       return( false);
 
    Stmt *Body = Method->getBody();
-   result = Visitor.TraverseStmt( Body);
-   if( result)
-      result = Visitor.CheckObjCArguments( Expr);
-
-   return( result);
+   return( Visitor.TraverseStmt( Body));
 }
 
 
@@ -3334,7 +3517,11 @@ bool CGObjCMulleRuntime::OptimizeReuseParam( CodeGenFunction &CGF,
    //
 
    if( ! param_unused_after_expr( (ObjCMethodDecl *) parent, (ObjCMessageExpr *) Expr))
+   {
+      // fprintf( stderr, "reuse denied\n");
       return( false);
+   }
+   // fprintf( stderr, "can reuse\n");
 
    //
    // nice we can substitute _param, so what we do is
@@ -5093,9 +5280,6 @@ llvm::Constant *CGObjCMulleRuntime::EmitLoadInfoList(Twine Name,
 {
    llvm::Constant   *Values[8];
 
-   if( ! runtime_version)
-      llvm_unreachable( "Missing #include <mulle_objc_runtime/mulle_objc_runtime.h> in compilation, can not emit loadinfo");
-
    //
    // should get these values from the header
    //
@@ -5112,6 +5296,7 @@ llvm::Constant *CGObjCMulleRuntime::EmitLoadInfoList(Twine Name,
 
    bits  = optLevel << 8;
    bits |= no_tagged_pointers ? 0x4 : 0x0;
+   bits |= thread_local_runtime  ? 0x8 : 0x0;
    bits |= CGM.getLangOpts().ObjCAllocsAutoreleasedObjects ? 0x2 : 0;
    bits |= 0;         // we are sorted, so unsorted == 0
 
@@ -5193,6 +5378,17 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
    {
        return( nullptr);
    }
+   
+   // if we emit something, then check that our produced loadinfo is compatible
+   if( ! runtime_version)
+      llvm_unreachable( "Missing #include <mulle_objc_runtime/mulle_objc_runtime.h> in compilation, can not emit loadinfo");
+         // since the loadinfo and stuff is hardcoded, the check is also hardcoded
+   if( runtime_version < ((0 << 20) | (2 << 8) | 0) ||  runtime_version >= ((0 << 20) | (3 << 8) | 0))
+   {
+      // fprintf( stderr, "version found: 0x%x\n", (int) runtime_version);
+      llvm_unreachable( "This compiler is compatible only with mulle_objc_runtime 0.2.x");
+   }
+
 
   llvm::Constant *ClassList = EmitClassList( "OBJC_CLASS_LOADS", "__DATA,_objc_load_info", LoadClasses);
   llvm::Constant *CategoryList = EmitCategoryList( "OBJC_CATEGORY_LOADS", "__DATA,_objc_load_info", LoadCategories);

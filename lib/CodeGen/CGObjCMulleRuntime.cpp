@@ -3059,12 +3059,15 @@ public:
 static bool  param_unused_after_expr( ObjCMethodDecl *Method, ObjCMessageExpr *Expr)
 {
    MulleStatementVisitor   Visitor( Method, Expr);
-   
+   bool                    result;
+
    if( ! Method->getParamDecl())
       return( false);
 
    Stmt *Body = Method->getBody();
-   return( Visitor.TraverseStmt( Body));
+
+   result = Visitor.TraverseStmt( Body);
+   return( result);
 }
 
 

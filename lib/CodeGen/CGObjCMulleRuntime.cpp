@@ -23,7 +23,6 @@
 // @mulle-objc@ Memo: code places, that I modified elsewhere, should be marked
 //              like this followed by a comment.
 //===----------------------------------------------------------------------===//
-
 #include "CGObjCRuntime.h"
 #include "CGBlocks.h"
 #include "CGCleanup.h"
@@ -62,6 +61,14 @@
 #include "clang/AST/SelectorLocationsKind.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Compiler.h"
+
+
+#define MULLE_OBJC_RUNTIME_VERSION_MAJOR   0
+#define MULLE_OBJC_RUNTIME_VERSION_MINOR   2
+
+#define STR_MULLE_OBJC_RUNTIME_VERSION     "0.2"
+
+
 
 using namespace clang;
 using namespace CodeGen;
@@ -5384,10 +5391,16 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
    if( ! runtime_version)
       llvm_unreachable( "Missing #include <mulle_objc_runtime/mulle_objc_runtime.h> in compilation, can not emit loadinfo");
          // since the loadinfo and stuff is hardcoded, the check is also hardcoded
-   if( runtime_version < ((0 << 20) | (2 << 8) | 0) ||  runtime_version >= ((0 << 20) | (3 << 8) | 0))
+   
+   // not elegant...
+#define MIN_MULLE_OBJC_RUNTIME_VERSION   ((MULLE_OBJC_RUNTIME_VERSION_MAJOR << 20) | (MULLE_OBJC_RUNTIME_VERSION_MINOR << 8) | 0)  // inclusive
+#define MAX_MULLE_OBJC_RUNTIME_VERSION   ((MULLE_OBJC_RUNTIME_VERSION_MAJOR << 20) | ((MULLE_OBJC_RUNTIME_VERSION_MINOR + 1) << 8) | 0)  // exclusive
+   
+   if( runtime_version < MIN_MULLE_OBJC_RUNTIME_VERSION ||
+       runtime_version >= MAX_MULLE_OBJC_RUNTIME_VERSION)
    {
       // fprintf( stderr, "version found: 0x%x\n", (int) runtime_version);
-      llvm_unreachable( "This compiler is compatible only with mulle_objc_runtime 0.2.x");
+      llvm_unreachable( "This compiler is compatible only with mulle_objc_runtime " STR_MULLE_OBJC_RUNTIME_VERSION);
    }
 
 

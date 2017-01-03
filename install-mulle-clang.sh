@@ -6,7 +6,8 @@
 
 # various versions
 MULLE_OBJC_VERSION_BRANCH=39
-MULLE_OBJC_VERSION="3.9.0"  # for opt
+MULLE_OBJC_VERSION="3.9.1"  # for opt
+CLANG_VENDOR="mulle-clang (0.2 runtime)"
 
 CMAKE_VERSION="3.5"
 CMAKE_VERSION_MAJOR=3
@@ -591,6 +592,7 @@ _build_clang()
                cmake \
                   -Wno-dev \
                   -G "${CMAKE_GENERATOR}" \
+                  -DCLANG_VENDOR="${CLANG_VENDOR}" \
                   -DCMAKE_BUILD_TYPE="${CLANG_BUILD_TYPE}" \
                   -DCMAKE_INSTALL_PREFIX="${MULLE_CLANG_INSTALL_PREFIX}" \
                   ${CMAKE_FLAGS} \

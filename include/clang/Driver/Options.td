@@ -1077,7 +1077,8 @@ def fno_wrapv : Flag<["-"], "fno-wrapv">, Group<f_Group>;
 def fno_zero_initialized_in_bss : Flag<["-"], "fno-zero-initialized-in-bss">, Group<f_Group>;
 def fobjc_tps : Flag<["-"], "fobjc-tps">, Group<f_Group>, Flags<[CC1Option]>,
   HelpText<"use Objective-C tagged pointers for literals">;
-def fno_objc_tps : Flag<["-"], "fno-objc-tps">, Group<f_Group>;
+def fno_objc_tps : Flag<["-"], "fno-objc-tps">, Group<f_Group>, Flags<[CC1Option]>,
+   HelpText<"don't use Objective-C tagged pointers for literals">;
 def fobjc_aam : Flag<["-"], "fobjc-aam">, Group<f_Group>, Flags<[CC1Option]>,
   HelpText<"AlwaysAutoreleaseMode, +alloc becomes +instantiate">;
 def fno_objc_aam : Flag<["-"], "fno-objc-aam">, Group<f_Group>;

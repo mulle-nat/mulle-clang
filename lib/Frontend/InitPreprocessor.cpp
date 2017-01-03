@@ -604,11 +604,13 @@ static void InitializePredefinedMacros(const TargetInfo &TI,
 
     // @mulle-objc@ language: announce that we are running 
     if (LangOpts.ObjCRuntime.hasMulleMetaABI())
+    {
         Builder.defineMacro("__MULLE_OBJC__");
-    if (LangOpts.ObjCAllocsAutoreleasedObjects)
-        Builder.defineMacro("__MULLE_OBJC_AAM__");
-     if( ! LangOpts.ObjCDisableTaggedPointers)
-        Builder.defineMacro("__MULLE_OBJC_TPS__");
+       if (LangOpts.ObjCAllocsAutoreleasedObjects)
+          Builder.defineMacro("__MULLE_OBJC_AAM__");
+       if( ! LangOpts.ObjCDisableTaggedPointers)
+          Builder.defineMacro("__MULLE_OBJC_TPS__");
+    }
 
     if (LangOpts.ObjCRuntime.getKind() == ObjCRuntime::ObjFW) {
       VersionTuple tuple = LangOpts.ObjCRuntime.getVersion();

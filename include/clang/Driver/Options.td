@@ -1079,6 +1079,8 @@ def fobjc_tps : Flag<["-"], "fobjc-tps">, Group<f_Group>, Flags<[CC1Option]>,
   HelpText<"use Objective-C tagged pointers for literals">;
 def fno_objc_tps : Flag<["-"], "fno-objc-tps">, Group<f_Group>, Flags<[CC1Option]>,
    HelpText<"don't use Objective-C tagged pointers for literals">;
+def fobjc_trt : Flag<["-"], "fobjc-trt">, Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"use thread local runtime">;
 def fobjc_aam : Flag<["-"], "fobjc-aam">, Group<f_Group>, Flags<[CC1Option]>,
   HelpText<"AlwaysAutoreleaseMode, +alloc becomes +instantiate">;
 def fno_objc_aam : Flag<["-"], "fno-objc-aam">, Group<f_Group>;

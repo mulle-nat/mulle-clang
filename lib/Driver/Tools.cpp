@@ -5375,6 +5375,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   // @mulle-objc@ Forward compiler flags for MulleObjC
   Args.AddLastArg(CmdArgs, options::OPT_fobjc_aam);
   Args.AddLastArg(CmdArgs, options::OPT_fobjc_tps);
+  Args.AddLastArg(CmdArgs, options::OPT_fobjc_trt);
   Args.AddLastArg(CmdArgs, options::OPT_fno_objc_tps);
 
   // Forward flags for OpenMP. We don't do this if the current action is an

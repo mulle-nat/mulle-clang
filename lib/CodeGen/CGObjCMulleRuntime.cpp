@@ -64,9 +64,9 @@
 
 
 #define MULLE_OBJC_RUNTIME_VERSION_MAJOR   0
-#define MULLE_OBJC_RUNTIME_VERSION_MINOR   2
+#define MULLE_OBJC_RUNTIME_VERSION_MINOR   3
 
-#define STR_MULLE_OBJC_RUNTIME_VERSION     "0.2"
+#define STR_MULLE_OBJC_RUNTIME_VERSION     "0.3"
 
 
 
@@ -1536,11 +1536,11 @@ CGObjCMulleRuntime::CGObjCMulleRuntime(CodeGen::CodeGenModule &cgm) : CGObjCComm
 ObjCTypes(cgm) {
    ObjCABI = 1;
 
-   foundation_version   = 1848;   // default for testing
+   foundation_version   = 0;
    runtime_version      = 0;      // MUST be set by header, if we emit loadinfo
    user_version         = 0;
-   thread_local_runtime = 0;
-   no_tagged_pointers = CGM.getLangOpts().ObjCDisableTaggedPointers;
+   thread_local_runtime = CGM.getLangOpts().ObjCHasThreadLocalRuntime;
+   no_tagged_pointers   = CGM.getLangOpts().ObjCDisableTaggedPointers;
 
    memset( fastclassids, 0, sizeof( fastclassids));
    fastclassids_defined = false;
@@ -1620,38 +1620,49 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
       }
    }
 
+   // optional anyway
    if( ! foundation_version)
    {
-      // optional anyway
-      if( GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_FOUNDATION_VERSION_MAJOR", &major) &&
-          GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_FOUNDATION_VERSION_MINOR", &minor) &&
-          GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_FOUNDATION_VERSION_PATCH", &patch))
+      if( GetMacroDefinitionUnsignedIntegerValue( PP, "FOUNDATION_VERSION_MAJOR", &major) &&
+          GetMacroDefinitionUnsignedIntegerValue( PP, "FOUNDATION_VERSION_MINOR", &minor) &&
+          GetMacroDefinitionUnsignedIntegerValue( PP, "FOUNDATION_VERSION_PATCH", &patch))
       {
          foundation_version = (major << 20) | (minor << 8) | patch;
       }
    }
 
+   // optional anyway
+   if( ! user_version)
+   {
+      if( GetMacroDefinitionUnsignedIntegerValue( PP, "USER_VERSION_MAJOR", &major) &&
+          GetMacroDefinitionUnsignedIntegerValue( PP, "USER_VERSION_MINOR", &minor) &&
+          GetMacroDefinitionUnsignedIntegerValue( PP, "USER_VERSION_PATCH", &patch))
+      {
+         user_version = (major << 20) | (minor << 8) | patch;
+      }
+   }
+
+
    // possibly make this a #pragma sometime
-   if( GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_NO_TAGGED_POINTERS", &value))
+   if( GetMacroDefinitionUnsignedIntegerValue( PP, "__MULLE_OBJC_TPS__", &value))
+   {
+      no_tagged_pointers = ! value;
+   }
+
+   if( GetMacroDefinitionUnsignedIntegerValue( PP, "__MULLE_OBJC_NO_TPS__", &value))
    {
       no_tagged_pointers = value;
    }
 
    // possibly make this a #pragma sometime
-   if( GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_THREAD_LOCAL_RUNTIME", &value))
+   if( GetMacroDefinitionUnsignedIntegerValue( PP, "__MULLE_OBJC_TRT__", &value))
    {
       thread_local_runtime = value;
    }
 
-   // optional anyway
-   if( ! user_version)
+   if( GetMacroDefinitionUnsignedIntegerValue( PP, "__MULLE_OBJC_NO_TRT__", &value))
    {
-      if( GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_USER_VERSION_MAJOR", &major) &&
-          GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_USER_VERSION_MINOR", &minor) &&
-          GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_USER_VERSION_PATCH", &patch))
-      {
-         user_version = (major << 20) | (minor << 8) | patch;
-      }
+      thread_local_runtime = ! value;
    }
 
    /* this runs for every top level declaration.(layme)
@@ -5380,18 +5391,21 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
                             uniqueid_comparator);
    }
 
-   // dont't emit if there is nothing to do
+   // always emit to check for code compatability
    if( ! LoadClasses.size() && ! LoadCategories.size() && \
        ! LoadStrings.size() && ! EmitHashes.size())
    {
-       return( nullptr);
+      // if nothing is emitted, and no runtime versions has been set emit
+      // nothing, it's plain C code
+      if( ! runtime_version)
+         return( nullptr);
    }
-   
+
    // if we emit something, then check that our produced loadinfo is compatible
    if( ! runtime_version)
       llvm_unreachable( "Missing #include <mulle_objc_runtime/mulle_objc_runtime.h> in compilation, can not emit loadinfo");
-         // since the loadinfo and stuff is hardcoded, the check is also hardcoded
-   
+
+   // since the loadinfo and stuff is hardcoded, the check is also hardcoded
    // not elegant...
 #define MIN_MULLE_OBJC_RUNTIME_VERSION   ((MULLE_OBJC_RUNTIME_VERSION_MAJOR << 20) | (MULLE_OBJC_RUNTIME_VERSION_MINOR << 8) | 0)  // inclusive
 #define MAX_MULLE_OBJC_RUNTIME_VERSION   ((MULLE_OBJC_RUNTIME_VERSION_MAJOR << 20) | ((MULLE_OBJC_RUNTIME_VERSION_MINOR + 1) << 8) | 0)  // exclusive

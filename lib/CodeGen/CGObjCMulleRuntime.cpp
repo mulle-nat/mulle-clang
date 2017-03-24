@@ -62,8 +62,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Compiler.h"
 
-#include "MulleObjCRuntimeVersion.inc"
-
+#define COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION         4
 
 
 using namespace clang;
@@ -772,6 +771,7 @@ namespace {
 
       int64_t   no_tagged_pointers;
       int64_t   foundation_version;
+      int64_t   load_version;
       int64_t   runtime_version;
       int64_t   thread_local_runtime;
       int64_t   user_version;
@@ -1532,6 +1532,7 @@ CGObjCMulleRuntime::CGObjCMulleRuntime(CodeGen::CodeGenModule &cgm) : CGObjCComm
 ObjCTypes(cgm) {
    ObjCABI = 1;
 
+   load_version         = 0;
    foundation_version   = 0;
    runtime_version      = 0;      // MUST be set by header, if we emit loadinfo
    user_version         = 0;
@@ -1616,6 +1617,15 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
       }
    }
 
+   if( ! load_version)
+   {
+      if( GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_RUNTIME_LOAD_VERSION", &value))
+      {
+         load_version = value;
+         // fprintf( stderr, "load_version -> 0x%x\n", (int)  load_version);
+      }
+   }
+   
    // optional anyway
    if( ! foundation_version)
    {
@@ -4783,42 +4793,46 @@ void CGObjCMulleRuntime::GenerateCategory(const ObjCCategoryImplDecl *OCD) {
    llvm::array_pod_sort( ClassMethods.begin(), ClassMethods.end(),
                          uniqueid_comparator);
 
-   llvm::Constant *Values[9];
+   llvm::Constant *Values[10];
 
    // category name emitted below
 
-   Values[ 1] = HashClassConstantForString( Interface->getName());
-   Values[ 2] = GetClassName(Interface->getObjCRuntimeNameAsString());
+   Values[ 2] = HashClassConstantForString( Interface->getName());
+   Values[ 3] = GetClassName(Interface->getObjCRuntimeNameAsString());
    LazySymbols.insert(Interface->getIdentifier());
 
-   Values[ 3] = llvm::ConstantExpr::getBitCast( _HashConstantForString( Interface->getIvarHashString( CGM.getContext()), 0), ObjCTypes.ClassIDTy);;
+   Values[ 4] = llvm::ConstantExpr::getBitCast( _HashConstantForString( Interface->getIvarHashString( CGM.getContext()), 0), ObjCTypes.ClassIDTy);;
 
-   Values[ 4] = EmitMethodList("OBJC_CATEGORY_CLASS_METHODS_" + ExtName.str(),
+   Values[ 5] = EmitMethodList("OBJC_CATEGORY_CLASS_METHODS_" + ExtName.str(),
                               "__DATA,__cat_cls_meth,regular,no_dead_strip",
                               ClassMethods);
-   Values[ 5] = EmitMethodList("OBJC_CATEGORY_INSTANCE_METHODS_" + ExtName.str(),
+   Values[ 6] = EmitMethodList("OBJC_CATEGORY_INSTANCE_METHODS_" + ExtName.str(),
                               "__DATA,__cat_inst_meth,regular,no_dead_strip",
                               InstanceMethods);
 
    // If there is no category @interface then there can be no properties.
    if (Category)
    {
-      Values[ 0] = GetClassName(Category->getName());
-      Values[ 6] = EmitPropertyList("OBJC_CATEGORY_PROP_LIST_" + ExtName.str(),
+      Values[ 0] = llvm::ConstantExpr::getBitCast( _HashConstantForString( Category->getName(), 0), ObjCTypes.ClassIDTy);
+      Values[ 1] = GetClassName(Category->getName());
+
+      Values[ 7] = EmitPropertyList("OBJC_CATEGORY_PROP_LIST_" + ExtName.str(),
                                    OCD, Category, ObjCTypes);
-      Values[ 7] =
+      Values[ 8] =
       EmitProtocolIDList("OBJC_CATEGORY_PROTOCOLS_" + ExtName.str(),
                          Category->protocol_begin(), Category->protocol_end());
-      Values[ 8] =
+      Values[ 9] =
       EmitProtocolClassIDList("OBJC_CATEGORY_PROTOCOLCLASSES_" + ExtName.str(),
                                Category->protocol_begin(), Category->protocol_end());
    }
    else
    {
-      Values[ 0] = llvm::Constant::getNullValue(ObjCTypes.Int8PtrTy);
-      Values[ 6] = llvm::Constant::getNullValue(ObjCTypes.PropertyListPtrTy);
-      Values[ 7] = llvm::Constant::getNullValue(ObjCTypes.ProtocolListPtrTy);
+      Values[ 0] = llvm::ConstantExpr::getBitCast( _HashConstantForString( OCD->getName(), 0), ObjCTypes.ClassIDTy);
+      Values[ 1] = GetClassName( OCD->getName());
+
+      Values[ 7] = llvm::Constant::getNullValue(ObjCTypes.PropertyListPtrTy);
       Values[ 8] = llvm::Constant::getNullValue(ObjCTypes.ProtocolListPtrTy);
+      Values[ 9] = llvm::Constant::getNullValue(ObjCTypes.ProtocolListPtrTy);
    }
 
    llvm::Constant *Init = llvm::ConstantStruct::get(ObjCTypes.CategoryTy,
@@ -5293,14 +5307,15 @@ llvm::Constant *CGObjCMulleRuntime::EmitLoadInfoList(Twine Name,
                                                      llvm::Constant *StringList,
                                                      llvm::Constant *HashNameList)
 {
-   llvm::Constant   *Values[8];
+   llvm::Constant   *Values[9];
 
    //
    // should get these values from the header
    //
-   Values[0] = llvm::ConstantInt::get(ObjCTypes.IntTy, runtime_version);     // major, minor, patch version
-   Values[1] = llvm::ConstantInt::get(ObjCTypes.IntTy, foundation_version);  // foundation
-   Values[2] = llvm::ConstantInt::get(ObjCTypes.IntTy, user_version);        // user
+   Values[0] = llvm::ConstantInt::get(ObjCTypes.IntTy, load_version);        // just a number
+   Values[1] = llvm::ConstantInt::get(ObjCTypes.IntTy, runtime_version);     // major, minor, patch version
+   Values[2] = llvm::ConstantInt::get(ObjCTypes.IntTy, foundation_version);  // foundation
+   Values[3] = llvm::ConstantInt::get(ObjCTypes.IntTy, user_version);        // user
 
    unsigned int   optLevel;
 
@@ -5318,11 +5333,12 @@ llvm::Constant *CGObjCMulleRuntime::EmitLoadInfoList(Twine Name,
    //
    // memorize some compilation context
    //
-   Values[3] = llvm::ConstantInt::get(ObjCTypes.IntTy, bits);
-   Values[4] = ClassList;
-   Values[5] = CategoryList;
-   Values[6] = StringList;
-   Values[7] = HashNameList;
+   Values[4] = llvm::ConstantInt::get(ObjCTypes.IntTy, bits);
+   
+   Values[5] = ClassList;
+   Values[6] = CategoryList;
+   Values[7] = StringList;
+   Values[8] = HashNameList;
 
    llvm::Constant *Init = llvm::ConstantStruct::getAnon(Values);
 
@@ -5406,16 +5422,12 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
    
    // since the loadinfo and stuff is hardcoded, the check is also hardcoded
    // not elegant...
-#define MIN_MULLE_OBJC_RUNTIME_VERSION   ((MULLE_OBJC_RUNTIME_VERSION_MAJOR << 20) | (MULLE_OBJC_RUNTIME_VERSION_MINOR << 8) | 0)  // inclusive
-#define MAX_MULLE_OBJC_RUNTIME_VERSION   ((MULLE_OBJC_RUNTIME_VERSION_MAJOR << 20) | ((MULLE_OBJC_RUNTIME_VERSION_MINOR + 1) << 8) | 0)  // exclusive
-   
-   if( runtime_version < MIN_MULLE_OBJC_RUNTIME_VERSION ||
-       runtime_version >= MAX_MULLE_OBJC_RUNTIME_VERSION)
+  
+   if( load_version != COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION)
    {
       // fprintf( stderr, "version found: 0x%x\n", (int) runtime_version);
       CGM.getDiags().Report( diag::err_mulle_objc_runtime_version_mismatch);
    }
-
 
   llvm::Constant *ClassList = EmitClassList( "OBJC_CLASS_LOADS", "__DATA,_objc_load_info", LoadClasses);
   llvm::Constant *CategoryList = EmitCategoryList( "OBJC_CATEGORY_LOADS", "__DATA,_objc_load_info", LoadCategories);
@@ -7395,7 +7407,8 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
 
 //   struct _mulle_objc_loadcategory
 //   {
-//      char                              *category_name;
+//      mulle_objc_hash_t                 categoryid;
+//      char                              *categoryname;
 //
 //      mulle_objc_classid_t              classid;
 //      char                              *classname;         // useful ??
@@ -7411,7 +7424,7 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
 
    CategoryTy =
    llvm::StructType::create("struct._mulle_objc_loadcategory",
-                            Int8PtrTy, ClassIDTy, Int8PtrTy, ClassIDTy, MethodListPtrTy,
+                            ClassIDTy, Int8PtrTy, ClassIDTy, Int8PtrTy, ClassIDTy, MethodListPtrTy,
                             MethodListPtrTy, PropertyListPtrTy,
                             ProtocolIDPtrTy, ClassIDPtrTy, nullptr);
 
@@ -7464,18 +7477,32 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
    // some stuff we only use to emit the structure as input to load
    //
    ClassListTy = llvm::StructType::create("struct._mulle_objc_loadclasslist",
-                            IntTy, llvm::PointerType::getUnqual( ClassPtrTy), nullptr);
-
+                            IntTy,
+                            llvm::PointerType::getUnqual( ClassPtrTy),
+                            nullptr);
    CategoryListTy = llvm::StructType::create("struct._mulle_objc_loadcategorylist",
-                            IntTy, llvm::PointerType::getUnqual( llvm::PointerType::getUnqual( CategoryTy)), nullptr);
+                            IntTy,
+                            llvm::PointerType::getUnqual( llvm::PointerType::getUnqual( CategoryTy)),
+                            nullptr);
    StaticStringListTy = llvm::StructType::create("struct._mulle_objc_loadcategorylist",
-                                             IntTy, llvm::PointerType::getUnqual( llvm::PointerType::getUnqual( StaticStringTy)), nullptr);
+                                             IntTy,
+                                             llvm::PointerType::getUnqual( llvm::PointerType::getUnqual( StaticStringTy)),
+                                             nullptr);
    HashNameListTy = llvm::StructType::create("struct._mulle_objc_loadhashnamelist",
-                                             IntTy, llvm::PointerType::getUnqual( llvm::PointerType::getUnqual( HashNameTy)), nullptr);
+                                             IntTy,
+                                             llvm::PointerType::getUnqual( llvm::PointerType::getUnqual( HashNameTy)),
+                                             nullptr);
 
    LoadInfoTy = llvm::StructType::create("struct._mulle_objc_loadinfo",
+                            IntTy,
+                            IntTy,
+                            IntTy,
+                            IntTy,
+                            IntTy,
                             llvm::PointerType::getUnqual( ClassListTy),
                             llvm::PointerType::getUnqual( CategoryListTy),
+                            llvm::PointerType::getUnqual( StaticStringListTy),
+                            llvm::PointerType::getUnqual( HashNameListTy),
                             nullptr);
 
    ExceptionDataTy = nullptr; // later on demand

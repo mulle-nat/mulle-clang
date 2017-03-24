@@ -42,6 +42,7 @@
 #include "clang/Lex/LiteralSupport.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Parse/Parser.h"
+#include "clang/Sema/SemaDiagnostic.h" // ugliness
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SetVector.h"
@@ -54,7 +55,6 @@
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
-#include "llvm/Support/MD5.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstdio>
 
@@ -62,11 +62,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Compiler.h"
 
-
-#define MULLE_OBJC_RUNTIME_VERSION_MAJOR   0
-#define MULLE_OBJC_RUNTIME_VERSION_MINOR   3
-
-#define STR_MULLE_OBJC_RUNTIME_VERSION     "0.3"
+#include "MulleObjCRuntimeVersion.inc"
 
 
 
@@ -985,7 +981,7 @@ namespace {
       /// defined. The return value has type ProtocolPtrTy.
       llvm::Constant *GetProtocolRef(const ObjCProtocolDecl *PD);
 
-      // common helper function, turning names into abbreviated MD5 hashes
+      // common helper function, turning names into abbreviated hashes
       uint64_t          UniqueidHashForString( std::string s, uint64_t first_valid, unsigned WordSizeInBytes);
       llvm::ConstantInt *__HashConstantForString( std::string s, uint64_t first_valid);
       llvm::ConstantInt *_HashConstantForString( std::string s, uint64_t first_valid);
@@ -1579,7 +1575,7 @@ bool  CGObjCMulleRuntime::GetMacroDefinitionUnsignedIntegerValue( clang::Preproc
    token = &info->getReplacementToken( 0);
    if( token->getKind() != tok::numeric_constant)
    {
-      llvm_unreachable( "mulle_objc: preprocessor directives for the compiler must be integers only");
+      CGM.getDiags().Report( diag::err_mulle_objc_preprocessor_not_integer_value);
       return( 0);
    }
 
@@ -5403,8 +5399,11 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
 
    // if we emit something, then check that our produced loadinfo is compatible
    if( ! runtime_version)
-      llvm_unreachable( "Missing #include <mulle_objc_runtime/mulle_objc_runtime.h> in compilation, can not emit loadinfo");
-
+   {
+      CGM.getDiags().Report( diag::err_mulle_objc_preprocessor_missing_include);
+      return( nullptr);
+   }
+   
    // since the loadinfo and stuff is hardcoded, the check is also hardcoded
    // not elegant...
 #define MIN_MULLE_OBJC_RUNTIME_VERSION   ((MULLE_OBJC_RUNTIME_VERSION_MAJOR << 20) | (MULLE_OBJC_RUNTIME_VERSION_MINOR << 8) | 0)  // inclusive
@@ -5414,7 +5413,7 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
        runtime_version >= MAX_MULLE_OBJC_RUNTIME_VERSION)
    {
       // fprintf( stderr, "version found: 0x%x\n", (int) runtime_version);
-      llvm_unreachable( "This compiler is compatible only with mulle_objc_runtime " STR_MULLE_OBJC_RUNTIME_VERSION);
+      CGM.getDiags().Report( diag::err_mulle_objc_runtime_version_mismatch);
    }
 
 
@@ -6510,38 +6509,6 @@ static inline uint32_t   mulle_objc_fnv1_32( void *buf, size_t len)
 }
 
 
-#if 0
-uint64_t   CGObjCCommonMulleRuntime::UniqueidHashForString( std::string s, uint64_t first_valid, unsigned WordSizeInBytes)
-{
-   llvm::MD5             MD5Ctx;
-   llvm::MD5::MD5Result  hash;
-   uint64_t              value;
-   unsigned int          i;
-
-   MD5Ctx.update( s);
-   MD5Ctx.final( hash);
-
-   value = 0;
-   for( i = 0; i < WordSizeInBytes; i++)
-   {
-      value <<= 8;
-      value  |= hash[ i];
-   }
-
-   if( value < first_valid || (first_valid && value == (uint64_t) -1))
-   {
-      // FAIL! FIX
-      std::string  fail;
-
-      fail.append("congratulations, your string \"");
-      fail.append( s);
-      fail.append( "\" hashes badly (rare and precious, please tweet it @mulle_nat, then rename it).");
-      llvm_unreachable( fail.c_str());
-   }
-
-   return( value);
-}
-#else
 uint64_t   CGObjCCommonMulleRuntime::UniqueidHashForString( std::string s, uint64_t first_valid, unsigned WordSizeInBytes)
 {
    uint64_t   value;
@@ -6556,15 +6523,13 @@ uint64_t   CGObjCCommonMulleRuntime::UniqueidHashForString( std::string s, uint6
       // FAIL! FIX
       std::string  fail;
 
-      fail.append("congratulations, your string \"");
-      fail.append( s);
-      fail.append( "\" hashes badly (rare and precious, please tweet it @mulle_nat, then rename it).");
-      llvm_unreachable( fail.c_str());
+      fprintf( stderr, "congratulations, your string \"%s\" "
+              "hashes badly (rare and precious, please tweet it @mulle_nat, then rename it).", fail.c_str());
+      CGM.getDiags().Report( diag::err_mulle_objc_hash_invalid);
    }
 
    return( value);
 }
-#endif
 
 
 llvm::ConstantInt *CGObjCCommonMulleRuntime::__HashConstantForString( std::string s, uint64_t first_valid)
@@ -7523,17 +7488,22 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
       return( ExceptionDataTy);
 
    QualType   jmpbuf_type;
-
+   uint64_t   SetJmpBufferSize = 0;
+    
    // this type is only available if <setjmp.h> has been included already
 
    jmpbuf_type = cgm.getContext().getjmp_bufType();
    if( jmpbuf_type == QualType())
-      llvm_unreachable( "include <setjmp.h> before using Mulle ObjC exceptions");
-
-   uint64_t SetJmpBufferSize = cgm.getContext().getTypeSizeInChars( jmpbuf_type).getQuantity();
-   if( ! SetJmpBufferSize)
-      llvm_unreachable( "failed to figure out sizeof( struct jmpbuf)");
-
+   {
+      CGM.getDiags().Report( diag::err_mulle_objc_setjmp_not_included);
+   }
+   else
+   {
+      SetJmpBufferSize = cgm.getContext().getTypeSizeInChars( jmpbuf_type).getQuantity();
+      if( ! SetJmpBufferSize)
+         CGM.getDiags().Report( diag::err_mulle_objc_jmpbuf_size_unknown);
+   }
+    
    uint64_t SetJmpBufferInts = (SetJmpBufferSize + SetJmpBufferSize - 1)/ (CGM.Int32Ty->getBitWidth() / 8);
 
    // fprintf( stderr, "sizeof( jmpbuf) : %lld, %lld\n", SetJmpBufferSize, SetJmpBufferInts);

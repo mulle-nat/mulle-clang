@@ -6,8 +6,6 @@
 
 # various versions
 MULLE_OBJC_VERSION_BRANCH=39
-MULLE_OBJC_VERSION="3.9.1"  # for opt
-CLANG_VENDOR="mulle-clang (0.2 runtime)"
 
 CMAKE_VERSION="3.5"
 CMAKE_VERSION_MAJOR=3
@@ -19,6 +17,7 @@ CLANG_ARCHIVE="https://github.com/Codeon-GmbH/mulle-clang/archive/3.9.0.tar.gz"
 LLVM_ARCHIVE="http://www.llvm.org/releases/3.9.0/llvm-3.9.0.src.tar.xz"
 LIBCXX_ARCHIVE="http://llvm.org/releases/3.9.0/libcxx-3.9.0.src.tar.xz"
 LIBCXXABI_ARCHIVE="http://llvm.org/releases/3.9.0/libcxxabi-3.9.0.src.tar.xz"
+
 
 
 environment_initialize()
@@ -369,6 +368,41 @@ get_core_count()
 }
 
 
+get_mulle_clang_version()
+{
+   local src
+
+   cat "${1}/MULLE_CLANG_VERSION"
+}
+
+
+get_clang_vendor()
+{
+   local src
+
+   src="$1"
+
+   local compiler_version
+   local runtime_version
+
+   compiler_version="`get_mulle_clang_version "${src}"`"
+   if [ -z "${compiler_version}" ]
+   then
+      echo "Could not determine mulle-clang version" >&2
+      exit 1
+   fi
+
+   runtime_version="`grep STR_MULLE_OBJC_RUNTIME_VERSION "${src}/lib/CodeGen/MulleObjCRuntimeVersion.inc" | awk '{ print $3 }'`"
+   if [ -z "${runtime_version}" ]
+   then
+      echo "Could not determine runtime version" >&2
+      exit 1
+   fi
+
+   echo "mulle-clang ${compiler_version} (runtime: `eval echo ${runtime_version}`)"
+}
+
+
 #
 # Setup environment
 #
@@ -574,6 +608,8 @@ build_llvm()
 #
 _build_clang()
 {
+   CLANG_VENDOR="`get_clang_vendor "${CLANG_DIR}"`"
+
    #
    # Build mulle-clang
    #
@@ -585,6 +621,7 @@ _build_clang()
          cd "${CLANG_BUILD_DIR}"
 
             PATH="${LLVM_BIN_DIR}:$PATH"
+
 
             # cmake -DCMAKE_BUILD_TYPE=Debug "../${CLANG_DIR}"
             # try to build cmake with cmake
@@ -815,6 +852,7 @@ main()
 
    PATH="${PREFIX}/bin:$PATH"; export PATH
 
+   MULLE_OBJC_VERSION="`get_mulle_clang_version "${CLANG_DIR}"`"
    MULLE_CLANG_INSTALL_PREFIX="${MULLE_CLANG_INSTALL_PREFIX:-${PREFIX}/mulle-clang/${MULLE_OBJC_VERSION}}"
    MULLE_LLVM_INSTALL_PREFIX="${MULLE_LLVM_INSTALL_PREFIX:-${PREFIX}}"
 

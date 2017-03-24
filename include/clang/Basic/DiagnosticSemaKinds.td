@@ -5917,7 +5917,7 @@ def warn_objc_circular_container : Warning<
   InGroup<DiagGroup<"objc-circular-container">>;
 def note_objc_circular_container_declared_here : Note<"'%0' declared here">;
 
-// @mulle-objc@ compiler: error message definitions
+// @mulle-objc@ compiler: error message definitions begin
 def error_mulle_aam_ivar_access : Error<"in AAM instance variables such as %0 are not accessible">, AccessControl;
 def err_mulle_aam_unsupported_method_family : Error<
 "in AAM method %0 can not be defined, use a non AAM category">;
@@ -5936,6 +5936,22 @@ def err_mulle_objc_no_property_dot_expression : Error<
 def err_mulle_error_missing_property_ivar_decl : Error<
   "synthesized property %0 needs a compatible"
   " instance variable of the same name, prefixed with an underscore.">;
+// these are really CodeGen errors
+def err_mulle_objc_preprocessor_not_integer_value : Error<
+  "special preprocessor directives for the mulle-objc runtime must be integers only">;
+def err_mulle_objc_preprocessor_missing_include : Error<
+  "missing #include <mulle_objc/mulle_objc.h> in compilation. Can not emit runtime information">;
+def err_mulle_objc_runtime_version_mismatch: Error<
+   "the runtime version is not compatible with this compiler">;
+def err_mulle_objc_hash_invalid: Error<
+   "a string hashed to an invalid value">;
+def err_mulle_objc_setjmp_not_included: Error<
+   "include <setjmp.h> before using Mulle ObjC exceptions">;
+def err_mulle_objc_jmpbuf_size_unknown: Error<
+   "the compiler failed to figure out sizeof( struct jmpbuf)">;
+   
+// @mulle-objc@ compiler: error message definitions end
+  
 def warn_setter_getter_impl_required : Warning<
   "property %0 requires method %1 to be defined - "
   "use @synthesize, @dynamic or provide a method implementation "

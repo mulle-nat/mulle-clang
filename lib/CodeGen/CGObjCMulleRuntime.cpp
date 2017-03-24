@@ -62,7 +62,8 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Compiler.h"
 
-#define COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION         4
+
+#define COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION  4
 
 
 using namespace clang;
@@ -1625,7 +1626,8 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
          // fprintf( stderr, "load_version -> 0x%x\n", (int)  load_version);
       }
    }
-   
+
+
    // optional anyway
    if( ! foundation_version)
    {
@@ -2270,11 +2272,11 @@ CodeGen::RValue CGObjCMulleRuntime::CommonMessageSend(CodeGen::CodeGenFunction &
    if( ! Fn)
    {
       int optLevel = CGM.getLangOpts().OptimizeSize ? -1 : CGM.getCodeGenOpts().OptimizationLevel;
-      
+
       // tagged pointers bloat the code too much IMO (make decision later)
       // if( optLevel > 1 && ! no_tagged_pointers)
       //   optLevel = 1;
-      
+
       if( ! CallArgs.size())
          Fn = ObjCTypes.getMessageSendNoParamFn( optLevel); // : ObjCTypes.getMessageSendFn0();
       else
@@ -2709,7 +2711,7 @@ class MulleStatementVisitor : public RecursiveASTVisitor<MulleStatementVisitor>
   bool               returnFalseIfAnyTaintReference;
   bool               stopCollectingTaints;
   int                status;
-  
+
 public:
   MulleStatementVisitor( ObjCMethodDecl *M, ObjCMessageExpr *C)
   {
@@ -2723,17 +2725,17 @@ public:
      stopCollectingTaints = false;
      status = 0;
   }
-  
+
   Stmt  *GetLastStatement( void)
   {
      return( LastStatement);
   }
-  
+
   int   GetStatus( void)
   {
       return( status);
   }
-   
+
 protected:
   MulleStatementVisitor( ObjCMethodDecl *M,
                         ImplicitParamDecl *P,
@@ -2758,7 +2760,7 @@ public:
    bool VisitStmt(Stmt *s)
    {
       // fprintf( stderr, "%s %p (%s)\n", s->getStmtClassName(), s, __PRETTY_FUNCTION__);
-      
+
       skipThisStatement = SkipAfterStatement != nullptr;
 
       if( SkipAfterStatement == s)
@@ -2766,23 +2768,23 @@ public:
          skipThisStatement = true;
          SkipAfterStatement = nullptr;
       }
-      
+
       if( NextStatement == s)
       {
          stopCollectingTaints = true;
       }
       LastStatement = s;
-      
+
       return( true);
    }
-   
+
    bool TraverseStmt(Stmt *s)
    {
       bool  flag;
-      
+
       if( ! s)
          return( true);
-      
+
        // fprintf( stderr, "-> %s %p (%s)\n", s->getStmtClassName(), s, __PRETTY_FUNCTION__);
 
        flag = RecursiveASTVisitor<MulleStatementVisitor>::TraverseStmt( s);
@@ -2796,10 +2798,10 @@ public:
    bool VisitDeclRefExpr(DeclRefExpr *E)
    {
       Decl   *value;
-      
+
       if( skipThisStatement)
          return( true);
-      
+
       if( ! E)
          return( true);
 
@@ -2823,7 +2825,7 @@ public:
 
       return( true);
    }
-   
+
    bool VisitLabelStmt( LabelStmt *s)
    {
       //
@@ -2847,24 +2849,24 @@ public:
    int  isStatementTainted( Stmt *s)
    {
       MulleStatementVisitor   SubVisitor( Method, Param, &taintedLoves, &supertaintedLoves);
-      
+
       SubVisitor.TraverseStmt( s);
       SkipAfterStatement = SubVisitor.GetLastStatement();
-   
+
       // fprintf( stderr, "%s %p (%s) status=%d\n", s->getStmtClassName(), s, __PRETTY_FUNCTION__, SubVisitor.GetStatus());
 
       return( SubVisitor.GetStatus());
    }
-   
-   
+
+
    // &<E>
    void  checkReferencingExpr( Expr *E)
    {
       int    exprStatus;
-      
+
       E          = unparenthesizedAndUncastedExpr( E);
       exprStatus = isStatementTainted( E);
-      
+
       // addr turns untaints into taints, and taints into supertaints
       switch( exprStatus)
       {
@@ -2873,15 +2875,15 @@ public:
       case IsSupertaint :  status = IsSupertaint; break;
       }
    }
-   
+
    // *E, E->x, x[E], E[x]
    void  checkDereferencingExpr( Expr *E)
    {
       int    exprStatus;
-      
+
       E          = unparenthesizedAndUncastedExpr( E);
       exprStatus = isStatementTainted( E);
-      
+
       // * turns taints into untaints, supertaints and untaints stay
       switch( exprStatus)
       {
@@ -2895,20 +2897,20 @@ public:
    {
       if( skipThisStatement)
          return( true);
-      
+
       // fprintf( stderr, "%s %p (%s)\n", E->getStmtClassName(), E, __PRETTY_FUNCTION__);
 
       checkDereferencingExpr( E->getBase());
       return( true);
    }
-   
+
    bool VisitArraySubscriptExpr(const ArraySubscriptExpr *E)
    {
       if( skipThisStatement)
          return( true);
 
       // fprintf( stderr, "%s %p (%s)\n", E->getStmtClassName(), E, __PRETTY_FUNCTION__);
-      
+
       checkDereferencingExpr( (Expr *) E->getLHS());
       checkDereferencingExpr( (Expr *) E->getRHS());
       return( true);
@@ -2918,13 +2920,13 @@ public:
    {
       if( skipThisStatement)
          return( true);
-      
+
       // fprintf( stderr, "%s %p (%s)\n", op->getStmtClassName(), op, __PRETTY_FUNCTION__);
       switch( op->getOpcode())
       {
       default :
          break;
-         
+
       case UO_AddrOf :
          checkReferencingExpr( op->getSubExpr());
          break;
@@ -2950,10 +2952,10 @@ public:
       Expr         *rhs;
       DeclRefExpr  *ref;
       int          exprStatus;
-      
+
       if( skipThisStatement)
          return( true);
-      
+
       // fprintf( stderr, "%s %p (%s)\n", op->getStmtClassName(), op, __PRETTY_FUNCTION__);
       if( stopCollectingTaints)
          return( true);
@@ -2997,7 +2999,7 @@ public:
             exprStatus = isStatementTainted( rhs);
             // if( exprStatus > IsUntaint)
             //    fprintf( stderr, "TAINT %s %p (%s)\n", rhs->getStmtClassName(), rhs, __PRETTY_FUNCTION__);
-            
+
             switch( exprStatus)
             {
             case IsUntaint    : break;
@@ -3008,19 +3010,19 @@ public:
       }
       return( true);
    }
-   
+
    // own function
    bool  CheckObjCArguments( ObjCMessageExpr *C)
    {
       unsigned int  i, n;
-      
+
       n = C->getNumArgs();
       for( i = 0; i < n; i++)
          if( isStatementTainted( C->getArg( i)) >= IsTaint)
             return( false);
       return( true);
    }
-   
+
    bool VisitObjCMessageExpr(ObjCMessageExpr *d)
    {
       if( skipThisStatement)
@@ -3034,7 +3036,7 @@ public:
 
          if( ! CheckObjCArguments( d))
             return( false);
-         
+
          info = findNextStatementInBody( d, Method->getBody());
          if( info.insideLoop)
             return( false);
@@ -4523,7 +4525,7 @@ CGObjCMulleRuntime::EmitProtocolClassIDList(Twine Name,
    llvm::Constant       *classID;
    StringRef            name;
    StringRef            otherName;
-   
+
    for (; begin != end; ++begin)
    {
       name = (*begin)->getName();
@@ -4538,18 +4540,18 @@ CGObjCMulleRuntime::EmitProtocolClassIDList(Twine Name,
    // Just return null for empty protocol lists
    if (ClassIds.empty())
       return llvm::Constant::getNullValue(ObjCTypes.ClassIDPtrTy);
-   
+
    llvm::array_pod_sort( ClassIds.begin(), ClassIds.end(),
                         constant_uintptr_comparator);
-   
+
    // This list is null terminated.
    ClassIds.push_back(llvm::Constant::getNullValue(ObjCTypes.ClassIDTy));
-   
+
    llvm::Constant *Values[ 1];
    Values[ 0] = llvm::ConstantArray::get(llvm::ArrayType::get(ObjCTypes.ClassIDTy,
                                                               ClassIds.size()),
                                          ClassIds);
-   
+
    llvm::Constant       *Init = llvm::ConstantStruct::getAnon(Values);
    llvm::GlobalVariable *GV =
    CreateMetadataVar(Name, Init, "__DATA,__protoclassids,regular,no_dead_strip",
@@ -4930,20 +4932,20 @@ void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
 //      mulle_objc_classid_t              classid;
 //      char                              *classname;
 //      mulle_objc_hash_t                 classivarhash;
-//      
+//
 //      mulle_objc_classid_t              superclassid;
 //      char                              *superclassname;
 //      mulle_objc_hash_t                 superclassivarhash;
-//      
+//
 //      int                               fastclassindex;
 //      int                               instancesize;
-//      
+//
 //      struct _mulle_objc_ivarlist       *instancevariables;
-//      
+//
 //      struct _mulle_objc_methodlist     *classmethods;
 //      struct _mulle_objc_methodlist     *instancemethods;
 //      struct _mulle_objc_propertylist   *properties;
-//      
+//
 //      mulle_objc_protocolid_t           *protocolids;
 //      mulle_objc_classid_t              *protocolclassids;
 //   };
@@ -5040,7 +5042,7 @@ void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
 void   CGObjCMulleRuntime::GenerateForwardClass(const ObjCInterfaceDecl *OID)
 {
    StringRef   name;
-   
+
    name = OID->getName();
    DeclaredClassNames.insert( name.str());
 }
@@ -5334,7 +5336,7 @@ llvm::Constant *CGObjCMulleRuntime::EmitLoadInfoList(Twine Name,
    // memorize some compilation context
    //
    Values[4] = llvm::ConstantInt::get(ObjCTypes.IntTy, bits);
-   
+
    Values[5] = ClassList;
    Values[6] = CategoryList;
    Values[7] = StringList;
@@ -5419,10 +5421,10 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
       CGM.getDiags().Report( diag::err_mulle_objc_preprocessor_missing_include);
       return( nullptr);
    }
-   
+
    // since the loadinfo and stuff is hardcoded, the check is also hardcoded
    // not elegant...
-  
+
    if( load_version != COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION)
    {
       // fprintf( stderr, "version found: 0x%x\n", (int) runtime_version);
@@ -7516,7 +7518,7 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
 
    QualType   jmpbuf_type;
    uint64_t   SetJmpBufferSize = 0;
-    
+
    // this type is only available if <setjmp.h> has been included already
 
    jmpbuf_type = cgm.getContext().getjmp_bufType();
@@ -7530,7 +7532,7 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
       if( ! SetJmpBufferSize)
          CGM.getDiags().Report( diag::err_mulle_objc_jmpbuf_size_unknown);
    }
-    
+
    uint64_t SetJmpBufferInts = (SetJmpBufferSize + SetJmpBufferSize - 1)/ (CGM.Int32Ty->getBitWidth() / 8);
 
    // fprintf( stderr, "sizeof( jmpbuf) : %lld, %lld\n", SetJmpBufferSize, SetJmpBufferInts);

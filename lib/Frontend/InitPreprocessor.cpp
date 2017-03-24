@@ -605,6 +605,7 @@ static void InitializePredefinedMacros(const TargetInfo &TI,
     // @mulle-objc@ language: announce that we are running 
     if (LangOpts.ObjCRuntime.hasMulleMetaABI())
     {
+       //       Builder.defineMacro("__MULLE_METAABI__");  // superflous
        Builder.defineMacro("__MULLE_OBJC__");
        Builder.defineMacro( LangOpts.ObjCAllocsAutoreleasedObjects ? "__MULLE_OBJC_AAM__" : "__MULLE_OBJC_NO_AAM__");
        Builder.defineMacro( LangOpts.ObjCDisableTaggedPointers ? "__MULLE_OBJC_NO_TPS__" : "__MULLE_OBJC_TPS__");

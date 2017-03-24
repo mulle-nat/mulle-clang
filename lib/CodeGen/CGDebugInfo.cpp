@@ -553,10 +553,13 @@ llvm::DIType *CGDebugInfo::CreateType(const BuiltinType *BT) {
         TheCU, "objc_object", getOrCreateMainFile(), 0, 0, 0,
         llvm::DINode::FlagZero, nullptr, llvm::DINodeArray());
 
+     // @mulle-objc@ :: hack out isa
+#if 0
     DBuilder.replaceArrays(
         ObjTy, DBuilder.getOrCreateArray(&*DBuilder.createMemberType(
                    ObjTy, "isa", getOrCreateMainFile(), 0, Size, 0, 0,
                    llvm::DINode::FlagZero, ISATy)));
+#endif
     return ObjTy;
   }
   case BuiltinType::ObjCSel: {

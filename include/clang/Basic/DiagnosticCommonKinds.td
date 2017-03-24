@@ -218,6 +218,13 @@ def err_mt_message : Error<"[rewriter] %0">, SuppressInSystemHeader;
 def warn_mt_message : Warning<"[rewriter] %0">;
 def note_mt_message : Note<"[rewriter] %0">;
 
+
+// @mulle-objc@ AAM:  warn when renaming selectors
+def warn_mulle_aam_rename_selector : Warning<
+"in AAM, method calls to '%0' are actually calls to '%1'">,
+InGroup<AAMRenaming>;
+
+
 // ARCMigrate
 def warn_arcmt_nsalloc_realloc : Warning<"[rewriter] call returns pointer to GC managed memory; it will become unmanaged in ARC">;
 def err_arcmt_nsinvocation_ownership : Error<"NSInvocation's %0 is not safe to be used with an object with ownership other than __unsafe_unretained">;

@@ -854,6 +854,19 @@ void CodeGenFunction::StartFunction(GlobalDecl GD,
   if (CGM.getCodeGenOpts().InstrumentForProfiling)
     Fn->addFnAttr("counting-function", getTarget().getMCountName());
 
+  // @mulle-objc@ MetaABI: change return type of method to "void *" always (if not void)
+  // it would be nicer to place this into the `else in the
+  // code jungle below, but the reindentation scares me
+  
+  if( CGM.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+  {
+     if( dyn_cast_or_null< ObjCMethodDecl>( CurCodeDecl))
+     {
+        if( ! RetTy->isVoidType())
+           RetTy = CGM.getContext().VoidPtrTy;
+     }
+  }
+
   if (RetTy->isVoidType()) {
     // Void type; nothing to return.
     ReturnValue = Address::invalid();
@@ -879,7 +892,7 @@ void CodeGenFunction::StartFunction(GlobalDecl GD,
     Addr = Builder.CreateAlignedLoad(Addr, getPointerAlign(), "agg.result");
     ReturnValue = Address(Addr, getNaturalTypeAlignment(RetTy));
   } else {
-    ReturnValue = CreateIRTemp(RetTy, "retval");
+     ReturnValue = CreateIRTemp(RetTy, "retval");
 
     // Tell the epilog emitter to autorelease the result.  We do this
     // now so that various specialized functions can suppress it

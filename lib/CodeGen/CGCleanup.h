@@ -621,6 +621,7 @@ struct EHPersonality {
   static const EHPersonality GNUstep_ObjC;
   static const EHPersonality GNU_ObjCXX;
   static const EHPersonality NeXT_ObjC;
+  static const EHPersonality Mulle_ObjC;
   static const EHPersonality GNU_CPlusPlus;
   static const EHPersonality GNU_CPlusPlus_SJLJ;
   static const EHPersonality GNU_CPlusPlus_SEH;

@@ -5027,7 +5027,7 @@ static void AddObjCVisibilityResults(const LangOptions &LangOpts,
   Results.AddResult(Result(OBJC_AT_KEYWORD_NAME(NeedAt,"private")));
   Results.AddResult(Result(OBJC_AT_KEYWORD_NAME(NeedAt,"protected")));
   Results.AddResult(Result(OBJC_AT_KEYWORD_NAME(NeedAt,"public")));
-  if (LangOpts.ObjC2)
+  if (LangOpts.ObjC2 && ! LangOpts.ObjCRuntime.hasMulleMetaABI())
     Results.AddResult(Result(OBJC_AT_KEYWORD_NAME(NeedAt,"package")));
 }
 

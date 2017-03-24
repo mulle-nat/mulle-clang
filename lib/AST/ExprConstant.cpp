@@ -10044,8 +10044,11 @@ static ICEDiag CheckICE(const Expr* E, const ASTContext &Ctx) {
   case Expr::ObjCDictionaryLiteralClass:
   case Expr::ObjCEncodeExprClass:
   case Expr::ObjCMessageExprClass:
+  // @mulle-objc@ uniqueid: make @selector() and @protocol() constants integers
+    return ICEDiag(IK_NotICE, E->getLocStart());
   case Expr::ObjCSelectorExprClass:
   case Expr::ObjCProtocolExprClass:
+    return ICEDiag(IK_ICE, E->getLocStart());
   case Expr::ObjCIvarRefExprClass:
   case Expr::ObjCPropertyRefExprClass:
   case Expr::ObjCSubscriptRefExprClass:
@@ -10392,6 +10395,10 @@ bool Expr::isIntegerConstantExpr(const ASTContext &Ctx,
   if (Ctx.getLangOpts().CPlusPlus11)
     return EvaluateCPlusPlus11IntegralConstantExpr(Ctx, this, nullptr, Loc);
 
+  // @mulle-objc@ uniqueid: ObjCSelectorExpr are never immediately constant, as they are generated during runtime
+  if( dyn_cast<ObjCSelectorExpr>(this))
+     return false;
+  
   ICEDiag D = CheckICE(this, Ctx);
   if (D.Kind != IK_ICE) {
     if (Loc) *Loc = D.Loc;

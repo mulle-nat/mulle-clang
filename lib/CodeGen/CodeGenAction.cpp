@@ -272,6 +272,13 @@ namespace clang {
       ((BackendConsumer *)Context)->DiagnosticHandlerImpl(DI);
     }
 
+     
+    /// @mulle-objc@ compiler: pass through Parser to ObjCRuntime when finished
+    void ParserDidFinish( Parser *P) override {
+        if( Gen)
+           Gen->ParserDidFinish( P);
+    }
+     
     /// Get the best possible source location to represent a diagnostic that
     /// may have associated debug info.
     const FullSourceLoc

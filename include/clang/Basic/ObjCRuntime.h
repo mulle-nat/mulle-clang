@@ -53,7 +53,12 @@ public:
     GNUstep,
 
     /// 'objfw' is the Objective-C runtime included in ObjFW
-    ObjFW
+    ObjFW,
+   
+    /// @mulle-objc@ compiler: Add "Mulle" runtime
+    /// 'mulle' is the runtime from Mulle kybernetiK. It's fragile and
+    /// hopefully very fast
+    Mulle
   };
 
 private:
@@ -84,12 +89,22 @@ public:
     case MacOSX: return true;
     case GNUstep: return true;
     case ObjFW: return true;
+    // @mulle-objc@ compiler: is fragile, clang inspection for mulle runtime
+    case Mulle: return false;
     case iOS: return true;
     case WatchOS: return true;
     }
     llvm_unreachable("bad kind");
   }
 
+  // @mulle-objc@ compiler: additional method hasMulleMetaABI to check if compiling with mulle
+  bool hasMulleMetaABI() const {
+    switch (getKind()) {
+    case Mulle: return true;
+    default   : return false;
+    }
+    llvm_unreachable("bad kind");
+  }
   /// The inverse of isNonFragile():  does this runtime follow the set of
   /// implied behaviors for a "fragile" ABI?
   bool isFragile() const { return !isNonFragile(); }
@@ -110,6 +125,9 @@ public:
         return Arch != llvm::Triple::x86_64;
     // Except for deployment target of 10.5 or less,
     // Mac runtimes use legacy dispatch everywhere now.
+    // @mulle-objc@ compiler: is not legacy dispatch, clang inspection for mulle runtime
+    if( getKind() == Mulle)
+      return false; // Mulle dispatches differently I guess
     return true;
   }
 
@@ -118,6 +136,8 @@ public:
     switch (getKind()) {
     case FragileMacOSX:
     case MacOSX:
+    // @mulle-objc@ compiler: is not GNU family, clang inspection for mulle runtime
+    case Mulle:
     case iOS:
     case WatchOS:
       return false;
@@ -147,6 +167,8 @@ public:
     case WatchOS: return true;
     case GCC: return false;
     case GNUstep: return true;
+    // @mulle-objc@ compiler: dont allow ARC, clang inspection for mulle runtime
+    case Mulle : return false; // 4 now
     case ObjFW: return true;
     }
     llvm_unreachable("bad kind");
@@ -166,6 +188,8 @@ public:
 
     case GCC: return false;
     case GNUstep: return getVersion() >= VersionTuple(1, 6);
+    // @mulle-objc@ compiler: has no native ARC, clang inspection for mulle runtime
+    case Mulle: return false;
     case ObjFW: return true;
     }
     llvm_unreachable("bad kind");
@@ -216,6 +240,8 @@ public:
     // should imply a "maximal" runtime or something?
     case GCC: return true;
     case GNUstep: return true;
+    // @mulle-objc@ compiler: has no [] for NSArray
+    case Mulle : return false; // I don't even know what that means
     case ObjFW: return true;
     }
     llvm_unreachable("bad kind");
@@ -233,6 +259,8 @@ public:
   bool allowsPointerArithmetic() const {
     switch (getKind()) {
     case FragileMacOSX:
+    case Mulle:
+    // @mulle-objc@ compiler: allow pointer arithmetic, clang inspection for mulle runtime
     case GCC:
       return true;
     case MacOSX:
@@ -262,6 +290,8 @@ public:
     case WatchOS: return true;
     case GCC: return false;
     case GNUstep: return false;
+    // @mulle-objc@ compiler: has terminate, clang inspection for mulle runtime
+    case Mulle: return false;
     case ObjFW: return false;
     }
     llvm_unreachable("bad kind");
@@ -277,6 +307,8 @@ public:
     case GCC: return true;
     case GNUstep: return true;
     case ObjFW: return true;
+    // @mulle-objc@ compiler: weak class import, clang inspection for mulle runtime
+    case Mulle: return false;   // maybe so, maybe not so
     }
     llvm_unreachable("bad kind");
   }
@@ -290,6 +322,8 @@ public:
     case FragileMacOSX: return false;
     case GCC: return true;
     case GNUstep: return true;
+    // @mulle-objc@ compiler: unwind exceptions, clang inspection for mulle runtime
+    case Mulle: return false;
     case ObjFW: return true;
     }
     llvm_unreachable("bad kind");

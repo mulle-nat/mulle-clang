@@ -179,6 +179,11 @@ void CodeGenModule::createObjCRuntime() {
   case ObjCRuntime::WatchOS:
     ObjCRuntime.reset(CreateMacObjCRuntime(*this));
     return;
+   
+  // @mulle-objc@ compiler: add ObjCRuntime::Mulle to runtimes
+  case ObjCRuntime::Mulle:
+    ObjCRuntime.reset( CreateMulleObjCRuntime(*this));
+    return;
   }
   llvm_unreachable("bad runtime kind");
 }
@@ -1193,6 +1198,13 @@ void CodeGenModule::AddDependentLib(StringRef Lib) {
   auto *MDOpts = llvm::MDString::get(getLLVMContext(), Opt);
   LinkerOptionsMetadata.push_back(llvm::MDNode::get(getLLVMContext(), MDOpts));
 }
+
+
+void CodeGenModule::ParserDidFinish( Parser *P) {
+   if( ObjCRuntime)
+      ObjCRuntime->ParserDidFinish( P);
+}
+
 
 /// \brief Add link options implied by the given module, including modules
 /// it depends on, using a postorder walk.

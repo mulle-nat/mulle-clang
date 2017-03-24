@@ -267,7 +267,8 @@ class ASTContext : public RefCountedBase<ASTContext> {
   mutable TypedefDecl *ObjCClassDecl;
 
   /// \brief The typedef for the predefined \c Protocol class in Objective-C.
-  mutable ObjCInterfaceDecl *ObjCProtocolClassDecl;
+/// @mulle-objc@ compiler: change type of ObjCProtocolClassDecl
+  mutable NamedDecl *ObjCProtocolClassDecl;
   
   /// \brief The typedef for the predefined 'BOOL' type.
   mutable TypedefDecl *BOOLDecl;
@@ -1638,6 +1639,9 @@ public:
     return getLangOpts().CPlusPlus ? BoolTy : IntTy;
   }
 
+  /// @mulle-objc@ : MetaABI Helper
+  bool   typeNeedsMetaABIAlloca( QualType type);
+
   /// \brief Emit the Objective-CC type encoding for the given type \p T into
   /// \p S.
   ///
@@ -1726,7 +1730,8 @@ public:
 
   /// \brief Retrieve the Objective-C class declaration corresponding to 
   /// the predefined \c Protocol class.
-  ObjCInterfaceDecl *getObjCProtocolDecl() const;
+  /// @mulle-objc@ compiler: change type of getObjCProtocolDecl
+  NamedDecl *getObjCProtocolDecl() const;
 
   /// \brief Retrieve declaration of 'BOOL' typedef
   TypedefDecl *getBOOLDecl() const {
@@ -1745,7 +1750,10 @@ public:
   
   /// \brief Retrieve the type of the Objective-C \c Protocol class.
   QualType getObjCProtoType() const {
-    return getObjCInterfaceType(getObjCProtocolDecl());
+   /// @mulle-objc@ compiler: change type of getObjCProtocolDecl
+    if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+      return getTypeDeclType( (TypedefDecl *) getObjCProtocolDecl());
+    return getObjCInterfaceType( (ObjCInterfaceDecl *) getObjCProtocolDecl());
   }
   
   /// \brief Retrieve the C type declaration corresponding to the predefined
@@ -2587,6 +2595,8 @@ public:
 private:
   void InitBuiltinType(CanQualType &R, BuiltinType::Kind K);
 
+// @mulle-objc@ compiler: need getObjCEncodingForTypeImpl to be public
+public:
   // Return the Objective-C type encoding for a given type.
   void getObjCEncodingForTypeImpl(QualType t, std::string &S,
                                   bool ExpandPointedToStructures,
@@ -2600,6 +2610,7 @@ private:
                                   bool EncodePointerToObjCTypedef = false,
                                   QualType *NotEncodedT=nullptr) const;
 
+private:
   // Adds the encoding of the structure's members.
   void getObjCEncodingForStructureImpl(RecordDecl *RD, std::string &S,
                                        const FieldDecl *Field,

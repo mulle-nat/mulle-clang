@@ -3891,7 +3891,13 @@ public:
                       TemplateArgumentListInfo *ExplicitTemplateArgs = nullptr,
                       ArrayRef<Expr *> Args = None, TypoExpr **Out = nullptr);
 
-  ExprResult LookupInObjCMethod(LookupResult &LookUp, Scope *S,
+  // @mulle-objc@ MetaABI: additional methods GetMulle_paramExpr GetMulle_paramFieldExpr
+  ExprResult   GetMulle_paramExpr( Scope *S, CXXScopeSpec &SS, SourceLocation Loc, StringRef Name);
+  ExprResult   GetMulle_paramFieldExpr( FieldDecl *FD, Scope *S, CXXScopeSpec &SS, SourceLocation Loc);
+  ExprResult   GetMulle_paramExprAsType( QualType type, Scope *S, CXXScopeSpec &SS, SourceLocation Loc, StringRef Name);
+
+  // @mulle-objc@ compiler: added CXXScopeSpec to LookupInObjCMethod parameters
+  ExprResult LookupInObjCMethod(LookupResult &LookUp, Scope *S, CXXScopeSpec &SS,
                                 IdentifierInfo *II,
                                 bool AllowBuiltinCreation=false);
 
@@ -7774,6 +7780,28 @@ public:
     AttributeList *AttrList, tok::ObjCKeywordKind MethodImplKind,
     bool isVariadic, bool MethodDefinition);
 
+   // @mulle-objc@ MetaABI: additional method SetMulleObjCParam
+   // Why do I have to specify the size of the vector when passing ??
+    void   SetMulleObjCParam( ObjCMethodDecl *ObjCMethod,
+                              Selector Sel,
+                              SmallVector<ParmVarDecl*, 16> *Params,
+                              QualType resultType,
+                              unsigned int abiDesc,
+                              SourceLocation   Loc);
+    bool            isMetaABIAllocaMethod( ObjCMethodDecl *ObjCMethod,
+                                          QualType resultType);
+       
+    enum MetaABIDescription
+    {
+       MetaABIVoidPtrRval   = 0x0,
+       MetaABIVoidPtrParam  = 0x1,
+       MetaABIRvalAsStruct  = 0x2,
+       MetaABIParamAsStruct = 0x4
+    };
+       
+    unsigned int    metaABIDescription( SmallVector<ParmVarDecl*, 16> &Params,
+                                       QualType resultType);
+
   ObjCMethodDecl *LookupMethodInQualifiedType(Selector Sel,
                                               const ObjCObjectPointerType *OPT,
                                               bool IsInstance);
@@ -7870,6 +7898,18 @@ public:
                                           ObjCMethodDecl *Method,
                                           MultiExprArg Args);
 
+  // @mulle-objc@ compiler: additional method CheckMulleObjCFunctionDefined
+  bool  CheckMulleObjCFunctionDefined( Scope *S,
+                                       SourceLocation Loc,
+                                       StringRef Name);
+
+  // @mulle-objc@ AAM:  check that selectors conform
+  int   CheckSelectorForAAM( Selector Sel,
+                             ObjCMethodDecl *Method,
+                             QualType ReceiverType,
+                             SourceLocation SelLoc,
+                             SourceRange RecRange);
+       
   ExprResult ActOnInstanceMessage(Scope *S,
                                   Expr *Receiver,
                                   Selector Sel,

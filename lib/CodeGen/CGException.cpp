@@ -104,6 +104,9 @@ const EHPersonality
 EHPersonality::GNU_ObjCXX = { "__gnustep_objcxx_personality_v0", nullptr };
 const EHPersonality
 EHPersonality::GNUstep_ObjC = { "__gnustep_objc_personality_v0", nullptr };
+// @mulle-objc@ compiler: exception personality
+const EHPersonality
+EHPersonality::Mulle_ObjC = { "__mulle_objc_personality_v0", nullptr };
 const EHPersonality
 EHPersonality::MSVC_except_handler = { "_except_handler3", nullptr };
 const EHPersonality
@@ -146,6 +149,9 @@ static const EHPersonality &getObjCPersonality(const llvm::Triple &T,
     else if (useLibGCCSEHPersonality(T))
       return EHPersonality::GNU_ObjC_SEH;
     return EHPersonality::GNU_ObjC;
+   // @mulle-objc@ compiler: exception personality
+  case ObjCRuntime::Mulle:
+    return EHPersonality::Mulle_ObjC;
   }
   llvm_unreachable("bad runtime kind");
 }
@@ -184,6 +190,9 @@ static const EHPersonality &getObjCXXPersonality(const llvm::Triple &T,
     return EHPersonality::GNU_ObjC;
   case ObjCRuntime::GNUstep:
     return EHPersonality::GNU_ObjCXX;
+   // @mulle-objc@ compiler: exception personality
+  case ObjCRuntime::Mulle:
+    return EHPersonality::Mulle_ObjC;
   }
   llvm_unreachable("bad runtime kind");
 }

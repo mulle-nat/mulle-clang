@@ -7600,6 +7600,8 @@ CodeGen::CreateMacObjCRuntime(CodeGen::CodeGenModule &CGM) {
   case ObjCRuntime::GNUstep:
   case ObjCRuntime::GCC:
   case ObjCRuntime::ObjFW:
+  // @mulle-objc@ compiler: ugliness add ObjCRuntime::Mulle to other runtime code
+  case ObjCRuntime::Mulle:
     llvm_unreachable("these runtimes are not Mac runtimes");
   }
   llvm_unreachable("bad runtime");

@@ -3848,12 +3848,12 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
         else
           V = Builder.CreateLoad(RV.getAggregateAddress());
 
-         // @mulle-objc@ MetaABI: function call argument, cast into void *, if dst is objc method (or NULL)
+        // @mulle-objc@ MetaABI: function call argument, cast into void *, if dst is objc method (or NULL)
 	if( ArgNo == 2 && CGM.getLangOpts().ObjCRuntime.hasMulleMetaABI())
 	{
-            const ObjCMethodDecl *MD = dyn_cast_or_null<ObjCMethodDecl>( CalleeInfo.getCalleeDecl());
+            const ObjCMethodDecl *MD = dyn_cast_or_null<ObjCMethodDecl>( Callee.getAbstractInfo().getCalleeDecl());
 
-            if( ! CalleeInfo.getCalleeDecl() || (MD && ! MD->getParamDecl()))
+            if( ! Callee.getAbstractInfo().getCalleeDecl() || (MD && ! MD->getParamDecl()))
 	    {
                // promote all non pointers to uintptr_t and make them pointers
 	       if( ! V->getType()->isPointerTy())
@@ -3863,7 +3863,8 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
 	       }
 	    }
 	}
-
+        // @mulle-objc@ MetaABI: <-
+         
         // Implement swifterror by copying into a new swifterror argument.
         // We'll write back in the normal path out of the call.
         if (CallInfo.getExtParameterInfo(ArgNo).getABI()

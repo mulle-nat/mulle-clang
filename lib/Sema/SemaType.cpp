@@ -3505,8 +3505,6 @@ static void emitNullabilityConsistencyWarning(Sema &S,
 static void checkNullabilityConsistency(Sema &S,
                                         SimplePointerKind pointerKind,
                                         SourceLocation pointerLoc) {
-  Sema &S = state.getSema();
-
   // @mulle-objc@ compiler: nullability completeness is not objective-c like
   if( S.Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
      return;

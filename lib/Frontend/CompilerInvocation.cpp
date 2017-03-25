@@ -1582,16 +1582,13 @@ void CompilerInvocation::setLangDefaults(LangOptions &Opts, InputKind IK,
         LangStd = LangStandard::lang_gnu11;
        break;
     case IK_ObjC:
-    // @mulle-objc@ AAM:  .aam filename extension support
+    // @mulle-objc@ AAM:  .aam filename extension support ->
     case IK_ObjCAAM:
     case IK_PreprocessedObjC:
     // @mulle-objc@ C11 should be standard now
       LangStd = LangStandard::lang_c11;
       break;
-    case IK_ObjC:
-    case IK_PreprocessedObjC:
-      LangStd = LangStandard::lang_gnu11;
-      break;
+    // @mulle-objc@ end <-
     case IK_CXX:
     case IK_PreprocessedCXX:
     case IK_ObjCXX:

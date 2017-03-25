@@ -23,9 +23,9 @@
 // @mulle-objc@ Memo: code places, that I modified elsewhere, should be marked
 //              like this followed by a comment.
 //===----------------------------------------------------------------------===//
-#include "CGObjCRuntime.h"
 #include "CGBlocks.h"
 #include "CGCleanup.h"
+#include "CGObjCRuntime.h"
 #include "CGRecordLayout.h"
 #include "CodeGenFunction.h"
 #include "CodeGenModule.h"
@@ -1384,14 +1384,7 @@ namespace {
                                   const ObjCInterfaceDecl *Interface,
                                   const ObjCIvarDecl *Ivar) override;
 
-
       llvm::ConstantStruct *CreateNSConstantStringStruct( StringRef S, unsigned StringLength) override;
-      /// GetClassGlobal - Return the global variable for the Objective-C
-      /// class of the given name.
-      llvm::GlobalVariable *GetClassGlobal(StringRef Name,
-                                           bool Weak = false) override {
-         llvm_unreachable("CGObjCMulleRuntime::GetClassGlobal");
-      }
    };
 }
 
@@ -2229,7 +2222,8 @@ CodeGen::RValue   CGObjCMulleRuntime::CommonFunctionCall(CodeGen::CodeGenFunctio
    if (CGM.ReturnSlotInterferesWithArgs( FI))
       nullReturn.init( CGF, Arg0);
 
-   RValue rvalue = CGF.EmitCall( FI, Fn, Return, ActualArgs, Method);
+   CGCallee Callee = CGCallee::forDirect(Fn);
+   RValue rvalue = CGF.EmitCall( FI, Callee, Return, ActualArgs);
 
    RValue param = ActualArgs.size() >= 3 ? ActualArgs[ 2].RV : rvalue; // rvalue is just bogus, wont be used then
 
@@ -3629,7 +3623,7 @@ void  CGObjCMulleRuntime::PushArgumentsIntoRecord( CodeGenFunction &CGF,
       arg   = Method->getArg( i);
 
       LValue LV = CGF.EmitLValueForFieldInitialization( Record, Field);
-      CGF.EmitInitializerForField( Field, LV, (Expr *) arg, None);
+      CGF.EmitInitializerForField( Field, LV, (Expr *) arg);
 
       ++i;
    }
@@ -6604,11 +6598,12 @@ llvm::Constant *CGObjCCommonMulleRuntime::GetClassName(StringRef RuntimeName) {
 }
 
 llvm::Function *CGObjCCommonMulleRuntime::GetMethodDefinition(const ObjCMethodDecl *MD) {
+#if 0
    llvm::DenseMap<const ObjCMethodDecl*, llvm::Function*>::iterator
    I = MethodDefinitions.find(MD);
    if (I != MethodDefinitions.end())
       return I->second;
-
+#endif
    return nullptr;
 }
 
@@ -7043,12 +7038,12 @@ llvm::Constant *CGObjCCommonMulleRuntime::GetMethodVarType(const FieldDecl *Fiel
    return getConstantGEP(VMContext, Entry, 0, 0);
 }
 
+
 llvm::Constant *CGObjCCommonMulleRuntime::GetMethodVarType(const ObjCMethodDecl *D,
                                                            bool Extended) {
    std::string TypeStr;
-   if (CGM.getContext().getObjCEncodingForMethodDecl(D, TypeStr, Extended))
-      return nullptr;
 
+   TypeStr = CGM.getContext().getObjCEncodingForMethodDecl(D, Extended);
    llvm::GlobalVariable *&Entry = MethodVarTypes[TypeStr];
 
    if (!Entry)
@@ -7131,7 +7126,8 @@ llvm::Constant *
 CGObjCCommonMulleRuntime::GetPropertyTypeString(const ObjCPropertyDecl *PD,
                                        const Decl *Container) {
    std::string TypeStr;
-   CGM.getContext().getObjCEncodingForPropertyDecl(PD, Container, TypeStr);
+
+   TypeStr = CGM.getContext().getObjCEncodingForPropertyDecl(PD, Container);
    return GetPropertyName(&CGM.getContext().Idents.get(TypeStr));
 }
 

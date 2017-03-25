@@ -5,18 +5,19 @@
 # BSD-3 License
 
 # various versions
-MULLE_OBJC_VERSION_BRANCH=39
+MULLE_OBJC_VERSION_BRANCH="40"
+LLVM_VERSION="4.0.0"
 
 CMAKE_VERSION="3.5"
-CMAKE_VERSION_MAJOR=3
-CMAKE_VERSION_MINOR=5
-CMAKE_VERSION_PATCH=2
+CMAKE_VERSION_MAJOR="3"
+CMAKE_VERSION_MINOR="5"
+CMAKE_VERSION_PATCH="2"
 CMAKE_PATCH_VERSION="${CMAKE_VERSION}.2"
 
-CLANG_ARCHIVE="https://github.com/Codeon-GmbH/mulle-clang/archive/3.9.0.tar.gz"
-LLVM_ARCHIVE="http://www.llvm.org/releases/3.9.0/llvm-3.9.0.src.tar.xz"
-LIBCXX_ARCHIVE="http://llvm.org/releases/3.9.0/libcxx-3.9.0.src.tar.xz"
-LIBCXXABI_ARCHIVE="http://llvm.org/releases/3.9.0/libcxxabi-3.9.0.src.tar.xz"
+CLANG_ARCHIVE="https://github.com/Codeon-GmbH/mulle-clang/archive/${LLVM_VERSION}.tar.gz"
+LLVM_ARCHIVE="http://www.llvm.org/releases/${LLVM_VERSION}/llvm-${LLVM_VERSION}.src.tar.xz"
+LIBCXX_ARCHIVE="http://llvm.org/releases/${LLVM_VERSION}/libcxx-${LLVM_VERSION}.src.tar.xz"
+LIBCXXABI_ARCHIVE="http://llvm.org/releases/${LLVM_VERSION}/libcxxabi-${LLVM_VERSION}.src.tar.xz"
 
 
 
@@ -370,9 +371,28 @@ get_core_count()
 
 get_mulle_clang_version()
 {
-   local src
+   local src="$1"
 
-   cat "${1}/MULLE_CLANG_VERSION"
+   if [ ! -d "${src}" ]
+   then
+      fail "mulle-clang not downloaded yet"
+   fi
+
+   if [ ! -f "${src}/MULLE_CLANG_VERSION" ]
+   then
+      fail "No MULLE_CLANG_VERSION version found in \"${src}\""
+   fi
+   cat "${src}/MULLE_CLANG_VERSION"
+}
+
+
+get_runtime_load_version()
+{
+   local src="$1"
+
+   grep COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION "${src}/lib/CodeGen/CGObjCMulleRuntime.cpp" \
+    | head -1 \
+    | awk '{ print $3 }'
 }
 
 
@@ -383,7 +403,7 @@ get_clang_vendor()
    src="$1"
 
    local compiler_version
-   local runtime_version
+   local runtime_load_version
 
    compiler_version="`get_mulle_clang_version "${src}"`"
    if [ -z "${compiler_version}" ]
@@ -392,14 +412,14 @@ get_clang_vendor()
       exit 1
    fi
 
-   runtime_version="`grep STR_MULLE_OBJC_RUNTIME_VERSION "${src}/lib/CodeGen/MulleObjCRuntimeVersion.inc" | awk '{ print $3 }'`"
-   if [ -z "${runtime_version}" ]
+   runtime_load_version="`get_runtime_load_version "${src}"`"
+   if [ -z "${runtime_load_version}" ]
    then
-      echo "Could not determine runtime version" >&2
+      echo "Could not determine runtime load version" >&2
       exit 1
    fi
 
-   echo "mulle-clang ${compiler_version} (runtime: `eval echo ${runtime_version}`)"
+   echo "mulle-clang ${compiler_version} (runtime-load-version: `eval echo ${runtime_load_version}`)"
 }
 
 
@@ -503,19 +523,21 @@ _llvm_module_download()
    then
       curl -L -C- -o "_${filename}" "${archive}"  || fail "curl failed"
       tar tfJ "_${filename}" > /dev/null || fail "tar archive corrupt"
-      mv "_${filename}" "${filename}"
+      mv "_${filename}" "${filename}" || exit 1
    fi
 
    tar xfJ "${filename}" || fail "tar failed"
-   mv "${extractname}" "${dst}/${name}"
+   mv "${extractname}" "${dst}/${name}" || exit 1
 }
 
 
 download_llvm()
 {
+   log_info "Downloading llvm ..."
+
    if [ ! -d "${LLVM_DIR}" ]
    then
-      log_fluff "Download llvm..."
+      log_verbose "Downloading llvm from \"${LLVM_ARCHIVE}\" ..."
 
       _llvm_module_download "llvm" "${LLVM_ARCHIVE}" "${SRC_DIR}"
    fi
@@ -524,37 +546,45 @@ download_llvm()
    then
       if [ ! -d "${LLVM_DIR}/projects/libcxx" ]
       then
-         log_fluff "Download libcxx..."
+         log_verbose "Downloading libcxx from \"${LIBCXX_ARCHIVE}\" ..."
 
          _llvm_module_download "libcxx" "${LIBCXX_ARCHIVE}" "${LLVM_DIR}/projects"
+      else
+         log_fluff "\"${LLVM_DIR}/projects/libcxx\" already exists"
       fi
 
       if [ ! -d "${LLVM_DIR}/projects/libcxxabi" ]
       then
-         log_fluff "Download libcxxabi..."
+         log_verbose "Downloading libcxxabi from \"${LIBCXXABI_ARCHIVE}\" ..."
 
          _llvm_module_download "libcxxabi" "${LIBCXXABI_ARCHIVE}" "${LLVM_DIR}/projects"
+      else
+         log_fluff "\"${LLVM_DIR}/projects/libcxxabi\" already exists"
       fi
+   else
+      log_fluff "Skipped libcxx"
    fi
 }
 
 
 download_clang()
 {
-   log_fluff "Download mulle-clang..."
-
    if [ ! -d "${CLANG_DIR}" ]
    then
       if [ ! -f mulle-clang.tgz ]
       then
+         log_verbose "Downloading mulle-clang from \"${CLANG_ARCHIVE}\" ..."
          curl -L -C- -o _mulle-clang.tgz "${CLANG_ARCHIVE}"  || fail "curl failed"
          tar tfz _mulle-clang.tgz > /dev/null || fail "tar archive corrupt"
-         mv _mulle-clang.tgz mulle-clang.tgz
+         mv _mulle-clang.tgz mulle-clang.tgz  || exit 1
       fi
 
-      tar xfz mulle-clang.tgz
-      mkdir -p "`dirname -- "${CLANG_DIR}"`" 2> /dev/null
-      mv mulle-clang-3.9.0  "${CLANG_DIR}"
+      log_verbose "Unpacking into \"${CLANG_DIR}\" ..."
+      tar xfz mulle-clang.tgz || fail "tar archive corrupt"
+      mkdir -p "`dirname -- "${CLANG_DIR}"`" 2> /dev/null || exit 1
+      mv mulle-clang-${LLVM_VERSION} "${CLANG_DIR}" || exit 1
+   else
+      log_fluff "\"${CLANG_DIR}\" already exists"
    fi
 }
 
@@ -596,7 +626,7 @@ _build_llvm()
 
 build_llvm()
 {
-   log_fluff "Build llvm..."
+   log_info "Building llvm ..."
 
    _build_llvm "$@"
 }
@@ -608,8 +638,6 @@ build_llvm()
 #
 _build_clang()
 {
-   CLANG_VENDOR="`get_clang_vendor "${CLANG_DIR}"`"
-
    #
    # Build mulle-clang
    #
@@ -657,8 +685,23 @@ download_mulle_clang()
 {
 # try to download most problematic first
 # instead of downloading llvm first for an hour...
+   log_info "Downloading mulle-clang ..."
 
-   download_clang
+   if [ "${BUILD_CLANG}" != "NO" ]
+   then
+      download_clang
+
+      #
+      # now we can derive some more values
+      #
+      MULLE_CLANG_VERSION="`get_mulle_clang_version "${CLANG_DIR}"`" || exit 1
+      CLANG_VENDOR="`get_clang_vendor "${CLANG_DIR}"`" || exit 1
+      MULLE_CLANG_INSTALL_PREFIX="${MULLE_CLANG_INSTALL_PREFIX:-${PREFIX}/mulle-clang/${LLVM_VERSION}}"
+
+      log_verbose "CLANG_VENDOR=${CLANG_VENDOR}"
+      log_verbose "MULLE_CLANG_VERSION=${MULLE_CLANG_VERSION}"
+      log_verbose "MULLE_CLANG_INSTALL_PREFIX=${MULLE_CLANG_INSTALL_PREFIX}"
+   fi
 
 # should check if llvm is installed, if yes
 # check proper version and then use it
@@ -671,7 +714,7 @@ download_mulle_clang()
 
 build_mulle_clang()
 {
-   log_fluff "Build mulle-clang..."
+   log_info "Build mulle-clang ..."
 
 # should check if llvm is installed, if yes
 # check proper version and then use it
@@ -685,7 +728,10 @@ build_mulle_clang()
       fi
    fi
 
-   build_clang install
+   if [ "${BUILD_CLANG}" != "NO" ]
+   then
+      build_clang install
+   fi
 }
 
 
@@ -703,7 +749,10 @@ _build_mulle_clang()
       fi
    fi
 
-   _build_clang install
+   if [ "${BUILD_CLANG}" != "NO" ]
+   then
+      _build_clang install
+   fi
 }
 
 
@@ -731,7 +780,7 @@ install_executable()
 
 install_mulle_clang_link()
 {
-   log_fluff "Install mulle-clang link..."
+   log_info "Installing mulle-clang link ..."
 
    if [ ! -f "${MULLE_CLANG_INSTALL_PREFIX}/bin/clang${EXE_EXTENSION}" ]
    then
@@ -770,7 +819,7 @@ uninstall_mulle_clang_link()
 {
    local prefix
 
-   log_fluff "Uninstall mulle-clang link..."
+   log_info "Uninstalling mulle-clang link ..."
 
    prefix="${1:-${MULLE_CLANG_INSTALL_PREFIX}}"
 
@@ -852,8 +901,6 @@ main()
 
    PATH="${PREFIX}/bin:$PATH"; export PATH
 
-   MULLE_OBJC_VERSION="`get_mulle_clang_version "${CLANG_DIR}"`"
-   MULLE_CLANG_INSTALL_PREFIX="${MULLE_CLANG_INSTALL_PREFIX:-${PREFIX}/mulle-clang/${MULLE_OBJC_VERSION}}"
    MULLE_LLVM_INSTALL_PREFIX="${MULLE_LLVM_INSTALL_PREFIX:-${PREFIX}}"
 
    COMMAND="${1:-default}"
@@ -919,9 +966,8 @@ main()
 
    # blurb a little, this has some advantages
 
-   log_info "MULLE_OBJC_VERSION=${MULLE_OBJC_VERSION}"
-   log_info "MULLE_CLANG_INSTALL_PREFIX=${MULLE_CLANG_INSTALL_PREFIX}"
-   log_info "SYMLINK_PREFIX=${SYMLINK_PREFIX}"
+   log_verbose "MULLE_OBJC_VERSION_BRANCH=${MULLE_OBJC_VERSION_BRANCH}"
+   log_verbose "SYMLINK_PREFIX=${SYMLINK_PREFIX}"
 
    setup_build_environment
 

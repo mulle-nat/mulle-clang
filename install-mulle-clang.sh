@@ -408,15 +408,13 @@ get_clang_vendor()
    compiler_version="`get_mulle_clang_version "${src}"`"
    if [ -z "${compiler_version}" ]
    then
-      echo "Could not determine mulle-clang version" >&2
-      exit 1
+      fail "Could not determine mulle-clang version"
    fi
 
    runtime_load_version="`get_runtime_load_version "${src}"`"
    if [ -z "${runtime_load_version}" ]
    then
-      echo "Could not determine runtime load version" >&2
-      exit 1
+      fail "Could not determine runtime load version"
    fi
 
    echo "mulle-clang ${compiler_version} (runtime-load-version: `eval echo ${runtime_load_version}`)"
@@ -715,6 +713,25 @@ download_mulle_clang()
 build_mulle_clang()
 {
    log_info "Build mulle-clang ..."
+
+   if [ -d lib -o \
+        -d include -o \
+        -d bin -o \
+        -d libexec -o \
+        -d share ]
+   then
+      log_info "There are artifacts left over from a previous run."
+      log_info "If you are upgrading to a new version of llvm, you"
+      log_info "should do:"
+      log_info "  sudo rm -rf ./bin ./build ./include ./lib ./libexec ./share"
+   else
+      if [ -d build ]
+      then
+         log_info "As there is an old ./build folder here, the previous build"
+         log_info "is likely to get reused. If this is not what you want:"
+         log_info "  sudo rm -rf ./build"
+      fi
+   fi
 
 # should check if llvm is installed, if yes
 # check proper version and then use it

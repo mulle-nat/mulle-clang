@@ -69,15 +69,18 @@ PATH=`pwd`/build/llvm.d/bin:$PATH
 DIR="${1:-build/mulle-clang-xcode.d}"
 SRC="${2:-src/mulle-clang}"
 
+
 CLANG_VENDOR="`get_clang_vendor "${SRC}"`"
+MULLE_CLANG_INSTALL_PREFIX="$PWD"
 
 mkdir -p "${DIR}" > /dev/null
 cd "${DIR}"
 
 cmake -DCMAKE_OSX_SYSROOT=`xcrun --show-sdk-path` \
--DCLANG_VENDOR="${CLANG_VENDOR}" \
--DCMAKE_OSX_DEPLOYMENT_TARGET=10.10 \
--DCMAKE_BUILD_TYPE=Debug -G "Xcode" "../../${SRC}"
+   -DCLANG_VENDOR="${CLANG_VENDOR}" \
+   -DCMAKE_OSX_DEPLOYMENT_TARGET=10.10 \
+   -DCMAKE_INSTALL_PREFIX="${MULLE_CLANG_INSTALL_PREFIX}" \
+   -DCMAKE_BUILD_TYPE=Debug -G "Xcode" "../../${SRC}"
 if [ $? -ne 0 ]
 then
    exit 1

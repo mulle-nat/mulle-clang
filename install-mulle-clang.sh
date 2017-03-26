@@ -130,6 +130,48 @@ fail()
 }
 
 
+internal_fail()
+{
+   fail "$@"
+}
+
+
+exekutor_trace()
+{
+   if [ "${MULLE_FLAG_EXECUTOR_DRY_RUN}" = "YES" -o "${MULLE_FLAG_LOG_EXECUTOR}" = "YES" ]
+   then
+      local arrow
+
+      [ -z "${MULLE_EXECUTABLE_PID}" ] && internal_fail "MULLE_EXECUTABLE_PID not set"
+
+      if [ "${PPID}" -ne "${MULLE_EXECUTABLE_PID}" ]
+      then
+         arrow="=[${PPID}]=>"
+      else
+         arrow="==>"
+      fi
+
+      if [ -z "${MULLE_EXECUTOR_LOG_DEVICE}" ]
+      then
+         echo "${arrow}" "$@" >&2
+      else
+         echo "${arrow}" "$@" > "${MULLE_EXECUTOR_LOG_DEVICE}"
+      fi
+   fi
+}
+
+
+exekutor()
+{
+   exekutor_trace "$@"
+
+   if [ "${MULLE_FLAG_EXECUTOR_DRY_RUN}" != "YES" ]
+   then
+      "$@"
+   fi
+}
+
+
 is_root()
 {
    if [ "$EUID" != "" ]
@@ -163,7 +205,7 @@ fetch_brew()
       Darwin)
          log_fluff "Installing OS X brew"
 
-         ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)" || fail "ruby"
+         exekutor ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)" || fail "ruby"
       ;;
 
       Linux)
@@ -173,7 +215,7 @@ fetch_brew()
          install_binary_if_missing "ruby"
 
          log_fluff "Installing Linux brew"
-         ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/linuxbrew/go/install)" || fail "ruby"
+         exekutor ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/linuxbrew/go/install)" || fail "ruby"
       ;;
    esac
 }
@@ -194,7 +236,7 @@ install_with_brew()
    fi
 
    log_info "Download $1 using brew"
-   PATH="$PATH:/usr/local/bin" brew install "$1" || exit 1
+   PATH="$PATH:/usr/local/bin" exekutor brew install "$1" || exit 1
 }
 
 
@@ -218,12 +260,12 @@ install_binary_if_missing()
             if command -v "apt-get" > /dev/null 2>&1
             then
                log_info "You may get asked for your password to install $1"
-               sudo_if_needed apt-get install "$1" || exit 1
+               sudo_if_needed exekutor apt-get install "$1" || exit 1
             else
                if command -v "yum" > /dev/null 2>&1
                then
                   log_info "You may get asked for your password to install $1"
-                  sudo_if_needed yum install "$1" || exit 1
+                  sudo_if_needed exekutor yum install "$1" || exit 1
                else
                   fail "You need to install $1 manually from $2"
                fi
@@ -235,12 +277,12 @@ install_binary_if_missing()
          if command -v "pkg" > /dev/null 2>&1
          then
             log_info "You may get asked for your password to install $1"
-            sudo_if_needed pkg install "$1" || exit 1
+            sudo_if_needed exekutor pkg install "$1" || exit 1
          else
             if command -v "pkg_add" > /dev/null 2>&1
             then
                log_info "You may get asked for your password to install $1"
-               sudo_if_needed pkg_add -r "$1" || exit 1
+               sudo_if_needed exekutor pkg_add -r "$1" || exit 1
             else
                fail "You need to install $1 manually from $2"
             fi
@@ -263,26 +305,26 @@ build_cmake()
    install_binary_if_missing "tar" "from somewhere"
    install_binary_if_missing "make" "from somewhere"
 
-   mkdir "${SRC_DIR}" 2> /dev/null
+   exekutor mkdir "${SRC_DIR}" 2> /dev/null
    set -e
-      cd "${SRC_DIR}"
+      exekutor cd "${SRC_DIR}"
 
          if [ -d "cmake-${CMAKE_PATCH_VERSION}" ]
          then
-            rm -rf "cmake-${CMAKE_PATCH_VERSION}"
+            exekutor rm -rf "cmake-${CMAKE_PATCH_VERSION}"
          fi
          if [ ! -f "cmake-${CMAKE_PATCH_VERSION}.tar.gz" ]
          then
-            curl -k -L -O "https://cmake.org/files/v${CMAKE_VERSION}/cmake-${CMAKE_PATCH_VERSION}.tar.gz"
+            exekutor curl -k -L -O "https://cmake.org/files/v${CMAKE_VERSION}/cmake-${CMAKE_PATCH_VERSION}.tar.gz"
          fi
 
-         tar xfz "cmake-${CMAKE_PATCH_VERSION}.tar.gz"
-         cd "cmake-${CMAKE_PATCH_VERSION}"
-         ./configure "--prefix=${PREFIX}"
-         ${MAKE} install || exit 1
+         exekutor tar xfz "cmake-${CMAKE_PATCH_VERSION}.tar.gz"
+         exekutor cd "cmake-${CMAKE_PATCH_VERSION}"
+         exekutor ./configure "--prefix=${PREFIX}"
+         exekutor ${MAKE} install || exit 1
 
          hash -r  # apparently needed...
-      cd "${OWD}"
+      exekutor cd "${OWD}"
    set +e
 }
 
@@ -293,7 +335,7 @@ check_cmake_version()
    local minor
    local version
 
-   version="`cmake -version 2> /dev/null| awk '{ print $3 }'`"
+   version="`cmake -version 2> /dev/null | awk '{ print $3 }'`"
    if [ -z "${version}" ]
    then
       log_fluff "The cmake is not installed."
@@ -519,13 +561,13 @@ _llvm_module_download()
 
    if [ ! -f "${filename}" ]
    then
-      curl -L -C- -o "_${filename}" "${archive}"  || fail "curl failed"
-      tar tfJ "_${filename}" > /dev/null || fail "tar archive corrupt"
-      mv "_${filename}" "${filename}" || exit 1
+      exekutor curl -L -C- -o "_${filename}" "${archive}"  || fail "curl failed"
+      exekutor tar tfJ "_${filename}" > /dev/null || fail "tar archive corrupt"
+      exekutor mv "_${filename}" "${filename}" || exit 1
    fi
 
-   tar xfJ "${filename}" || fail "tar failed"
-   mv "${extractname}" "${dst}/${name}" || exit 1
+   exekutor tar xfJ "${filename}" || fail "tar failed"
+   exekutor mv "${extractname}" "${dst}/${name}" || exit 1
 }
 
 
@@ -572,15 +614,15 @@ download_clang()
       if [ ! -f mulle-clang.tgz ]
       then
          log_verbose "Downloading mulle-clang from \"${CLANG_ARCHIVE}\" ..."
-         curl -L -C- -o _mulle-clang.tgz "${CLANG_ARCHIVE}"  || fail "curl failed"
-         tar tfz _mulle-clang.tgz > /dev/null || fail "tar archive corrupt"
-         mv _mulle-clang.tgz mulle-clang.tgz  || exit 1
+         exekutor curl -L -C- -o _mulle-clang.tgz "${CLANG_ARCHIVE}"  || fail "curl failed"
+         exekutor tar tfz _mulle-clang.tgz > /dev/null || fail "tar archive corrupt"
+         exekutor mv _mulle-clang.tgz mulle-clang.tgz  || exit 1
       fi
 
       log_verbose "Unpacking into \"${CLANG_DIR}\" ..."
-      tar xfz mulle-clang.tgz || fail "tar archive corrupt"
-      mkdir -p "`dirname -- "${CLANG_DIR}"`" 2> /dev/null || exit 1
-      mv mulle-clang-${LLVM_VERSION} "${CLANG_DIR}" || exit 1
+      exekutor tar xfz mulle-clang.tgz || fail "tar archive corrupt"
+      exekutor mkdir -p "`dirname -- "${CLANG_DIR}"`" 2> /dev/null || exit 1
+      exekutor mv mulle-clang-${LLVM_VERSION} "${CLANG_DIR}" || exit 1
    else
       log_fluff "\"${CLANG_DIR}\" already exists"
    fi
@@ -597,13 +639,13 @@ _build_llvm()
    #
    # Build llvm
    #
-   if [ ! -f "${LLVM_BUILD_DIR}/Makefile" ]
+   if [ ! -f "${LLVM_BUILD_DIR}/Makefile" -o "${RUN_LLVM_CMAKE}" = "YES" ]
    then
-      mkdir -p "${LLVM_BUILD_DIR}" 2> /dev/null
+      exekutor mkdir -p "${LLVM_BUILD_DIR}" 2> /dev/null
 
       set -e
-         cd "${LLVM_BUILD_DIR}"
-            cmake \
+         exekutor cd "${LLVM_BUILD_DIR}"
+            exekutor cmake \
                -Wno-dev \
                -G "${CMAKE_GENERATOR}" \
                -DCMAKE_BUILD_TYPE="${LLVM_BUILD_TYPE}" \
@@ -611,14 +653,14 @@ _build_llvm()
                -DLLVM_ENABLE_CXX1Y:BOOL=OFF \
                ${CMAKE_FLAGS} \
                "${BUILD_RELATIVE}/../${LLVM_DIR}"
-         cd "${OWD}"
+         exekutor cd "${OWD}"
       set +e
    fi
 
-   cd "${LLVM_BUILD_DIR}" || fail "build_llvm: ${LLVM_BUILD_DIR} missing"
+   exekutor cd "${LLVM_BUILD_DIR}" || fail "build_llvm: ${LLVM_BUILD_DIR} missing"
    # hmm
-      ${MAKE} ${MAKE_FLAGS} "$@" || fail "build_llvm: ${MAKE} failed"
-   cd "${OWD}"
+      exekutor ${MAKE} ${MAKE_FLAGS} "$@" || fail "build_llvm: ${MAKE} failed"
+   exekutor cd "${OWD}"
 }
 
 
@@ -641,10 +683,10 @@ _build_clang()
    #
    if [ ! -f "${CLANG_BUILD_DIR}/Makefile" ]
    then
-      mkdir -p "${CLANG_BUILD_DIR}" 2> /dev/null
+      exekutor mkdir -p "${CLANG_BUILD_DIR}" 2> /dev/null
 
       set -e
-         cd "${CLANG_BUILD_DIR}"
+         exekutor cd "${CLANG_BUILD_DIR}"
 
             PATH="${LLVM_BIN_DIR}:$PATH"
 
@@ -652,7 +694,7 @@ _build_clang()
             # cmake -DCMAKE_BUILD_TYPE=Debug "../${CLANG_DIR}"
             # try to build cmake with cmake
             CC="${C_COMPILER}" CXX="${CXX_COMPILER}" \
-               cmake \
+               exekutor cmake \
                   -Wno-dev \
                   -G "${CMAKE_GENERATOR}" \
                   -DCLANG_VENDOR="${CLANG_VENDOR}" \
@@ -660,13 +702,13 @@ _build_clang()
                   -DCMAKE_INSTALL_PREFIX="${MULLE_CLANG_INSTALL_PREFIX}" \
                   ${CMAKE_FLAGS} \
                   "${BUILD_RELATIVE}/../${CLANG_DIR}"
-         cd "${OWD}"
+         exekutor cd "${OWD}"
       set +e
    fi
 
-   cd "${CLANG_BUILD_DIR}" || fail "build_clang: ${CLANG_BUILD_DIR} missing"
-      ${MAKE} ${MAKE_FLAGS} "$@" || fail "build_clang: ${MAKE} failed"
-   cd "${OWD}"
+   exekutor cd "${CLANG_BUILD_DIR}" || fail "build_clang: ${CLANG_BUILD_DIR} missing"
+      exekutor ${MAKE} ${MAKE_FLAGS} "$@" || fail "build_clang: ${MAKE} failed"
+   exekutor cd "${OWD}"
 }
 
 
@@ -694,11 +736,9 @@ download_mulle_clang()
       #
       MULLE_CLANG_VERSION="`get_mulle_clang_version "${CLANG_DIR}"`" || exit 1
       CLANG_VENDOR="`get_clang_vendor "${CLANG_DIR}"`" || exit 1
-      MULLE_CLANG_INSTALL_PREFIX="${MULLE_CLANG_INSTALL_PREFIX:-${PREFIX}/mulle-clang/${LLVM_VERSION}}"
 
       log_verbose "CLANG_VENDOR=${CLANG_VENDOR}"
       log_verbose "MULLE_CLANG_VERSION=${MULLE_CLANG_VERSION}"
-      log_verbose "MULLE_CLANG_INSTALL_PREFIX=${MULLE_CLANG_INSTALL_PREFIX}"
    fi
 
 # should check if llvm is installed, if yes
@@ -856,6 +896,14 @@ main()
             set -x
          ;;
 
+         -n)
+            MULLE_FLAG_EXECUTOR_DRY_RUN="YES"
+         ;;
+
+         -V)
+            MULLE_FLAG_LOG_EXECUTOR="YES"
+         ;;
+
          -v|--verbose)
             FLUFF=
             VERBOSE="YES"
@@ -864,15 +912,19 @@ main()
          -vv|--very-verbose)
             FLUFF="YES"
             VERBOSE="YES"
-         ;;
-
-         -vvv|--very-verbose-with-settings)
-            FLUFF="YES"
-            VERBOSE="YES"
+            MULLE_FLAG_LOG_EXECUTOR="YES"
          ;;
 
          --build-cmake)
             BUILD_CMAKE="YES"
+         ;;
+
+         --llvm-debug)
+            LLVM_BUILD_TYPE=Debug
+         ;;
+
+         --clang-debug)
+            CLANG_BUILD_TYPE=Debug
          ;;
 
          --prefix)
@@ -919,6 +971,7 @@ main()
    PATH="${PREFIX}/bin:$PATH"; export PATH
 
    MULLE_LLVM_INSTALL_PREFIX="${MULLE_LLVM_INSTALL_PREFIX:-${PREFIX}}"
+   MULLE_CLANG_INSTALL_PREFIX="${MULLE_CLANG_INSTALL_PREFIX:-${PREFIX}}"
 
    COMMAND="${1:-default}"
    [ $# -eq 0 ] || shift
@@ -981,6 +1034,12 @@ main()
 
    LLVM_BIN_DIR="${LLVM_BIN_DIR:-${LLVM_BUILD_DIR}/bin}"
 
+   # if manually changed rerun cmake even if Makefile exists
+   if [ "${LLVM_BUILD_TYPE}" != "Release" ]
+   then
+      RUN_LLVM_CMAKE="YES"
+   fi
+
    # blurb a little, this has some advantages
 
    log_verbose "MULLE_OBJC_VERSION_BRANCH=${MULLE_OBJC_VERSION_BRANCH}"
@@ -1016,6 +1075,7 @@ main()
    esac
 }
 
+MULLE_EXECUTABLE_PID="$$"
 
 environment_initialize
 log_initialize

@@ -346,6 +346,30 @@ void Sema::ActOnStartOfObjCMethodDef(Scope *FnBodyScope, Decl *D) {
      }
   }
 
+  //
+  // @mulle-objc@ AAM:  check that family is compatible
+  // certain methods returning retained objects can not
+  // be used.
+  //
+  if( getLangOpts().ObjCAllocsAutoreleasedObjects)
+  {
+     switch (MDecl->getMethodFamily())
+     {
+     case ObjCMethodFamily::OMF_alloc       :
+     case ObjCMethodFamily::OMF_new         :
+     case ObjCMethodFamily::OMF_copy        :
+     case ObjCMethodFamily::OMF_mutableCopy :
+     case ObjCMethodFamily::OMF_autorelease :
+     case ObjCMethodFamily::OMF_release     :
+     case ObjCMethodFamily::OMF_retain      :
+     case ObjCMethodFamily::OMF_retainCount :
+         Diag(MDecl->getLocation(), diag::err_mulle_aam_unsupported_method_family)
+            << MDecl->getSelector();
+     default : ;
+     }
+  }
+  // @mulle-objc@ AAM: <-
+
   // In ARC, disallow definition of retain/release/autorelease/retainCount
   if (getLangOpts().ObjCAutoRefCount) {
     switch (MDecl->getMethodFamily()) {
@@ -4586,26 +4610,6 @@ Decl *Sema::ActOnMethodDeclaration(
   }
   
   ObjCMethod->setMethodParams(Context, Params, SelectorLocs);
-
-//  // @mulle-objc@ AAM:  check that family is compatible
-//  // the params are what is used for syntax checks and all the
-//  // other good stuff.
-//  if( getLangOpts().ObjCAllocsAutoreleasedObjects)
-//  {
-//     switch( (int) Sel.getMethodFamily())
-//     {
-//     case ObjCMethodFamily::OMF_alloc       :
-//     case ObjCMethodFamily::OMF_new         :
-//     case ObjCMethodFamily::OMF_copy        :
-//     case ObjCMethodFamily::OMF_mutableCopy :
-//     case ObjCMethodFamily::OMF_autorelease :
-//     case ObjCMethodFamily::OMF_release     :
-//     case ObjCMethodFamily::OMF_retain      :
-//     case ObjCMethodFamily::OMF_retainCount :
-//         Diag(ObjCMethod->getLocation(), diag::err_mulle_aam_unsupported_method_family)
-//            << ObjCMethod->getDeclName();
-//     }
-//  }
 
   // @mulle-objc@ MetaABI: create ParamRecord
   // the params are what is used for syntax checks and all the

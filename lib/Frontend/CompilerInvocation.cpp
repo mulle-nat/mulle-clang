@@ -1720,8 +1720,9 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
       case IK_PreprocessedObjC:
         if ( !Std.isC11())
           Diags.Report(diag::err_drv_argument_not_allowed_with)
-            << A->getAsString(Args) << "C/ObjC";
+            << A->getAsString(Args) << "C/ObjC' '(C11 needed)";
         break;
+      // @mulle-objc@ C11: <-
       case IK_CXX:
       case IK_ObjCXX:
       case IK_PreprocessedCXX:

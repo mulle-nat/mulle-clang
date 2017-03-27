@@ -1,4 +1,4 @@
-#! /bin/sh -x
+#! /bin/sh
 
 fail()
 {
@@ -66,25 +66,35 @@ get_clang_vendor()
 
 PATH=`pwd`/build/llvm.d/bin:$PATH
 
+CONFIGURATION="${1:-Release}"
+[ $# -ne 0 ] && shift
 DIR="${1:-build/mulle-clang-xcode.d}"
-SRC="${2:-src/mulle-clang}"
+[ $# -ne 0 ] && shift
+SRC="${1:-src/mulle-clang}"
+[ $# -ne 0 ] && shift
 
 
 CLANG_VENDOR="`get_clang_vendor "${SRC}"`"
 MULLE_CLANG_INSTALL_PREFIX="$PWD"
 
 mkdir -p "${DIR}" > /dev/null
-cd "${DIR}"
+(
+   cd "${DIR}"
 
-cmake -DCMAKE_OSX_SYSROOT=`xcrun --show-sdk-path` \
-   -DCLANG_VENDOR="${CLANG_VENDOR}" \
-   -DCMAKE_OSX_DEPLOYMENT_TARGET=10.10 \
-   -DCMAKE_INSTALL_PREFIX="${MULLE_CLANG_INSTALL_PREFIX}" \
-   -DCMAKE_BUILD_TYPE=Debug -G "Xcode" "../../${SRC}"
-if [ $? -ne 0 ]
-then
-   exit 1
-fi
-cd ..
+   cmake -DCMAKE_OSX_SYSROOT=`xcrun --show-sdk-path` \
+      -DCLANG_VENDOR="${CLANG_VENDOR}" \
+      -DCMAKE_OSX_DEPLOYMENT_TARGET=10.10 \
+      -DCMAKE_INSTALL_PREFIX="${MULLE_CLANG_INSTALL_PREFIX}" \
+      -DCMAKE_BUILD_TYPE="${CONFIGURATION}" -G "Xcode" "../../${SRC}"
 
-echo "ln -s /Volumes/Source/srcO/mulle-clang/build/mulle-clang-xcode.d/Debug/bin/clang /usr/local/bin/mulle-clang"
+   if [ $? -ne 0 ]
+   then
+      exit 1
+   fi
+) || exit 1
+
+echo "ln -sf `pwd -P`/mulle-clang-xcode.d/${CONFIGURATION}/bin/clang /usr/local/bin/mulle-clang"
+ln -sf "`pwd -P`/build/mulle-clang-xcode.d/${CONFIGURATION}/bin/clang" "/usr/local/bin/mulle-clang"
+
+echo ln -sf "${DIR}/Clang.xcodeproj"
+ln -sf "${DIR}/Clang.xcodeproj"

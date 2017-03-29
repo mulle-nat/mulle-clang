@@ -3608,10 +3608,6 @@ void  CGObjCMulleRuntime::PushCallArgsIntoRecord( CodeGenFunction &CGF,
 
    for( RecordDecl::field_iterator CurField = RD->field_begin(), SentinelField = RD->field_end(); CurField != SentinelField; CurField++)
    {
-      FieldDecl    *Field;
-
-      Field = *CurField;
-
       RValue   RHS = Args[ i].RV;
       LValue   LHS = CGF.EmitLValueForFieldInitialization( Record, *CurField);
       CGF.EmitStoreThroughLValue( RHS, LHS, true);
@@ -3844,9 +3840,10 @@ CGObjCMulleRuntime::EmitProtocolIDList(Twine Name,
 
 
 /*
- just a list of class IDs. Get protocols passed in, then determine if that
- protocol has a class of the same name. @class Foo;  is sufficient if we
- have @protocol Foo;
+   just a list of class IDs. Get protocols passed in, then determine if that
+   protocol has a class of the same name. @class Foo;  is sufficient if we
+   have @protocol Foo;
+   TODO: It would be nice to check that the class is a root class.
  */
 llvm::Constant *
 CGObjCMulleRuntime::EmitProtocolClassIDList(Twine Name,
@@ -4156,8 +4153,8 @@ void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
    CGM.getContext().getASTObjCImplementationLayout(ID).getSize().getQuantity();
 
    // FIXME: Set CXX-structors flag.
-   if (ID->getClassInterface()->getVisibility() == HiddenVisibility)
-      Flags |= FragileABI_Class_Hidden;
+   // if (ID->getClassInterface()->getVisibility() == HiddenVisibility)
+   //   Flags |= FragileABI_Class_Hidden;
 
    SmallVector<llvm::Constant *, 16> InstanceMethods, ClassMethods, InstanceVariables, Properties;
 
@@ -4303,6 +4300,7 @@ void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
    } else
       GV = CreateMetadataVar(Name, Init, Section, 4, true);
 
+   DeclaredClassNames.insert( ClassName);
    DefinedClasses.push_back(GV);
    ImplementedClasses.push_back(Interface);
 

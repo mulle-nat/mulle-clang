@@ -837,7 +837,7 @@ install_executable()
 
 install_mulle_clang_link()
 {
-   log_info "Installing mulle-clang link ..."
+   log_info "Installing mulle-clang (and mulle-scan-build) link ..."
 
    if [ ! -f "${MULLE_CLANG_INSTALL_PREFIX}/bin/clang${EXE_EXTENSION}" ]
    then
@@ -847,6 +847,7 @@ before you can install"
    fi
 
    install_executable "${MULLE_CLANG_INSTALL_PREFIX}/bin/clang${CLANG_SUFFIX}${EXE_EXTENSION}" mulle-clang${CLANG_SUFFIX}${EXE_EXTENSION}
+   install_executable "${MULLE_CLANG_INSTALL_PREFIX}/bin/scan-build${CLANG_SUFFIX}${EXE_EXTENSION}" mulle-scan-build${CLANG_SUFFIX}${EXE_EXTENSION}
 }
 
 
@@ -876,11 +877,12 @@ uninstall_mulle_clang_link()
 {
    local prefix
 
-   log_info "Uninstalling mulle-clang link ..."
+   log_info "Uninstalling mulle-clang (and mulle-scan-build) link ..."
 
    prefix="${1:-${MULLE_CLANG_INSTALL_PREFIX}}"
 
    uninstall_executable "${prefix}/bin/mulle-clang${CLANG_SUFFIX}"
+   uninstall_executable "${prefix}/bin/mulle-scan-build${CLANG_SUFFIX}"
 }
 
 

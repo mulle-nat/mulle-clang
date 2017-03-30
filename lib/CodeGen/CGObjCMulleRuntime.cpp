@@ -808,13 +808,6 @@ namespace {
       llvm::StringMap<llvm::GlobalVariable*> IvarTypes;
       /// mulle::end
 
-
-      /// DefinedSymbols - External symbols which are defined by this
-      /// module. The symbols in this list and LazySymbols are used to add
-      /// special linker symbols which ensure that Objective-C modules are
-      /// linked properly.
-      llvm::SetVector<IdentifierInfo*> DefinedSymbols;
-
       /// ClassNames - uniqued class names.
       llvm::StringMap<llvm::GlobalVariable*> ClassNames;
 
@@ -833,7 +826,7 @@ namespace {
       llvm::DenseMap<IdentifierInfo*, llvm::GlobalVariable*> PropertyNames;
 
       /// DeclaredClassNames - all known class names.
-      std::set<std::string> DeclaredClassNames;
+      llvm::DenseSet<IdentifierInfo*> DeclaredClassNames;
 
       /// SelectorReferences - uniqued selector references.
       llvm::DenseMap<Selector, llvm::GlobalVariable*> SelectorReferences;
@@ -3854,13 +3847,14 @@ CGObjCMulleRuntime::EmitProtocolClassIDList(Twine Name,
    llvm::Constant       *classID;
    StringRef            name;
    StringRef            otherName;
-
+   IdentifierInfo       *identifier;
+   
    for (; begin != end; ++begin)
    {
-      name = (*begin)->getName();
-      if( DeclaredClassNames.find( name.str()) != DeclaredClassNames.end())
+      identifier = (*begin)->getIdentifier();
+      if( DeclaredClassNames.find( identifier) != DeclaredClassNames.end())
       {
-         classID = HashClassConstantForString( name);
+         classID = HashClassConstantForString( identifier->getNameStart());
          ClassIds.push_back( classID);
          break;
       }
@@ -4132,7 +4126,6 @@ enum FragileClassFlags {
 
 
 void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
-   DefinedSymbols.insert(ID->getIdentifier());
 
    std::string ClassName = ID->getNameAsString();
    // FIXME: Gross
@@ -4300,7 +4293,7 @@ void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
    } else
       GV = CreateMetadataVar(Name, Init, Section, 4, true);
 
-   DeclaredClassNames.insert( ClassName);
+   DeclaredClassNames.insert( ID->getIdentifier());
    DefinedClasses.push_back(GV);
    ImplementedClasses.push_back(Interface);
 
@@ -4311,10 +4304,7 @@ void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
 
 void   CGObjCMulleRuntime::GenerateForwardClass(const ObjCInterfaceDecl *OID)
 {
-   StringRef   name;
-
-   name = OID->getName();
-   DeclaredClassNames.insert( name.str());
+   DeclaredClassNames.insert( OID->getIdentifier());
 }
 
 

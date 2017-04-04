@@ -2694,6 +2694,13 @@ bool Expr::isConstantInitializer(ASTContext &Ctx, bool IsForRef,
   case StringLiteralClass:
   case ObjCEncodeExprClass:
     return true;
+  // @mulle-objc@: allow @selector as compile-time constant
+  case ObjCSelectorExprClass:
+     if( Ctx.getLangOpts().ObjCRuntime.hasConstantSelector())
+        return true;
+     break;
+  // @mulle-objc@: allow @selector as compile-time constant <-
+        
   case CXXTemporaryObjectExprClass:
   case CXXConstructExprClass: {
     const CXXConstructExpr *CE = cast<CXXConstructExpr>(this);

@@ -149,7 +149,12 @@ public:
 
   /// Generate a constant string object.
   virtual ConstantAddress GenerateConstantString(const StringLiteral *) = 0;
-  
+
+   // @mulle-objc@: emit constant selectors
+   /// Generate a constant selector for participating runtimes
+  virtual llvm::Constant  *GenerateConstantSelector(Selector);
+   // @mulle-objc@: emit constant selectors <-
+
   /// Generate a category.  A category contains a list of methods (and
   /// accompanying metadata) and a list of protocols.
   virtual void GenerateCategory(const ObjCCategoryImplDecl *OCD) = 0;

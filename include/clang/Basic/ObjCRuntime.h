@@ -97,7 +97,15 @@ public:
     llvm_unreachable("bad kind");
   }
 
-  // @mulle-objc@ compiler: additional method hasMulleMetaABI to check if compiling with mulle
+  // @mulle-objc@ compiler: additional methods hasConstantSelector and hasMulleMetaABI to check if compiling with mulle
+  bool hasConstantSelector() const {
+     switch (getKind()) {
+        case Mulle: return true;
+        default   : return false;
+     }
+     llvm_unreachable("bad kind");
+  }
+
   bool hasMulleMetaABI() const {
     switch (getKind()) {
     case Mulle: return true;
@@ -105,6 +113,8 @@ public:
     }
     llvm_unreachable("bad kind");
   }
+  //@mulle-objc@ compiler: additional methods <-
+   
   /// The inverse of isNonFragile():  does this runtime follow the set of
   /// implied behaviors for a "fragile" ABI?
   bool isFragile() const { return !isNonFragile(); }

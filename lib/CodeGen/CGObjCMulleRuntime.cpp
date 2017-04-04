@@ -939,6 +939,8 @@ namespace {
       /// defined. The return value has type ProtocolPtrTy.
       llvm::Constant *GetProtocolRef(const ObjCProtocolDecl *PD);
 
+#pragma mark - FNV1 hashing + conveniences
+      
       // common helper function, turning names into abbreviated hashes
       uint64_t          UniqueidHashForString( std::string s, uint64_t first_valid, unsigned WordSizeInBytes);
       llvm::ConstantInt *__HashConstantForString( std::string s, uint64_t first_valid);
@@ -968,6 +970,7 @@ namespace {
          return( _HashConstantForString( s, 0x0)); // here we don't care
       }
 
+      
       /// CreateMetadataVar - Create a global variable with internal
       /// linkage for use by the Objective-C runtime.
       ///
@@ -1221,6 +1224,8 @@ namespace {
       void GenerateClass(const ObjCImplementationDecl *ClassDecl) override;
 
       void GenerateForwardClass(const ObjCInterfaceDecl *OID) override;
+
+      llvm::Constant  *GenerateConstantSelector(Selector) override;
 
       void RegisterAlias(const ObjCCompatibleAliasDecl *OAD) override {}
 
@@ -4307,6 +4312,10 @@ void   CGObjCMulleRuntime::GenerateForwardClass(const ObjCInterfaceDecl *OID)
    DeclaredClassNames.insert( OID->getIdentifier());
 }
 
+llvm::Constant  *CGObjCMulleRuntime::GenerateConstantSelector(Selector sel)
+{
+   return( HashSelConstantForString( sel.getAsString()));
+}
 
 /*
 struct _mulle_objc_ivar_descriptor

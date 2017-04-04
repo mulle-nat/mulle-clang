@@ -408,6 +408,13 @@ void   CGObjCRuntime::GenerateForwardClass(const ObjCInterfaceDecl *OID)
    // do nothing
 }
 
+
+llvm::Constant  *CGObjCRuntime::GenerateConstantSelector( Selector sel)
+{
+   // shouldn't be called for non-participating runtimes
+   return( nullptr);
+}
+
 // @mulle-objc@ MetaABI: end
 
 

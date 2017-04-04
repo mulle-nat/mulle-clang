@@ -6567,8 +6567,8 @@ TypedefDecl *ASTContext::getObjCIdDecl() const {
 TypedefDecl *ASTContext::getObjCSelDecl() const {
   if (!ObjCSelDecl) {
     // @mulle-objc@ uniqueid: change SEL type to uint32_t
-    QualType T = getLangOpts().ObjCRuntime.hasMulleMetaABI()
-                     ? ObjCBuiltinSelTy
+    QualType T = getLangOpts().ObjCRuntime.hasConstantSelector()
+                     ? UnsignedIntTy
                      : getPointerType(ObjCBuiltinSelTy);
     ObjCSelDecl = buildImplicitTypedef(T, "SEL");
   }
@@ -6589,7 +6589,7 @@ NamedDecl *ASTContext::getObjCProtocolDecl() const {
   if (!ObjCProtocolClassDecl) {
     if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
     {
-      QualType T = getLangOpts().ObjCRuntime.hasMulleMetaABI() ? ObjCBuiltinSelTy
+      QualType T = getLangOpts().ObjCRuntime.hasConstantSelector() ? UnsignedIntTy
                                                                : getPointerType(ObjCBuiltinSelTy);
       ObjCProtocolClassDecl = buildImplicitTypedef(T, "PROTOCOL");
     }

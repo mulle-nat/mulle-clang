@@ -63,7 +63,7 @@
 #include "llvm/Support/Compiler.h"
 
 
-#define COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION  4
+#define COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION  5
 
 
 using namespace clang;
@@ -890,6 +890,9 @@ namespace {
       /// class or protocol definition. The return value has type char *.
       llvm::Constant *GetClassName(StringRef RuntimeName);
 
+      // a string like __FILE__
+      llvm::Constant *GetSourceLocationDescription( SourceLocation loc);
+
       llvm::Function *GetMethodDefinition(const ObjCMethodDecl *MD);
 
       // dup from CodeGenModule, but easier here
@@ -899,6 +902,7 @@ namespace {
       llvm::StringMapEntry<llvm::GlobalAlias *> &GetNSConstantStringMapEntry( const StringLiteral *Literal, unsigned &StringLength);
 
       ConstantAddress   GenerateConstantString(const StringLiteral *SL) override;
+
 
 
       Qualifiers::ObjCLifetime getBlockCaptureLifetime(QualType QT, bool ByrefLayout);
@@ -993,6 +997,10 @@ namespace {
                                                   ObjCLabelType LabelType,
                                                   bool ForceNonFragileABI = false,
                                                   bool NullTerminate = true);
+
+      llvm::GlobalVariable *CreateCStringLiteral(StringRef Name,
+                                                 StringRef Label,
+                                                 bool NullTerminate = true);
 
       /// EmitImageInfo - Emit the image info marker used to encode some module
       /// level information.
@@ -4021,6 +4029,18 @@ llvm::Constant *CGObjCCommonMulleRuntime::EmitPropertyList(Twine Name,
 }
 
 
+llvm::Constant *CGObjCCommonMulleRuntime::GetSourceLocationDescription( SourceLocation  loc)
+{
+   PresumedLoc PLoc = CGM.getContext().getSourceManager().getPresumedLoc( loc);
+   
+   SmallString<128> FN;
+   
+   FN += PLoc.getFilename();
+   llvm::GlobalVariable *Entry = CreateCStringLiteral( FN, "OBJC_DEBUG_INFO_");
+   return( getConstantGEP(VMContext, Entry, 0, 0));
+}
+
+
 //   struct _mulle_objc_loadcategory
 //   {
 //      mulle_objc_categoryid_t          categoryid;
@@ -4064,7 +4084,7 @@ void CGObjCMulleRuntime::GenerateCategory(const ObjCCategoryImplDecl *OCD) {
    llvm::array_pod_sort( ClassMethods.begin(), ClassMethods.end(),
                          uniqueid_comparator);
 
-   llvm::Constant *Values[10];
+   llvm::Constant *Values[11];
 
    // category name emitted below
 
@@ -4105,6 +4125,12 @@ void CGObjCMulleRuntime::GenerateCategory(const ObjCCategoryImplDecl *OCD) {
       Values[ 8] = llvm::Constant::getNullValue(ObjCTypes.ProtocolListPtrTy);
       Values[ 9] = llvm::Constant::getNullValue(ObjCTypes.ProtocolListPtrTy);
    }
+   if( CGM.getCodeGenOpts().getDebugInfo() != codegenoptions::NoDebugInfo)
+   {
+      Values[ 10] = GetSourceLocationDescription( OCD->getLocation());
+   }
+   else
+      Values[ 10] = llvm::Constant::getNullValue(ObjCTypes.Int8PtrTy);
 
    llvm::Constant *Init = llvm::ConstantStruct::get(ObjCTypes.CategoryTy,
                                                     Values);
@@ -4215,9 +4241,11 @@ void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
 //
 //      mulle_objc_protocolid_t           *protocolids;
 //      mulle_objc_classid_t              *protocolclassids;
+//
+//      char                              *origin;
 //   };
 
-   llvm::Constant *Values[14];
+   llvm::Constant *Values[15];
    int   i = 0;
 
    ObjCInterfaceDecl *Super = Interface->getSuperClass();
@@ -4277,6 +4305,11 @@ void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
    Values[ i++] = Protocols;
    Values[ i++] = ProtocolClasses;
 
+   if( CGM.getCodeGenOpts().getDebugInfo() != codegenoptions::NoDebugInfo)
+      Values[ i++] = GetSourceLocationDescription( ID->getLocation());
+   else
+      Values[ i++] = llvm::Constant::getNullValue(ObjCTypes.Int8PtrTy);
+   
    assert( i == sizeof( Values) / sizeof( llvm::Constant *));
 
    llvm::Constant *Init = llvm::ConstantStruct::get(ObjCTypes.ClassTy,
@@ -4491,6 +4524,29 @@ llvm::GlobalVariable *CGObjCCommonMulleRuntime::CreateMetadataVar(Twine Name,
 
 
 llvm::GlobalVariable *
+CGObjCCommonMulleRuntime::CreateCStringLiteral(StringRef Name,
+                                               StringRef Label,
+                                               bool NullTerminate) {
+   StringRef  Section;
+   
+   Section = "__TEXT,__cstring,cstring_literals";
+   llvm::Constant *Value =
+   llvm::ConstantDataArray::getString(VMContext, Name, NullTerminate);
+   llvm::GlobalVariable *GV =
+   new llvm::GlobalVariable(CGM.getModule(), Value->getType(),
+                            /*isConstant=*/true,
+                            llvm::GlobalValue::PrivateLinkage, Value, Label);
+   if (CGM.getTriple().isOSBinFormatMachO())
+      GV->setSection(Section);
+   GV->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
+   GV->setAlignment(CharUnits::One().getQuantity());
+   CGM.addCompilerUsedGlobal(GV);
+   
+   return GV;
+}
+
+
+llvm::GlobalVariable *
 CGObjCCommonMulleRuntime::CreateCStringLiteral(StringRef Name, ObjCLabelType Type,
                                                bool ForceNonFragileABI,
                                                bool NullTerminate) {
@@ -4505,22 +4561,7 @@ CGObjCCommonMulleRuntime::CreateCStringLiteral(StringRef Name, ObjCLabelType Typ
   }
 
 
-  StringRef Section;
-  Section = "__TEXT,__cstring,cstring_literals";
-
-  llvm::Constant *Value =
-      llvm::ConstantDataArray::getString(VMContext, Name, NullTerminate);
-  llvm::GlobalVariable *GV =
-      new llvm::GlobalVariable(CGM.getModule(), Value->getType(),
-                               /*isConstant=*/true,
-                               llvm::GlobalValue::PrivateLinkage, Value, Label);
-  if (CGM.getTriple().isOSBinFormatMachO())
-    GV->setSection(Section);
-  GV->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
-  GV->setAlignment(CharUnits::One().getQuantity());
-  CGM.addCompilerUsedGlobal(GV);
-
-  return GV;
+  return( CreateCStringLiteral( Name, Label, NullTerminate));
 }
 
 
@@ -6249,6 +6290,8 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
 //
 //      mulle_objc_protocolid_t           *protocolids;
 //      mulle_objc_classid_t              *protocolclassids;
+//
+//      char                              *origin;
 //   };
 
    ClassTy->setBody(
@@ -6270,6 +6313,8 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
 
                     ProtocolIDPtrTy,
                     ClassIDPtrTy,
+
+                    Int8PtrTy,         // origin,
                     nullptr);
 
    ClassPtrTy = llvm::PointerType::getUnqual(ClassTy);
@@ -6290,13 +6335,28 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
 //
 //      mulle_objc_protocolid_t           *protocolids;
 //      mulle_objc_classid_t              *protocolclassids;
+//
+//      char                              *origin;
 //   };
 
    CategoryTy =
    llvm::StructType::create("struct._mulle_objc_loadcategory",
-                            ClassIDTy, Int8PtrTy, ClassIDTy, Int8PtrTy, ClassIDTy, MethodListPtrTy,
-                            MethodListPtrTy, PropertyListPtrTy,
-                            ProtocolIDPtrTy, ClassIDPtrTy, nullptr);
+                            ClassIDTy,
+                            Int8PtrTy,
+                            
+                            ClassIDTy,
+                            Int8PtrTy,
+                            ClassIDTy,
+                            
+                            MethodListPtrTy,
+                            MethodListPtrTy,
+                            PropertyListPtrTy,
+                            
+                            ProtocolIDPtrTy,
+                            ClassIDPtrTy,
+                            
+                            Int8PtrTy,
+                            nullptr);
 
    //   struct _mulle_objc_loadstaticstring
    //   {

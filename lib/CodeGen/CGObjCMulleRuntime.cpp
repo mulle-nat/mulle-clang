@@ -164,7 +164,7 @@ namespace {
 
       /// id mulle_objc_object_call_classid (id, SEL, void *, CLASSID)
       ///
-      /// The messenger used for super calls
+      /// The messenger used for super calls from instance methods
       ///
       llvm::Constant *getMessageSendSuperFn( int optLevel) const
       {
@@ -195,9 +195,9 @@ namespace {
          StringRef    name;
          switch( optLevel)
          {
-         default : name = "mulle_objc_class_inline_metacall_classid"; break;
+         default : name = "mulle_objc_infraclass_inline_metacall_classid"; break;
          case -1 :
-         case 0  : name = "mulle_objc_class_metacall_classid"; break;
+         case 0  : name = "mulle_objc_infraclass_metacall_classid"; break;
          }
 
          llvm::Type *params[] = { ObjectPtrTy, SelectorIDTy, ParamsPtrTy, ClassIDTy  };
@@ -296,16 +296,16 @@ namespace {
       llvm::Type *CachePtrTy;
 
 
-      // TODO: use different code for different optlevel, like mulle_objc_uninlined_unfailing_get_or_lookup_class
+      // TODO: use different code for different optlevel, like mulle_objc_uninlined_unfailing_get_or_lookup_infraclass
       llvm::Constant *getGetRuntimeClassFn( int optLevel) {
          llvm::Type *params[] = { ClassIDTy };
          llvm::Constant *fn;
          StringRef    name;
          switch( optLevel)
          {
-         default : name = "mulle_objc_inline_unfailing_get_or_lookup_class"; break;
+         default : name = "mulle_objc_inline_unfailing_get_or_lookup_infraclass"; break;
          case -1 :
-         case 0  : name = "mulle_objc_unfailing_get_or_lookup_class"; break;
+         case 0  : name = "mulle_objc_unfailing_get_or_lookup_infraclass"; break;
          }
 
          llvm::AttributeSet   attributes = llvm::AttributeSet::get(CGM.getLLVMContext(),
@@ -1652,7 +1652,7 @@ llvm::Value *CGObjCMulleRuntime::GetClass(CodeGenFunction &CGF,
 
    int optLevel = CGM.getLangOpts().OptimizeSize ? -1 : CGM.getCodeGenOpts().OptimizationLevel;
    classPtr = CGF.EmitNounwindRuntimeCall(ObjCTypes.getGetRuntimeClassFn( optLevel),
-                                          classID, "mulle_objc_unfailing_get_or_lookup_class"); // string what for ??
+                                          classID, "mulle_objc_unfailing_get_or_lookup_infraclass"); // string what for ??
    rval     = CGF.Builder.CreateBitCast( classPtr, ObjCTypes.ObjectPtrTy);
    return rval;
 }

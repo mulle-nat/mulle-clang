@@ -153,6 +153,7 @@ public:
    // @mulle-objc@: emit constant selectors
    /// Generate a constant selector for participating runtimes
   virtual llvm::Constant  *GenerateConstantSelector(Selector);
+  virtual llvm::Constant  *GenerateConstantProtocol(ObjCProtocolDecl *protocol);
    // @mulle-objc@: emit constant selectors <-
 
   /// Generate a category.  A category contains a list of methods (and

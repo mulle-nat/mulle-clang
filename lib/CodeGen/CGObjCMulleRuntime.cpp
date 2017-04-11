@@ -903,8 +903,6 @@ namespace {
 
       ConstantAddress   GenerateConstantString(const StringLiteral *SL) override;
 
-
-
       Qualifiers::ObjCLifetime getBlockCaptureLifetime(QualType QT, bool ByrefLayout);
 
       virtual llvm::Constant *BuildGCBlockLayout(CodeGen::CodeGenModule &CGM,
@@ -1233,7 +1231,8 @@ namespace {
 
       void GenerateForwardClass(const ObjCInterfaceDecl *OID) override;
 
-      llvm::Constant  *GenerateConstantSelector(Selector) override;
+      llvm::Constant  *GenerateConstantSelector(Selector sel) override;
+      llvm::Constant  *GenerateConstantProtocol(ObjCProtocolDecl *protocol) override;
 
       void RegisterAlias(const ObjCCompatibleAliasDecl *OAD) override {}
 
@@ -4349,6 +4348,13 @@ llvm::Constant  *CGObjCMulleRuntime::GenerateConstantSelector(Selector sel)
 {
    return( HashSelConstantForString( sel.getAsString()));
 }
+
+
+llvm::Constant  *CGObjCMulleRuntime::GenerateConstantProtocol( ObjCProtocolDecl *protocol)
+{
+   return( HashSelConstantForString( protocol->getName()));
+}
+
 
 /*
 struct _mulle_objc_ivar_descriptor

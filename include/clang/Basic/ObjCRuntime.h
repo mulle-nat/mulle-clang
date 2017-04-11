@@ -106,6 +106,10 @@ public:
      llvm_unreachable("bad kind");
   }
 
+  bool hasConstantProtocol() const {  // kinda pedanti, could
+     return( hasConstantSelector());
+  }
+
   bool hasMulleMetaABI() const {
     switch (getKind()) {
     case Mulle: return true;

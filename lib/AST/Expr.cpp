@@ -2699,6 +2699,10 @@ bool Expr::isConstantInitializer(ASTContext &Ctx, bool IsForRef,
      if( Ctx.getLangOpts().ObjCRuntime.hasConstantSelector())
         return true;
      break;
+  case ObjCProtocolExprClass:
+     if( Ctx.getLangOpts().ObjCRuntime.hasConstantProtocol())
+        return true;
+     break;
   // @mulle-objc@: allow @selector as compile-time constant <-
         
   case CXXTemporaryObjectExprClass:

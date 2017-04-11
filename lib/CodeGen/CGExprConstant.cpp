@@ -987,12 +987,19 @@ public:
     return llvm::ConstantDataArray::getString(VMContext, Str, false);
   }
      
-   // @mulle-objc@: allow @selector as compile-time constant
+   // @mulle-objc@: allow @selector/@protocol as compile-time constant
+   // This should only get called if hasConstantSelector is true
+   
    llvm::Constant *VisitObjCSelectorExpr(ObjCSelectorExpr *E) {
         // This must be an @selector initializing an array in a static initializer.
       return( CGM.getObjCRuntime().GenerateConstantSelector(E->getSelector()));
    }
-   // @mulle-objc@: allow @selector as compile-time constant <-
+
+   llvm::Constant *VisitObjCProtocolExpr(ObjCProtocolExpr *E) {
+        // This must be an @protocol initializing an array in a static initializer.
+      return( CGM.getObjCRuntime().GenerateConstantProtocol(E->getProtocol()));
+   }
+   // @mulle-objc@: allow @selector/@protocol as compile-time constant <-
 
   llvm::Constant *VisitUnaryExtension(const UnaryOperator *E) {
     return Visit(E->getSubExpr());

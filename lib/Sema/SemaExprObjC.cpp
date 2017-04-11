@@ -1249,6 +1249,7 @@ ExprResult Sema::ParseObjCProtocolExpression(IdentifierInfo *ProtocolId,
   QualType Ty = Context.getObjCProtoType();
   if (Ty.isNull())
     return true;
+#if 0
   // @mulle-objc@ uniqueid: fake up protocol type to be a uint32_t
   // should ask runtime to return it
    if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
@@ -1259,6 +1260,7 @@ ExprResult Sema::ParseObjCProtocolExpression(IdentifierInfo *ProtocolId,
    {
       Ty = Context.getObjCObjectPointerType(Ty);
    }
+#endif   
   return new (Context) ObjCProtocolExpr(Ty, PDecl, AtLoc, ProtoIdLoc, RParenLoc);
 }
 

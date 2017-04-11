@@ -415,6 +415,12 @@ llvm::Constant  *CGObjCRuntime::GenerateConstantSelector( Selector sel)
    return( nullptr);
 }
 
+llvm::Constant  *CGObjCRuntime::GenerateConstantProtocol( ObjCProtocolDecl *protocol)
+{
+   // shouldn't be called for non-participating runtimes
+   return( nullptr);
+}
+
 // @mulle-objc@ MetaABI: end
 
 

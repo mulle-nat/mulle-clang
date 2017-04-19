@@ -187,14 +187,14 @@ sudo_if_needed()
 {
    if [ -z "${SUDO}" ] || is_root
    then
-      eval "$@"
+      eval exekutor "$@"
    else
       command -v "${SUDO}" > /dev/null 2>&1
       if [ $? -ne 0 ]
       then
          fail "Install ${SUDO} or run as root"
       fi
-      eval ${SUDO} "$@"
+      eval exekutor ${SUDO} "$@"
    fi
 }
 
@@ -265,7 +265,7 @@ install_binary_if_missing()
                if command -v "yum" > /dev/null 2>&1
                then
                   log_info "You may get asked for your password to install $1"
-                  sudo_if_needed exekutor yum install "$1" || exit 1
+                  sudo_if_needed yum install "$1" || exit 1
                else
                   fail "You need to install $1 manually from $2"
                fi
@@ -277,12 +277,12 @@ install_binary_if_missing()
          if command -v "pkg" > /dev/null 2>&1
          then
             log_info "You may get asked for your password to install $1"
-            sudo_if_needed exekutor pkg install "$1" || exit 1
+            sudo_if_needed pkg install "$1" || exit 1
          else
             if command -v "pkg_add" > /dev/null 2>&1
             then
                log_info "You may get asked for your password to install $1"
-               sudo_if_needed exekutor pkg_add -r "$1" || exit 1
+               sudo_if_needed pkg_add -r "$1" || exit 1
             else
                fail "You need to install $1 manually from $2"
             fi
@@ -827,10 +827,10 @@ install_executable()
 
    if [ ! -w "${dstdir}" ]
    then
-      sudo_if_needed mkdir -p "${dstdir}"
-      sudo_if_needed ln -s -f "${src}" "${dstdir}/${dstname}"
+      exekutor sudo_if_needed mkdir -p "${dstdir}"
+      exekutor sudo_if_needed ln -s -f "${src}" "${dstdir}/${dstname}"
    else
-      ln -s -f "${src}" "${dstdir}/${dstname}"
+      exekutor ln -s -f "${src}" "${dstdir}/${dstname}"
    fi
 }
 
@@ -863,9 +863,9 @@ uninstall_executable()
 
       if [ ! -w "${path}" ]
       then
-         sudo_if_needed rm "${path}"
+         exekutor sudo_if_needed rm "${path}"
       else
-         rm "${path}"
+         exekutor rm "${path}"
       fi
    else
       log_fluff "${path} is already gone"

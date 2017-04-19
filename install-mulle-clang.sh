@@ -7,6 +7,7 @@
 # various versions
 MULLE_OBJC_VERSION_BRANCH="40"
 LLVM_VERSION="4.0.0"
+CLANG_VERSION="4.0.0.0"
 
 CMAKE_VERSION="3.5"
 CMAKE_VERSION_MAJOR="3"
@@ -14,7 +15,7 @@ CMAKE_VERSION_MINOR="5"
 CMAKE_VERSION_PATCH="2"
 CMAKE_PATCH_VERSION="${CMAKE_VERSION}.2"
 
-CLANG_ARCHIVE="https://github.com/Codeon-GmbH/mulle-clang/archive/${LLVM_VERSION}.tar.gz"
+CLANG_ARCHIVE="https://github.com/Codeon-GmbH/mulle-clang/archive/${CLANG_VERSION}.tar.gz"
 LLVM_ARCHIVE="http://www.llvm.org/releases/${LLVM_VERSION}/llvm-${LLVM_VERSION}.src.tar.xz"
 LIBCXX_ARCHIVE="http://llvm.org/releases/${LLVM_VERSION}/libcxx-${LLVM_VERSION}.src.tar.xz"
 LIBCXXABI_ARCHIVE="http://llvm.org/releases/${LLVM_VERSION}/libcxxabi-${LLVM_VERSION}.src.tar.xz"
@@ -622,7 +623,7 @@ download_clang()
       log_verbose "Unpacking into \"${CLANG_DIR}\" ..."
       exekutor tar xfz mulle-clang.tgz || fail "tar archive corrupt"
       exekutor mkdir -p "`dirname -- "${CLANG_DIR}"`" 2> /dev/null || exit 1
-      exekutor mv mulle-clang-${LLVM_VERSION} "${CLANG_DIR}" || exit 1
+      exekutor mv mulle-clang-${CLANG_VERSION} "${CLANG_DIR}" || exit 1
    else
       log_fluff "\"${CLANG_DIR}\" already exists"
    fi

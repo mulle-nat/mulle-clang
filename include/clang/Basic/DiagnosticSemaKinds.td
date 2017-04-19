@@ -5942,7 +5942,7 @@ def err_mulle_objc_preprocessor_not_integer_value : Error<
 def err_mulle_objc_preprocessor_missing_include : Error<
   "missing #include <mulle_objc/mulle_objc.h> in compilation. Can not emit runtime information">;
 def err_mulle_objc_runtime_version_mismatch: Error<
-   "the runtime version is not compatible with this compiler">;
+   "the runtime load version %0 is not compatible with this compiler %1">;
 def err_mulle_objc_hash_invalid: Error<
    "a string hashed to an invalid value">;
 def err_mulle_objc_setjmp_not_included: Error<

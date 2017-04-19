@@ -4777,8 +4777,14 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
 
    if( load_version != COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION)
    {
+      char   buf1[ 32];
+      char   buf2[ 32];
       // fprintf( stderr, "version found: 0x%x\n", (int) runtime_version);
-      CGM.getDiags().Report( diag::err_mulle_objc_runtime_version_mismatch);
+      sprintf( buf1, "%u", (unsigned) load_version);
+      sprintf( buf2, "%u", (unsigned) COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION);
+      
+      CGM.getDiags().Report( diag::err_mulle_objc_runtime_version_mismatch) <<
+                            buf1 << buf2;
    }
 
   llvm::Constant *ClassList = EmitClassList( "OBJC_CLASS_LOADS", "__DATA,_objc_load_info", LoadClasses);

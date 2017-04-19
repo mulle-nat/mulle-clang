@@ -260,7 +260,7 @@ install_binary_if_missing()
             if command -v "apt-get" > /dev/null 2>&1
             then
                log_info "You may get asked for your password to install $1"
-               sudo_if_needed exekutor apt-get install "$1" || exit 1
+               sudo_if_needed apt-get install "$1" || exit 1
             else
                if command -v "yum" > /dev/null 2>&1
                then

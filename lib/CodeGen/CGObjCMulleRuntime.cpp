@@ -47,6 +47,7 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/CallSite.h"
@@ -1100,6 +1101,10 @@ namespace {
       /// definition is seen. The return value has type ProtocolPtrTy.
       llvm::Constant *GetOrEmitProtocolRef(const ObjCProtocolDecl *PD) override;
 
+
+      void  CollectProtocolIDs( llvm::SmallPtrSet<llvm::Constant *, 16> &ProtocolRefs,
+                                ObjCProtocolDecl::protocol_iterator begin,
+                                ObjCProtocolDecl::protocol_iterator end);
 
       /// EmitProtocolIDList - Generate the list of referenced
       /// protocols. The return value has type ProtocolListPtrTy.
@@ -3809,20 +3814,39 @@ static int constant_uintptr_comparator( llvm::Constant * const *P1,
    just a list of protocol IDs,
    which gets stuck on a category or on a class
  */
+void  CGObjCMulleRuntime::CollectProtocolIDs( llvm::SmallPtrSet<llvm::Constant *, 16> &ProtocolRefs,
+                                ObjCProtocolDecl::protocol_iterator begin,
+                                ObjCProtocolDecl::protocol_iterator end)
+{
+   const ObjCProtocolDecl *PD;
+
+   for (; begin != end; ++begin)
+   {
+      PD = *begin;
+      // recursively add all inherited protocols too
+      ProtocolRefs.insert( GetProtocolRef(PD));
+      CollectProtocolIDs( ProtocolRefs, PD->protocol_begin(), PD->protocol_end());
+   }
+}
+
+
 llvm::Constant *
 CGObjCMulleRuntime::EmitProtocolIDList(Twine Name,
                             ObjCProtocolDecl::protocol_iterator begin,
                             ObjCProtocolDecl::protocol_iterator end)
 {
+   llvm::SmallPtrSet<llvm::Constant *, 16> ProtocolRefsSet;
    SmallVector<llvm::Constant *, 16> ProtocolRefs;
-
-   for (; begin != end; ++begin)
-      ProtocolRefs.push_back(GetProtocolRef(*begin));
-
+   
+   CollectProtocolIDs( ProtocolRefsSet, begin, end);
+   
    // Just return null for empty protocol lists
-   if (ProtocolRefs.empty())
+   if (ProtocolRefsSet.empty())
       return llvm::Constant::getNullValue(ObjCTypes.ProtocolIDPtrTy);
 
+   for( auto ref = ProtocolRefsSet.begin(); ref != ProtocolRefsSet.end(); ++ref)
+      ProtocolRefs.push_back( *ref);
+   
    llvm::array_pod_sort( ProtocolRefs.begin(), ProtocolRefs.end(),
                          constant_uintptr_comparator);
 

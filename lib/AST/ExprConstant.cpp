@@ -6775,6 +6775,10 @@ public:
   }
 
   bool CheckReferencedDecl(const Expr *E, const Decl *D);
+  
+  // @mulle-objc@ : protocol hack
+  // MulleObjCSelectorExpr goes through VisitDeclRefExpr but
+  // protocol does not
   bool VisitDeclRefExpr(const DeclRefExpr *E) {
     if (CheckReferencedDecl(E, E->getDecl()))
       return true;
@@ -10395,10 +10399,12 @@ bool Expr::isIntegerConstantExpr(const ASTContext &Ctx,
   if (Ctx.getLangOpts().CPlusPlus11)
     return EvaluateCPlusPlus11IntegralConstantExpr(Ctx, this, nullptr, Loc);
 
-  // @mulle-objc@ uniqueid: ObjCSelectorExpr are never immediately constant, as they are generated during runtime
-  if( dyn_cast<ObjCSelectorExpr>(this))
+  // @mulle-objc@ uniqueid: ObjCSelectorExpr are never immediately constant,
+  // as they are generated during runtime, same goes for ProtocolExpr
+  if( dyn_cast<ObjCSelectorExpr>(this) || dyn_cast<ObjCProtocolExpr>(this))
      return false;
-  
+  // @mulle-objc@ uniqueid: <-
+
   ICEDiag D = CheckICE(this, Ctx);
   if (D.Kind != IK_ICE) {
     if (Loc) *Loc = D.Loc;

@@ -3101,7 +3101,11 @@ static void  fill_struct_info( struct struct_info *info, CodeGenModule *CGM, Tag
 }
 
 
-static RecordDecl   *create_union_type( ASTContext *context, QualType paramType, QualType spaceType, QualType rvalType, bool hasRvalType)
+static RecordDecl   *create_union_type( ASTContext *context,
+                                        QualType paramType,
+                                        QualType spaceType,
+                                        QualType rvalType,
+                                        bool hasRvalType)
 {
    QualType       FieldTypes[3];
    const char     *FieldNames[3];
@@ -3482,7 +3486,13 @@ bool CGObjCMulleRuntime::OptimizeReuseParam( CodeGenFunction &CGF,
    size_t sizeRecord       = rounded_type_length( &CGM.getContext(), record_info.recTy, Void5PtrTy);
    size_t sizeParentRecord = rounded_type_length( &CGM.getContext(), parent_info.recTy, Void5PtrTy);
 
-   if( sizeParentRecord < sizeRecord)
+   //
+   // TODO: there is a bug in llvm tbaa, that makes reuse of zero sized
+   // records impossible (with this code).
+   // If tests/1_compiler/metaabi/single/scalar/double/doubleme.m passes
+   // without  || ! sizeRecord, then keep it removed
+   //
+   if( sizeParentRecord < sizeRecord || ! sizeRecord)
       return( false);
 
    //
@@ -3522,10 +3532,11 @@ bool CGObjCMulleRuntime::OptimizeReuseParam( CodeGenFunction &CGF,
    // this next emit is needed, weird llvmism i dont understand
    RValue loaded       = CGF.EmitLoadOfLValue(ParentRecord, SourceLocation());
 
+   // only memcpy, if there are actual parameters
    CGF.EmitAggregateCopy( Address( loaded.getScalarVal(), CGM.getPointerAlign()),
-                         RecordAddress,
-                         record_info.recTy,
-                         false);
+                          RecordAddress,
+                          record_info.recTy,
+                          false);
 
    // dont need the alloca anymore
    if( Marker.SizeV)

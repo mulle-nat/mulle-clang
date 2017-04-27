@@ -64,7 +64,7 @@
 #include "llvm/Support/Compiler.h"
 
 
-#define COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION  5
+#define COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION  6
 
 
 using namespace clang;
@@ -4497,9 +4497,8 @@ llvm::Constant *CGObjCMulleRuntime::GetMethodConstant(const ObjCMethodDecl *MD) 
                                        ObjCTypes.SelectorIDTy),
       llvm::ConstantExpr::getBitCast(GetMethodVarName(MD->getSelector()),
                                      ObjCTypes.Int8PtrTy),
-      GetMethodVarType(MD),
+      GetMethodVarType(MD, true),
       llvm::ConstantInt::get(ObjCTypes.IntTy, bits),
-
       llvm::ConstantExpr::getBitCast(Fn, ObjCTypes.Int8PtrTy)
    };
    return llvm::ConstantStruct::get(ObjCTypes.MethodTy, Method);

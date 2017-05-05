@@ -148,15 +148,15 @@ into `/usr/bin`:
 #### Ubuntu 16.04 LTS / Debian xenial 64 bit
 
 ```
-curl -O -L http://download.codeon.de/bottles/mulle-clang-3.9.0-xenial-amd64.deb
-sudo dpkg --install mulle-clang-3.9.0-xenial-amd64.deb
+curl -O -L http://download.codeon.de/bottles/mulle-clang-4.0.0.0-xenial-amd64.deb
+sudo dpkg --install mulle-clang-4.0.0.0-xenial-amd64.deb
 ```
 
 #### Ubuntu 14.04 LTS / Debian trusty 64 bit
 
 ```
-curl -O -L http://download.codeon.de/bottles/mulle-clang-3.9.0-trusty-amd64.deb
-sudo dpkg --install mulle-clang-3.9.0-trusty-amd64.deb
+curl -O -L http://download.codeon.de/bottles/mulle-clang-4.0.0.0-trusty-amd64.deb
+sudo dpkg --install mulle-clang-4.0.0.0-trusty-amd64.deb
 ```
 
 

@@ -148,7 +148,7 @@ brew install codeon-gmbh/software/mulle-clang
 This will install the compiler into `/opt/mulle-clang` and a symlink
 into `/usr/bin`:
 
-#### Ubuntu 17.04 LTS / Debian zesty 64 bit
+#### Ubuntu 17.04 / Debian zesty 64 bit
 
 ```
 curl -O -L http://download.codeon.de/bottles/mulle-clang-4.0.0.0-zesty-amd64.deb
@@ -170,6 +170,12 @@ curl -O -L http://download.codeon.de/bottles/mulle-clang-4.0.0.0-trusty-amd64.de
 sudo dpkg --install mulle-clang-4.0.0.0-trusty-amd64.deb
 ```
 
+#### Ubuntu 12.04.5 LTS / Debian precise 64 bit
+
+```
+curl -O -L http://download.codeon.de/bottles/mulle-clang-4.0.0.0-precise-amd64.deb
+sudo dpkg --install mulle-clang-4.0.0.0-precise-amd64.deb
+```
 
 ### Manually
 

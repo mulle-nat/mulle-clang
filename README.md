@@ -57,10 +57,14 @@ Name           | Description
 
 ## Additional Compiler defined Macros
 
-Name                 | Description
----------------------|--------------------------------------
-`__MULLE_OBJC__`     | Compiling for mulle-objc
-`__MULLE_OBJC_AAM__` | AAM is enabled
+Name                    | Description
+------------------------|--------------------------------------
+`__MULLE_OBJC__`        | Compiling for mulle-objc
+`__MULLE_OBJC_AAM__`    | AAM is enabled
+`__MULLE_OBJC_NO_AAM__` | AAM is disabled
+`__MULLE_OBJC_TPS__`    | Tagged pointers are enabled
+`__MULLE_OBJC_NO_TPS__` | Tagged pointers are disabled
+
 
 
 ## Macros used in Code Generation
@@ -83,7 +87,6 @@ Name                                  | Description
 `MULLE_OBJC_USER_VERSION_MAJOR`       | User supplied version
 `MULLE_OBJC_USER_VERSION_MINOR`       | User supplied of the Foundation
 `MULLE_OBJC_USER_VERSION_PATCH`       | User supplied of the Foundation, all these version information values will be stored in the emitted object file.
-`MULLE_OBJC_NO_TAGGED_POINTERS`       | Disable the emission of tagged pointer code
 `MULLE_OBJC_FASTCLASSHASH_0`          | First unique ID of a fast class
 ... | ...
 `MULLE_OBJC_FASTCLASSHASH_63`         | Last unique ID of a fast class
@@ -96,23 +99,23 @@ defined in the runtime.
 
 ### -O2
 
-* `mulle_objc_inline_unfailing_get_or_lookup_class`
-* `mulle_objc_class_inline_metacall_classid`
+* `mulle_objc_inline_unfailing_get_or_lookup_infraclass`
+* `mulle_objc_infraclass_inline_metacall_classid`
 * `mulle_objc_object_inline_constant_methodid_call`
 * `mulle_objc_object_retain`
 * `mulle_objc_object_release`
 
 ### -O1
 
-* `mulle_objc_inline_unfailing_get_or_lookup_class`
-* `mulle_objc_class_inline_metacall_classid`
+* `mulle_objc_inline_unfailing_get_or_lookup_infraclass`
+* `mulle_objc_infraclass_inline_metacall_classid`
 * `mulle_objc_object_constant_methodid_call`
 
 ### -O0, -Os
 
-* `mulle_objc_unfailing_get_or_lookup_class`
+* `mulle_objc_unfailing_get_or_lookup_infraclass`
 * `mulle_objc_object_call`
-* `mulle_objc_class_metacall_classid`
+* `mulle_objc_infraclass_metacall_classid`
 
 ### All
 
@@ -144,6 +147,14 @@ brew install codeon-gmbh/software/mulle-clang
 
 This will install the compiler into `/opt/mulle-clang` and a symlink
 into `/usr/bin`:
+
+#### Ubuntu 17.04 LTS / Debian zesty 64 bit
+
+```
+curl -O -L http://download.codeon.de/bottles/mulle-clang-4.0.0.0-zesty-amd64.deb
+sudo dpkg --install mulle-clang-4.0.0.0-zesty-amd64.deb
+```
+
 
 #### Ubuntu 16.04 LTS / Debian xenial 64 bit
 

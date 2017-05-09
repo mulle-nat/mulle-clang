@@ -945,9 +945,9 @@ namespace {
 #pragma mark - FNV1 hashing + conveniences
       
       // common helper function, turning names into abbreviated hashes
-      uint64_t          UniqueidHashForString( std::string s, uint64_t first_valid, unsigned WordSizeInBytes);
-      llvm::ConstantInt *__HashConstantForString( std::string s, uint64_t first_valid);
-      llvm::ConstantInt *_HashConstantForString( std::string s, uint64_t first_valid);
+      uint32_t          UniqueIdHashForString( std::string s, uint32_t first_valid);
+      llvm::ConstantInt *__HashConstantForString( std::string s, uint32_t first_valid);
+      llvm::ConstantInt *_HashConstantForString( std::string s, uint32_t first_valid);
       llvm::ConstantInt *HashClassConstantForString( std::string s)
       {
          return( _HashConstantForString( s, 0x1));
@@ -4312,7 +4312,7 @@ void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
       uint32_t   uniqueid;
 
       // the ClassID is possibly 32 bit though, so we have to rehash here
-      uniqueid = UniqueidHashForString(ID->getObjCRuntimeNameAsString(), 1, 4);
+      uniqueid = UniqueIdHashForString(ID->getObjCRuntimeNameAsString(), 1);
       for( j = 31; j >= 0; j--)
       {
          if( fastclassids[ j] == uniqueid)
@@ -5881,10 +5881,11 @@ llvm::Value *CGObjCMulleRuntime::EmitNSAutoreleasePoolClassRef(CodeGenFunction &
 #pragma mark -
 #pragma mark Hash Selectors, ClassIDs and friends
 
-
-
 #define FNV1_32_PRIME             0x01000193
 #define MULLE_OBJC_FNV1_32_INIT   0x811c9dc5
+
+extern "C"
+{
 
 static uint32_t   mulle_objc_chained_fnv1_32( void *buf, size_t len, uint32_t hash)
 {
@@ -5913,16 +5914,33 @@ static inline uint32_t   mulle_objc_fnv1_32( void *buf, size_t len)
 }
 
 
-uint64_t   CGObjCCommonMulleRuntime::UniqueidHashForString( std::string s, uint64_t first_valid, unsigned WordSizeInBytes)
+uint32_t  MulleObjCUniqueIdHashForString( std::string s);
+
+
+uint32_t  MulleObjCUniqueIdHashForString( std::string s)
 {
-   uint64_t   value;
+   uint32_t   value;
    char       *c_str;
-
+   
    c_str = (char *) s.c_str();
-   value = (uint64_t) mulle_objc_fnv1_32( (void *) c_str, s.length());
-//   fprintf( stderr, "%s = %08lx\n", c_str, (long) value);
+   value = mulle_objc_fnv1_32( (void *) c_str, s.length());
+   //   fprintf( stderr, "%s = %08lx\n", c_str, (long) value);
+   
+   return( value);
+}
 
-   if( value < first_valid || (first_valid && value == (uint64_t) -1))
+};
+
+
+
+uint32_t   CGObjCCommonMulleRuntime::UniqueIdHashForString( std::string s,
+                                                            uint32_t first_valid)
+{
+   uint32_t   value;
+   
+   value = MulleObjCUniqueIdHashForString( s);
+
+   if( value < first_valid || (first_valid && value == (uint32_t) -1))
    {
       // FAIL! FIX
       std::string  fail;
@@ -5936,27 +5954,18 @@ uint64_t   CGObjCCommonMulleRuntime::UniqueidHashForString( std::string s, uint6
 }
 
 
-llvm::ConstantInt *CGObjCCommonMulleRuntime::__HashConstantForString( std::string s, uint64_t first_valid)
+llvm::ConstantInt *CGObjCCommonMulleRuntime::__HashConstantForString( std::string s, uint32_t first_valid)
 {
-   //   unsigned WordSizeInBits = CGM.getTarget().getPointerWidth(0);
-   //   unsigned ByteSizeInBits = CGM.getTarget().getCharWidth();
-   unsigned WordSizeInBytes = 4; // WordSizeInBits/ByteSizeInBits;
-   uint64_t   value;
+   uint32_t   value;
 
-   value = UniqueidHashForString( s, first_valid, WordSizeInBytes);
-
-   if( WordSizeInBytes == 8)
-   {
-      const llvm::APInt SelConstant(64, value);
-      return (llvm::ConstantInt *) llvm::ConstantInt::getIntegerValue(CGM.Int64Ty, SelConstant);
-   }
+   value = UniqueIdHashForString( s, first_valid);
 
    const llvm::APInt SelConstant(32, value);
    return (llvm::ConstantInt *) llvm::ConstantInt::getIntegerValue(CGM.Int32Ty, SelConstant);
 }
 
 
-llvm::ConstantInt *CGObjCCommonMulleRuntime::_HashConstantForString( std::string s, uint64_t first_valid)
+llvm::ConstantInt *CGObjCCommonMulleRuntime::_HashConstantForString( std::string s, uint32_t first_valid)
 {
    llvm::ConstantInt *&Entry = DefinedHashes[ s];  // how does this work ???
 

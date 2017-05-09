@@ -4314,6 +4314,14 @@ static bool HandleConstructorCall(const Expr *E, const LValue &This,
                                Info, Result);
 }
 
+// @mulle-objc@: give access to hash calculation
+extern "C"
+{
+   uint32_t  MulleObjCUniqueIdHashForString( std::string s);
+};
+// @mulle-objc@: <<
+
+
 //===----------------------------------------------------------------------===//
 // Generic Evaluation
 //===----------------------------------------------------------------------===//
@@ -4405,6 +4413,34 @@ public:
     return Error(E);
   }
 
+  // @mulle-objc@ : @selector and @protocol as constant expression
+  bool VisitObjCSelectorExpr( const ObjCSelectorExpr *E) {
+     if( ! getEvalInfo().getLangOpts().ObjCRuntime.hasConstantSelector())
+        return( VisitExpr( E));
+
+     uint32_t   hash;
+     
+     hash = MulleObjCUniqueIdHashForString( E->getSelector().getAsString());
+     if( ! hash || hash == (uint32_t) -1)
+        return Error(E);
+     APValue Result( APSInt( llvm::APInt( 32, hash)));
+     return DerivedSuccess(Result, E);
+  }
+     
+  bool VisitObjCProtocolExpr( const ObjCProtocolExpr *E) {
+      if( ! getEvalInfo().getLangOpts().ObjCRuntime.hasConstantSelector())
+           return( VisitExpr( E));
+
+     uint32_t   hash;
+     
+     hash = MulleObjCUniqueIdHashForString( E->getProtocol()->getNameAsString());
+     if( ! hash || hash == (uint32_t) -1)
+        return Error(E);
+     APValue Result( APSInt( llvm::APInt( 32, hash)));
+     return DerivedSuccess(Result, E);
+  }
+  // @mulle-objc@ : @selector as constant expression <<
+     
   bool VisitParenExpr(const ParenExpr *E)
     { return StmtVisitorTy::Visit(E->getSubExpr()); }
   bool VisitUnaryExtension(const UnaryOperator *E)

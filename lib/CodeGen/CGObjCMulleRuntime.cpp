@@ -64,7 +64,7 @@
 #include "llvm/Support/Compiler.h"
 
 
-#define COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION  6
+#define COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION  7
 
 
 using namespace clang;
@@ -4452,7 +4452,7 @@ llvm::Constant *CGObjCMulleRuntime::GetIvarConstant( const ObjCInterfaceDecl *OI
       llvm::ConstantExpr::getBitCast( HashIvarConstantForString( IVD->getNameAsString()),
                                       ObjCTypes.SelectorIDTy),
       GetIvarName( IVD),
-      GetIvarType(IVD),
+      GetIvarType( IVD),
       llvm::ConstantInt::get(ObjCTypes.IntTy,
                              ComputeIvarBaseOffset(CGM, OID, IVD))
    };
@@ -6125,7 +6125,7 @@ llvm::Constant *CGObjCCommonMulleRuntime::GetIvarType(const ObjCIvarDecl *Ivar)
    llvm::GlobalVariable *&Entry = IvarTypes[TypeStr];
 
    if (!Entry)
-      Entry = CreateCStringLiteral(Ivar->getNameAsString(), ObjCLabelType::IvarType);
+      Entry = CreateCStringLiteral( TypeStr, ObjCLabelType::IvarType);
    return getConstantGEP(VMContext, Entry, 0, 0);
 }
 

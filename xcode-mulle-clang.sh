@@ -82,10 +82,10 @@ mkdir -p "${DIR}" > /dev/null
    cd "${DIR}"
 
    cmake -DCMAKE_OSX_SYSROOT=`xcrun --show-sdk-path` \
-      -DCLANG_VENDOR="${CLANG_VENDOR}" \
-      -DCMAKE_OSX_DEPLOYMENT_TARGET=10.10 \
-      -DCMAKE_INSTALL_PREFIX="${MULLE_CLANG_INSTALL_PREFIX}" \
-      -DCMAKE_BUILD_TYPE="${CONFIGURATION}" -G "Xcode" "../../${SRC}"
+         -DCLANG_VENDOR="${CLANG_VENDOR}" \
+         -DCMAKE_OSX_DEPLOYMENT_TARGET=10.10 \
+         -DCMAKE_INSTALL_PREFIX="${MULLE_CLANG_INSTALL_PREFIX}" \
+         -DCMAKE_BUILD_TYPE="${CONFIGURATION}" -G "Xcode" "../../${SRC}"
 
    if [ $? -ne 0 ]
    then

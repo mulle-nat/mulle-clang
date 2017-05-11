@@ -5881,11 +5881,23 @@ llvm::Value *CGObjCMulleRuntime::EmitNSAutoreleasePoolClassRef(CodeGenFunction &
 #pragma mark -
 #pragma mark Hash Selectors, ClassIDs and friends
 
+extern "C"
+{
+// this code is duplicated in ExprConstant.cpp
+// for some stupid C++ linker reasons, don't ask me!
+//
+// nm lib/libclangCodeGen.a | grep HashForString
+// 00000000000006e0 T _MulleObjCUniqueIdHashForString
+// nm lib/libclangAST.a | grep HashForString
+//                 U _MulleObjCUniqueIdHashForString
+// But:
+// Undefined symbols for architecture x86_64:
+//  "_MulleObjCUniqueIdHashForString", referenced from:
+// when linking libclang.dylib (using cmdline only)
+//
 #define FNV1_32_PRIME             0x01000193
 #define MULLE_OBJC_FNV1_32_INIT   0x811c9dc5
 
-extern "C"
-{
 
 static uint32_t   mulle_objc_chained_fnv1_32( void *buf, size_t len, uint32_t hash)
 {
@@ -5914,10 +5926,11 @@ static inline uint32_t   mulle_objc_fnv1_32( void *buf, size_t len)
 }
 
 
-uint32_t  MulleObjCUniqueIdHashForString( std::string s);
+// global no more
+// uint32_t  MulleObjCUniqueIdHashForString( std::string s);
 
 
-uint32_t  MulleObjCUniqueIdHashForString( std::string s)
+static uint32_t  MulleObjCUniqueIdHashForString( std::string s)
 {
    uint32_t   value;
    char       *c_str;

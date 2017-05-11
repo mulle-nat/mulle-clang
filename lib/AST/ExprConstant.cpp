@@ -4314,11 +4314,69 @@ static bool HandleConstructorCall(const Expr *E, const LValue &This,
                                Info, Result);
 }
 
-// @mulle-objc@: give access to hash calculation
 extern "C"
 {
-   uint32_t  MulleObjCUniqueIdHashForString( std::string s);
+// @mulle-objc@: give access to hash calculation
+// this code is duplicated in CGObjCMulleRuntime.cpp
+// for some stupid C++ linker reasons, don't ask me!
+//
+// nm lib/libclangCodeGen.a | grep HashForString
+// 00000000000006e0 T _MulleObjCUniqueIdHashForString
+// nm lib/libclangAST.a | grep HashForString
+//                 U _MulleObjCUniqueIdHashForString
+// But:
+// Undefined symbols for architecture x86_64:
+//  "_MulleObjCUniqueIdHashForString", referenced from:
+//
+#define FNV1_32_PRIME             0x01000193
+#define MULLE_OBJC_FNV1_32_INIT   0x811c9dc5
+
+
+static uint32_t   mulle_objc_chained_fnv1_32( void *buf, size_t len, uint32_t hash)
+{
+   unsigned char   *s;
+   unsigned char   *sentinel;
+
+   s        = (unsigned char *) buf;
+   sentinel = &s[ len];
+
+    /*
+     * FNV-1 hash each octet in the buffer
+     */
+    while( s < sentinel)
+    {
+	hash *= FNV1_32_PRIME;
+	hash ^= (uint32_t) *s++;
+    }
+
+    return( hash);
+}
+
+
+static inline uint32_t   mulle_objc_fnv1_32( void *buf, size_t len)
+{
+   return( mulle_objc_chained_fnv1_32( buf, len, MULLE_OBJC_FNV1_32_INIT));
+}
+
+
+// global no more
+// uint32_t  MulleObjCUniqueIdHashForString( std::string s);
+
+
+static uint32_t  MulleObjCUniqueIdHashForString( std::string s)
+{
+   uint32_t   value;
+   char       *c_str;
+   
+   c_str = (char *) s.c_str();
+   value = mulle_objc_fnv1_32( (void *) c_str, s.length());
+   //   fprintf( stderr, "%s = %08lx\n", c_str, (long) value);
+   
+   return( value);
+}
+
 };
+
 // @mulle-objc@: <<
 
 

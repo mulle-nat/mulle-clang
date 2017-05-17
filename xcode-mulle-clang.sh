@@ -96,5 +96,8 @@ mkdir -p "${DIR}" > /dev/null
 echo "ln -sf `pwd -P`/mulle-clang-xcode.d/${CONFIGURATION}/bin/clang /usr/local/bin/mulle-clang"
 ln -sf "`pwd -P`/build/mulle-clang-xcode.d/${CONFIGURATION}/bin/clang" "/usr/local/bin/mulle-clang"
 
+echo "ln -sf `pwd -P`/mulle-clang-xcode.d/bin/scan-build /usr/local/bin/mulle-scan-build"
+ln -sf "`pwd -P`/build/mulle-clang-xcode.d/bin/scan-build" "/usr/local/bin/mulle-scan-build"
+
 echo ln -sf "${DIR}/Clang.xcodeproj"
 ln -sf "${DIR}/Clang.xcodeproj"

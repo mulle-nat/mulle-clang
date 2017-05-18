@@ -4829,13 +4829,13 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
   llvm::Constant *LoadInfo = EmitLoadInfoList( "OBJC_LOAD_INFO", "__DATA,_objc_load_info", ClassList, CategoryList, StringList, HashNameList);
 
    // take collected initializers and create a __attribute__(constructor)
-   // static void   __load() function
+   // static void   __load_mulle_objc() function
    // that does the appropriate calls to setup the runtime
    // Now this I could handily steal from CGObjCGnu.cpp
 
   llvm::Function * LoadFunction = llvm::Function::Create(
       llvm::FunctionType::get(llvm::Type::getVoidTy(VMContext), false),
-      llvm::GlobalValue::InternalLinkage, "__load",
+      llvm::GlobalValue::InternalLinkage, "__load_mulle_objc",
       &CGM.getModule());
 
   // (nat) i have no idea, what this is for

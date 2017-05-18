@@ -761,16 +761,18 @@ build_mulle_clang()
         -d libexec -o \
         -d share ]
    then
-      log_info "There are artifacts left over from a previous run."
-      log_info "If you are upgrading to a new version of llvm, you"
-      log_info "should do:"
-      log_info "  sudo rm -rf ./bin ./build ./include ./lib ./libexec ./share"
+      log_warning "There are artifacts left over from a previous run.
+If you are upgrading to a new version of llvm, you
+should [CTRL]-[C] now and do:
+   ${C_RESET}${C_BOLD}sudo rm -rf ./bin ./build ./include ./lib ./libexec ./share"
+      sleep 8
    else
       if [ -d build ]
       then
-         log_info "As there is an old ./build folder here, the previous build"
-         log_info "is likely to get reused. If this is not what you want:"
-         log_info "  sudo rm -rf ./build"
+         log_warning "As there is an old ./build folder here, the previous build
+is likely to get reused. If this is not what you want, [CTRL]-[C] now and do:
+   ${C_RESET}${C_BOLD}sudo rm -rf ./build"
+         sleep 4
       fi
    fi
 

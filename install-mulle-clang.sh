@@ -9,16 +9,18 @@ MULLE_OBJC_VERSION_BRANCH="40"
 LLVM_VERSION="4.0.0"
 CLANG_VERSION="4.0.0.0"
 
-CMAKE_VERSION="3.5"
 CMAKE_VERSION_MAJOR="3"
 CMAKE_VERSION_MINOR="5"
 CMAKE_VERSION_PATCH="2"
-CMAKE_PATCH_VERSION="${CMAKE_VERSION}.2"
 
 CLANG_ARCHIVE="https://github.com/Codeon-GmbH/mulle-clang/archive/${CLANG_VERSION}.tar.gz"
 LLVM_ARCHIVE="http://www.llvm.org/releases/${LLVM_VERSION}/llvm-${LLVM_VERSION}.src.tar.xz"
 LIBCXX_ARCHIVE="http://llvm.org/releases/${LLVM_VERSION}/libcxx-${LLVM_VERSION}.src.tar.xz"
 LIBCXXABI_ARCHIVE="http://llvm.org/releases/${LLVM_VERSION}/libcxxabi-${LLVM_VERSION}.src.tar.xz"
+
+#
+CMAKE_VERSION="${CMAKE_VERSION_MAJOR}.${CMAKE_VERSION_MINOR}"
+CMAKE_PATCH_VERSION="${CMAKE_VERSION}.${CMAKE_VERSION_PATCH}"
 
 
 
@@ -64,6 +66,7 @@ log_initialize()
       esac
    fi
    C_ERROR="${C_RED}${C_BOLD}"
+   C_WARNING="${C_RED}${C_BOLD}"
    C_INFO="${C_MAGENTA}${C_BOLD}"
    C_FLUFF="${C_GREEN}${C_BOLD}"
    C_VERBOSE="${C_CYAN}${C_BOLD}"
@@ -97,6 +100,12 @@ concat()
 log_error()
 {
    printf "${C_ERROR}%b${C_RESET}\n" "$*" >&2
+}
+
+
+log_warning()
+{
+   printf "${C_WARNING}%b${C_RESET}\n" "$*" >&2
 }
 
 
@@ -529,17 +538,6 @@ setup_build_environment()
       else
          install_binary_if_missing "${C_COMPILER}" "somewhere (c compiler)"
       fi
-   fi
-
-   if [ ! -z "${MULLE_BUILD_LLDB}" ]
-   then
-      install_binary_if_missing "swig" "http://swig.org/"
-      case "${UNAME}" in
-         Linux)
-            install_binary_if_missing "libedit-dev" "somewhere"
-            install_binary_if_missing "ncurses-dev" "somewhere"
-            ;;
-      esac
    fi
 }
 
@@ -1010,12 +1008,10 @@ main()
    # these parameters are rarely needed
    #
    LLVM_BRANCH="release_${MULLE_OBJC_VERSION_BRANCH}"
-   LLDB_BRANCH="${LLVM_BRANCH}"
    CLANG_BRANCH="${LLVM_BRANCH}"
 
    # "mulle_objcclang_${MULLE_OBJC_VERSION_BRANCH}"
    MULLE_CLANG_BRANCH="mulle_objclang_${MULLE_OBJC_VERSION_BRANCH}"
-   MULLE_LLDB_BRANCH="${MULLE_CLANG_BRANCH}"
 
    #
    # it makes little sense to change these
@@ -1023,7 +1019,6 @@ main()
    SRC_DIR="src"
 
    LLVM_BUILD_TYPE="${LLVM_BUILD_TYPE:-Release}"
-   LLDB_BUILD_TYPE="${LLDB_BUILD_TYPE:-Debug}"
    CLANG_BUILD_TYPE="${CLANG_BUILD_TYPE:-Release}"
 
    LLVM_DIR="${SRC_DIR}/llvm"

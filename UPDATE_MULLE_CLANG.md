@@ -36,9 +36,11 @@ release_41 | mulle_objclang_41
 ...        | ...
 
 
-So what we do is, squash the current commits into one on a new branch (keeping
-the old branch and commits intact though). Then we grab the new stuff off from
-llvm. Since llvm branches are not that useful, rebasing often doesn't work, so
+So what we do is, squash the current commits into one - on a new branch.
+This keeps the old branch and commits intact. Then we grab the new stuff from
+llvm.
+
+Since llvm branches are not that useful, rebasing often doesn't work, so
 we cherrypick. Which is pretty much the same and we even get to keep some
 history in the old branch.
 
@@ -71,19 +73,27 @@ NEW_MULLE_DEV_BRANCH=mulle_objclang_41
    # this helps weed out re-edits and commits that weren't useful
    # easing the conflict resolution
    #
-   git merge --squash "tmp_${OLD_MULLE_DEV_BRANCH}"
+   # ???? git merge --squash "tmp_${OLD_MULLE_DEV_BRANCH}"
+   git merge --squash "${OLD_MULLE_DEV_BRANCH}"
+
+   # commit stuff
+   git commit -m "${OLD_MULLE_DEV_BRANCH} squashed"
+
+   # remember until where did we squash the old branch (in case of
+   # future edits)
+   git tag "${OLD_MULLE_DEV_BRANCH}_squashed" "${OLD_MULLE_DEV_BRANCH}"
 
    #
    # Now get the new stuff
    #
    git checkout -b "${NEW_MULLE_DEV_BRANCH}" "${NEW_LLVM_BRANCH}"
-   git cherrypick "tmp_${OLD_MULLE_DEV_BRANCH}"
+   git cherrypick "tmp_${NEW_MULLE_DEV_BRANCH}"
 
    #
    # resolve conflicts manually.
    # Check with grep '@mulle-objc' ... | wc -l, that all changes are present
    #
-   git branch -d "tmp_${OLD_MULLE_DEV_BRANCH}"
+   git branch -d "tmp_${NEW_MULLE_DEV_BRANCH}"
 )
 
 

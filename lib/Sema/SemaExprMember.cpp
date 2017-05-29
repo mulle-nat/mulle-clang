@@ -1667,7 +1667,19 @@ static ExprResult LookupMemberExpr(Sema &S, LookupResult &R,
     return LookupMemberExpr(S, R, BaseExpr, IsArrow, OpLoc, SS,
                             ObjCImpDecl, HasTemplateArgs);
   }
-
+   
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+  // Adjust builtin-protocol to the appropriate redefinition type if that's
+  // not just a pointer to builtin-protocol again.
+  if (IsArrow && BaseType->isSpecificBuiltinType(BuiltinType::ObjCProtocol) &&
+      !S.Context.getObjCPROTOCOLRedefinitionType()->isObjCProtocolType()) {
+    BaseExpr = S.ImpCastExprToType(
+        BaseExpr.get(), S.Context.getObjCPROTOCOLRedefinitionType(), CK_BitCast);
+    return LookupMemberExpr(S, R, BaseExpr, IsArrow, OpLoc, SS,
+                            ObjCImpDecl, HasTemplateArgs);
+  }
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
+   
   // Failure cases.
  fail:
 

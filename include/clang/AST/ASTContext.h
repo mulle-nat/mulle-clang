@@ -266,9 +266,10 @@ class ASTContext : public RefCountedBase<ASTContext> {
   /// \brief The typedef for the predefined \c Class type.
   mutable TypedefDecl *ObjCClassDecl;
 
-  /// \brief The typedef for the predefined \c Protocol class in Objective-C.
-/// @mulle-objc@ compiler: change type of ObjCProtocolClassDecl
-  mutable NamedDecl *ObjCProtocolClassDecl;
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+  /// \brief The typedef for the predefined \c PROTOCOL in Objective-C.
+  mutable TypedefDecl *ObjCPROTOCOLDecl;
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
   
   /// \brief The typedef for the predefined 'BOOL' type.
   mutable TypedefDecl *BOOLDecl;
@@ -278,6 +279,9 @@ class ASTContext : public RefCountedBase<ASTContext> {
   QualType ObjCIdRedefinitionType;
   QualType ObjCClassRedefinitionType;
   QualType ObjCSelRedefinitionType;
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+  QualType ObjCPROTOCOLRedefinitionType;
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
 
   /// The identifier 'bool'.
   mutable IdentifierInfo *BoolName = nullptr;
@@ -969,6 +973,9 @@ public:
   CanQualType BuiltinFnTy;
   CanQualType PseudoObjectTy, ARCUnbridgedCastTy;
   CanQualType ObjCBuiltinIdTy, ObjCBuiltinClassTy, ObjCBuiltinSelTy;
+/// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+  CanQualType ObjCBuiltinProtocolTy;
+/// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
   CanQualType ObjCBuiltinBoolTy;
 #define IMAGE_TYPE(ImgType, Id, SingletonId, Access, Suffix) \
   CanQualType SingletonId;
@@ -1540,6 +1547,21 @@ public:
   void setObjCSelRedefinitionType(QualType RedefType) {
     ObjCSelRedefinitionType = RedefType;
   }
+   
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+  /// \brief Retrieve the type that 'PROTOCOL' has been defined to, which may be
+  /// different from the built-in 'PROTOCOL' if 'PROTOCOL' has been typedef'd.
+  QualType getObjCPROTOCOLRedefinitionType() const {
+    if (ObjCPROTOCOLRedefinitionType.isNull())
+      return getObjCPROTOCOLType();
+    return ObjCPROTOCOLRedefinitionType;
+  }
+  
+  /// \brief Set the user-written type that redefines 'SEL'.
+  void setObjCPROTOCOLRedefinitionType(QualType RedefType) {
+    ObjCPROTOCOLRedefinitionType = RedefType;
+  }
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
 
   /// Retrieve the identifier 'NSObject'.
   IdentifierInfo *getNSObjectName() {
@@ -1683,6 +1705,19 @@ public:
   std::string getObjCEncodingForPropertyDecl(const ObjCPropertyDecl *PD,
                                              const Decl *Container) const;
 
+   /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+   /// \brief Retrieve the Objective-C class declaration corresponding to
+   /// the predefined \c Protocol class.
+   /// @mulle-objc@ compiler: change type of getObjCPROTOCOLDecl
+   TypedefDecl *getObjCPROTOCOLDecl() const;
+   
+   /// \brief Retrieve the type that corresponds to the predefined Objective-C
+   /// 'PROTOCOL' type.
+   QualType getObjCPROTOCOLType() const {
+      return getTypeDeclType(getObjCPROTOCOLDecl());
+   }
+   /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
+   
   bool ProtocolCompatibleWithProtocol(ObjCProtocolDecl *lProto,
                                       ObjCProtocolDecl *rProto) const;
   
@@ -1715,7 +1750,7 @@ public:
   QualType getObjCSelType() const { 
     return getTypeDeclType(getObjCSelDecl());
   }
-
+   
   /// \brief Retrieve the typedef declaration corresponding to the predefined
   /// Objective-C 'Class' type.
   TypedefDecl *getObjCClassDecl() const;
@@ -1727,11 +1762,6 @@ public:
   QualType getObjCClassType() const { 
     return getTypeDeclType(getObjCClassDecl());
   }
-
-  /// \brief Retrieve the Objective-C class declaration corresponding to 
-  /// the predefined \c Protocol class.
-  /// @mulle-objc@ compiler: change type of getObjCProtocolDecl
-  NamedDecl *getObjCProtocolDecl() const;
 
   /// \brief Retrieve declaration of 'BOOL' typedef
   TypedefDecl *getBOOLDecl() const {
@@ -1750,10 +1780,10 @@ public:
   
   /// \brief Retrieve the type of the Objective-C \c Protocol class.
   QualType getObjCProtoType() const {
-   /// @mulle-objc@ compiler: change type of getObjCProtocolDecl
+   /// @mulle-objc@ compiler: change type of getObjCPROTOCOLDecl
     if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
-      return getTypeDeclType( (TypedefDecl *) getObjCProtocolDecl());
-    return getObjCInterfaceType( (ObjCInterfaceDecl *) getObjCProtocolDecl());
+      return getTypeDeclType( (TypedefDecl *) getObjCPROTOCOLDecl());
+    return getObjCInterfaceType( (ObjCInterfaceDecl *) getObjCPROTOCOLDecl());
   }
   
   /// \brief Retrieve the C type declaration corresponding to the predefined
@@ -2348,6 +2378,11 @@ public:
   bool isObjCSelType(QualType T) const {
     return T == getObjCSelType();
   }
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+  bool isObjCProtocolType(QualType T) const {
+    return T == getObjCPROTOCOLType();
+  }
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
   bool ObjCQualifiedIdTypesAreCompatible(QualType LHS, QualType RHS,
                                          bool ForCompare);
 

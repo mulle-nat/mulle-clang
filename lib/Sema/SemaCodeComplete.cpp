@@ -615,6 +615,9 @@ SimplifiedTypeClass clang::getSimplifiedTypeClass(CanQualType T) {
       case BuiltinType::ObjCId:
       case BuiltinType::ObjCClass:
       case BuiltinType::ObjCSel:
+      /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+      case BuiltinType::ObjCProtocol:
+      /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
         return STC_ObjectiveC;
         
       default:
@@ -1190,6 +1193,9 @@ static bool isObjCReceiverType(ASTContext &C, QualType T) {
     case BuiltinType::ObjCId:
     case BuiltinType::ObjCClass:
     case BuiltinType::ObjCSel:
+    /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+    case BuiltinType::ObjCProtocol:
+    /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
       return true;
       
     default:

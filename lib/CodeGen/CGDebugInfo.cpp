@@ -565,6 +565,8 @@ llvm::DIType *CGDebugInfo::CreateType(const BuiltinType *BT) {
      // @mulle-objc@ :: hack out isa both parts <-
     return ObjTy;
   }
+
+  // @mulle-objc@ :: we keep it fake like this for the lldb debugger
   case BuiltinType::ObjCSel: {
     if (!SelTy)
       SelTy = DBuilder.createForwardDecl(llvm::dwarf::DW_TAG_structure_type,
@@ -572,6 +574,14 @@ llvm::DIType *CGDebugInfo::CreateType(const BuiltinType *BT) {
                                          getOrCreateMainFile(), 0);
     return SelTy;
   }
+
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+  case BuiltinType::ObjCProtocol: {
+     uint64_t Size = CGM.getContext().getTypeSize(BT);
+     BTName = "unsigned int";
+     return DBuilder.createBasicType( BTName, Size, llvm::dwarf::DW_ATE_unsigned);
+  }
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
 
 #define IMAGE_TYPE(ImgType, Id, SingletonId, Access, Suffix) \
   case BuiltinType::Id: \

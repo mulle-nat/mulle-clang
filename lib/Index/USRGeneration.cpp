@@ -663,6 +663,10 @@ void USRGenerator::VisitType(QualType T) {
           c = 'o'; break;
         case BuiltinType::ObjCClass:
           c = 'O'; break;
+        /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+        // brainless edit, what is USR ? what does 'e' mean ?
+        case BuiltinType::ObjCProtocol:
+        /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
         case BuiltinType::ObjCSel:
           c = 'e'; break;
       }

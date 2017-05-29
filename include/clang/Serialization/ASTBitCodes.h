@@ -809,6 +809,12 @@ namespace clang {
       PREDEF_TYPE_OMP_ARRAY_SECTION = 43,
       /// \brief The '__float128' type
       PREDEF_TYPE_FLOAT128_ID = 44,
+       
+      /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+      /// \brief The ObjC 'Protocol' type.
+      PREDEF_TYPE_OBJC_PROTOCOL = 45,
+      /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
+       
       /// \brief OpenCL image types with auto numeration
 #define IMAGE_TYPE(ImgType, Id, SingletonId, Access, Suffix) \
       PREDEF_TYPE_##Id##_ID,
@@ -937,12 +943,18 @@ namespace clang {
       SPECIAL_TYPE_OBJC_CLASS_REDEFINITION     = 5,
       /// \brief Objective-C "SEL" redefinition type
       SPECIAL_TYPE_OBJC_SEL_REDEFINITION       = 6,
+      /// \brief Objective-C "SEL" redefinition type
+/// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+/// unfortunately need to edit SPECIAL_TYPE_UCONTEXT_T to 8
+/// and add 1 to NumSpecialTypeIDs
+      SPECIAL_TYPE_OBJC_PROTOCOL_REDEFINITION  = 7,
       /// \brief C ucontext_t typedef type
-      SPECIAL_TYPE_UCONTEXT_T                  = 7
+      SPECIAL_TYPE_UCONTEXT_T                  = 8
     };
     
     /// \brief The number of special type IDs.
-    const unsigned NumSpecialTypeIDs = 8;
+    const unsigned NumSpecialTypeIDs = 9;
+/// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
 
     /// \brief Predefined declaration IDs.
     ///

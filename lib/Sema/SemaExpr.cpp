@@ -6974,6 +6974,20 @@ QualType Sema::FindCompositeObjCPointerType(ExprResult &LHS, ExprResult &RHS,
     LHS = ImpCastExprToType(LHS.get(), RHSTy, CK_BitCast);
     return RHSTy;
   }
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+  // And the same for uniqueid_t / PROTOCOL
+  if (Context.isObjCProtocolType(LHSTy) &&
+      (Context.hasSameType(RHSTy, Context.getObjCPROTOCOLRedefinitionType()))) {
+    RHS = ImpCastExprToType(RHS.get(), LHSTy, CK_BitCast);
+    return LHSTy;
+  }
+  if (Context.isObjCProtocolType(RHSTy) &&
+      (Context.hasSameType(LHSTy, Context.getObjCPROTOCOLRedefinitionType()))) {
+    LHS = ImpCastExprToType(LHS.get(), RHSTy, CK_BitCast);
+    return RHSTy;
+  }
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
+   
   // Check constraints for Objective-C object pointers types.
   if (LHSTy->isObjCObjectPointerType() && RHSTy->isObjCObjectPointerType()) {
 

@@ -191,13 +191,13 @@ void Sema::Initialize() {
     {
        DeclarationName PROTOCOL = &Context.Idents.get("PROTOCOL");
        if (IdResolver.begin(PROTOCOL) == IdResolver.end())
-         PushOnScopeChains(Context.getObjCProtocolDecl(), TUScope);
+         PushOnScopeChains(Context.getObjCPROTOCOLDecl(), TUScope);
     }
     else
     {
     DeclarationName Protocol = &Context.Idents.get("Protocol");
     if (IdResolver.begin(Protocol) == IdResolver.end())
-      PushOnScopeChains(Context.getObjCProtocolDecl(), TUScope);
+      PushOnScopeChains(Context.getObjCPROTOCOLDecl(), TUScope);
     }
   }
 

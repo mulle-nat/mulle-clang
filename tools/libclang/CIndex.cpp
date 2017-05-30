@@ -1513,6 +1513,12 @@ bool CursorVisitor::VisitBuiltinTypeLoc(BuiltinTypeLoc TL) {
   case BuiltinType::ObjCSel:
     VisitType = Context.getObjCSelType();
     break;
+
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+  case BuiltinType::ObjCProtocol:
+    VisitType = Context.getObjCPROTOCOLType();
+    break;
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
   }
 
   if (!VisitType.isNull()) {

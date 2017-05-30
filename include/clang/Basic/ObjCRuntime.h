@@ -106,7 +106,7 @@ public:
      llvm_unreachable("bad kind");
   }
 
-  bool hasConstantProtocol() const {  // kinda pedanti, could
+  bool hasConstantProtocol() const {  // kinda pedantic
      return( hasConstantSelector());
   }
 

@@ -65,6 +65,9 @@ class CGDebugInfo {
   llvm::DIType *ClassTy = nullptr;
   llvm::DICompositeType *ObjTy = nullptr;
   llvm::DIType *SelTy = nullptr;
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+  llvm::DIType *ProtocolTy = nullptr;
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
 #define IMAGE_TYPE(ImgType, Id, SingletonId, Access, Suffix) \
   llvm::DIType *SingletonId = nullptr;
 #include "clang/Basic/OpenCLImageTypes.def"

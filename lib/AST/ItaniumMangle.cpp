@@ -2237,6 +2237,10 @@ static bool isTypeSubstitutable(Qualifiers Quals, const Type *Ty) {
     return true;
   if (Ty->isSpecificBuiltinType(BuiltinType::ObjCSel))
     return true;
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+  if (Ty->isSpecificBuiltinType(BuiltinType::ObjCProtocol))
+    return true;
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
   if (Ty->isOpenCLSpecificType())
     return true;
   if (Ty->isBuiltinType())
@@ -2475,6 +2479,12 @@ void CXXNameMangler::mangleType(const BuiltinType *T) {
   case BuiltinType::ObjCSel:
     Out << "13objc_selector";
     break;
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+  case BuiltinType::ObjCProtocol:
+    Out << "13objc_protocol";
+    break;
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
+        
 #define IMAGE_TYPE(ImgType, Id, SingletonId, Access, Suffix) \
   case BuiltinType::Id: \
     type_name = "ocl_" #ImgType "_" #Suffix; \

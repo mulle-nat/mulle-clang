@@ -1646,7 +1646,8 @@ bool Type::isIntegralType(const ASTContext &Ctx) const {
   if (const BuiltinType *BT = dyn_cast<BuiltinType>(CanonicalType))
     return ((BT->getKind() >= BuiltinType::Bool &&
             BT->getKind() <= BuiltinType::Int128) ||
-            BT->getKind() == BuiltinType::ObjCSel); // @mulle-objc@ uniqueid: ObjCSel is integral
+            BT->getKind() == BuiltinType::ObjCSel ||
+            BT->getKind() == BuiltinType::ObjCProtocol); // @mulle-objc@ uniqueid: ObjCSel is integral
 
 
   // Complete enum types are integral in C.
@@ -1662,7 +1663,8 @@ bool Type::isIntegralOrUnscopedEnumerationType() const {
   if (const BuiltinType *BT = dyn_cast<BuiltinType>(CanonicalType))
     return(( BT->getKind() >= BuiltinType::Bool &&
             BT->getKind() <= BuiltinType::Int128) ||
-            BT->getKind() == BuiltinType::ObjCSel);  // @mulle-objc@ uniqueid: ObjCSel is integral
+            BT->getKind() == BuiltinType::ObjCSel ||
+            BT->getKind() == BuiltinType::ObjCProtocol); // @mulle-objc@ uniqueid: ObjCSel is integral
 
   // Check for a complete enum type; incomplete enum types are not properly an
   // enumeration type in the sense required here.
@@ -1770,7 +1772,8 @@ bool Type::isUnsignedIntegerType() const {
   if (const BuiltinType *BT = dyn_cast<BuiltinType>(CanonicalType)) {
     return(( BT->getKind() >= BuiltinType::Bool &&
              BT->getKind() <= BuiltinType::UInt128) ||
-             BT->getKind() == BuiltinType::ObjCSel);  // @mulle-objc@ uniqueid: ObjCSel is unsigned
+             BT->getKind() == BuiltinType::ObjCSel ||
+             BT->getKind() == BuiltinType::ObjCProtocol); // @mulle-objc@ uniqueid: ObjCSel is integral
   }
 
   if (const EnumType *ET = dyn_cast<EnumType>(CanonicalType)) {
@@ -1787,7 +1790,8 @@ bool Type::isUnsignedIntegerOrEnumerationType() const {
   if (const BuiltinType *BT = dyn_cast<BuiltinType>(CanonicalType)) {
     return(( BT->getKind() >= BuiltinType::Bool &&
              BT->getKind() <= BuiltinType::UInt128) ||
-             BT->getKind() == BuiltinType::ObjCSel);  // @mulle-objc@ uniqueid: ObjCSel is unsigned
+             BT->getKind() == BuiltinType::ObjCSel ||
+             BT->getKind() == BuiltinType::ObjCProtocol); // @mulle-objc@ uniqueid: ObjCSel is integral
   }
 
   if (const EnumType *ET = dyn_cast<EnumType>(CanonicalType)) {
@@ -1840,7 +1844,8 @@ bool Type::isArithmeticType() const {
   if (const BuiltinType *BT = dyn_cast<BuiltinType>(CanonicalType))
     return(( BT->getKind() >= BuiltinType::Bool &&
              BT->getKind() <= BuiltinType::Float128) ||
-             BT->getKind() == BuiltinType::ObjCSel);  // @mulle-objc@ uniqueid: ObjCSel is arithmetic
+             BT->getKind() == BuiltinType::ObjCSel ||
+             BT->getKind() == BuiltinType::ObjCProtocol); // @mulle-objc@ uniqueid: ObjCSel is integral
   if (const EnumType *ET = dyn_cast<EnumType>(CanonicalType))
     // GCC allows forward declaration of enum types (forbid by C99 6.7.2.3p2).
     // If a body isn't seen by the time we get here, return false.
@@ -2366,6 +2371,10 @@ bool Type::isPromotableIntegerType() const {
     case BuiltinType::WChar_U:
     case BuiltinType::Char16:
     case BuiltinType::Char32:
+    /// @mulle-objc@ uniqueid: make it integer promotable <
+    case BuiltinType::ObjCSel:
+    case BuiltinType::ObjCProtocol:
+    /// @mulle-objc@ uniqueid: make it integer promotable <
       return true;
     default:
       return false;
@@ -2624,6 +2633,10 @@ StringRef BuiltinType::getName(const PrintingPolicy &Policy) const {
     return "Class";
   case ObjCSel:
     return "SEL";
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+  case ObjCProtocol:
+    return "PROTOCOL";
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
 #define IMAGE_TYPE(ImgType, Id, SingletonId, Access, Suffix) \
   case Id: \
     return "__" #Access " " #ImgType "_t";
@@ -3639,6 +3652,9 @@ bool Type::canHaveNullability() const {
     case BuiltinType::ObjCId:
     case BuiltinType::ObjCClass:
     case BuiltinType::ObjCSel:
+    /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+    case BuiltinType::ObjCProtocol:
+    /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
 #define IMAGE_TYPE(ImgType, Id, SingletonId, Access, Suffix) \
     case BuiltinType::Id:
 #include "clang/Basic/OpenCLImageTypes.def"

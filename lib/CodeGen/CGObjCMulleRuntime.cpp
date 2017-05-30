@@ -64,7 +64,7 @@
 #include "llvm/Support/Compiler.h"
 
 
-#define COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION  7
+#define COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION  8
 
 
 using namespace clang;
@@ -667,7 +667,8 @@ namespace {
       MethodVarType,
       PropertyName,
       IvarName,
-      IvarType
+      IvarType,
+      ProtocolName,
    };
 
 
@@ -823,6 +824,9 @@ namespace {
       /// this translation unit.
       llvm::DenseMap<const ObjCMethodDecl*, llvm::Function*> MethodDefinitions;
 
+      /// ProtocolNames - uniqued protocol names.
+      llvm::DenseMap<IdentifierInfo*, llvm::GlobalVariable*> ProtocolNames;
+
       /// PropertyNames - uniqued method variable names.
       llvm::DenseMap<IdentifierInfo*, llvm::GlobalVariable*> PropertyNames;
 
@@ -877,6 +881,8 @@ namespace {
 
       llvm::Constant *GetIvarType(const ObjCIvarDecl *Ivar);
       llvm::Constant *GetIvarName(const ObjCIvarDecl *Ivar);
+
+      llvm::Constant *GetProtocolName(IdentifierInfo *Ident);
 
       /// GetPropertyName - Return a unique constant for the given
       /// name. The return value has type char *.
@@ -1083,6 +1089,8 @@ namespace {
 
       llvm::Constant *GetMethodConstant(const ObjCMethodDecl *MD);
 
+      llvm::Constant *GetProtocolConstant(const ObjCProtocolDecl *PD);
+
       /// EmitMethodList - Emit the method list for the given
       /// implementation. The return value has type MethodListPtrTy.
       llvm::Constant *EmitMethodList(Twine Name,
@@ -1102,13 +1110,13 @@ namespace {
       llvm::Constant *GetOrEmitProtocolRef(const ObjCProtocolDecl *PD) override;
 
 
-      void  CollectProtocolIDs( llvm::SmallPtrSet<llvm::Constant *, 16> &ProtocolRefs,
-                                ObjCProtocolDecl::protocol_iterator begin,
-                                ObjCProtocolDecl::protocol_iterator end);
+      void  CollectProtocols( llvm::SmallPtrSet<llvm::Constant *, 16> &ProtocolRefs,
+                              ObjCProtocolDecl::protocol_iterator begin,
+                              ObjCProtocolDecl::protocol_iterator end);
 
       /// EmitProtocolIDList - Generate the list of referenced
       /// protocols. The return value has type ProtocolListPtrTy.
-      llvm::Constant *EmitProtocolIDList(Twine Name,
+      llvm::Constant *EmitProtocolList(Twine Name,
                                          ObjCProtocolDecl::protocol_iterator begin,
                                          ObjCProtocolDecl::protocol_iterator end);
       /// EmitProtocolClassIDList - Generate the list of referenced
@@ -3822,10 +3830,56 @@ static int constant_uintptr_comparator( llvm::Constant * const *P1,
 
 
 /*
+ * in our uniform structs, the hash is always the first
+ * entry in the struct
+ */
+static int uniqueid_comparator( llvm::Constant * const *P1,
+                                llvm::Constant * const *P2)
+{
+   llvm::ConstantStruct   *methodA;
+   llvm::ConstantStruct   *methodB;
+   llvm::ConstantInt      *hashA;
+   llvm::ConstantInt      *hashB;
+   llvm::APInt            valueA;
+   llvm::APInt            valueB;
+   bool                   flag;
+
+   methodA = (llvm::ConstantStruct *) *P1;
+   methodB = (llvm::ConstantStruct *) *P2;
+
+   hashA = dyn_cast< llvm::ConstantInt>( methodA->getAggregateElement( 0U));
+   hashB = dyn_cast< llvm::ConstantInt>( methodB->getAggregateElement( 0U));
+
+   valueA = hashA->getUniqueInteger();
+   valueB = hashB->getUniqueInteger();
+
+   if( valueA == valueB)
+      return 0;
+
+   flag = valueA.ult( valueB);
+   return( flag ? -1 : +1);
+}
+
+
+
+/*
    just a list of protocol IDs,
    which gets stuck on a category or on a class
  */
-void  CGObjCMulleRuntime::CollectProtocolIDs( llvm::SmallPtrSet<llvm::Constant *, 16> &ProtocolRefs,
+
+llvm::Constant *CGObjCMulleRuntime::GetProtocolConstant(const ObjCProtocolDecl *PD) {
+
+   llvm::Constant *Protocol[] = {
+      llvm::ConstantExpr::getBitCast( HashProtocolConstantForString( PD->getNameAsString()),
+                                       ObjCTypes.ProtocolIDTy),
+      llvm::ConstantExpr::getBitCast(GetProtocolName(PD->getIdentifier()),
+                                     ObjCTypes.Int8PtrTy)
+   };
+   return llvm::ConstantStruct::get(ObjCTypes.ProtocolTy, Protocol);
+}
+
+
+void  CGObjCMulleRuntime::CollectProtocols( llvm::SmallPtrSet<llvm::Constant *, 16> &ProtocolRefs,
                                 ObjCProtocolDecl::protocol_iterator begin,
                                 ObjCProtocolDecl::protocol_iterator end)
 {
@@ -3835,48 +3889,48 @@ void  CGObjCMulleRuntime::CollectProtocolIDs( llvm::SmallPtrSet<llvm::Constant *
    {
       PD = *begin;
       // recursively add all inherited protocols too
-      ProtocolRefs.insert( GetProtocolRef(PD));
-      CollectProtocolIDs( ProtocolRefs, PD->protocol_begin(), PD->protocol_end());
+      ProtocolRefs.insert( GetProtocolConstant(PD));
+      CollectProtocols( ProtocolRefs, PD->protocol_begin(), PD->protocol_end());
    }
 }
 
 
+
 llvm::Constant *
-CGObjCMulleRuntime::EmitProtocolIDList(Twine Name,
+CGObjCMulleRuntime::EmitProtocolList(Twine Name,
                             ObjCProtocolDecl::protocol_iterator begin,
                             ObjCProtocolDecl::protocol_iterator end)
 {
    llvm::SmallPtrSet<llvm::Constant *, 16> ProtocolRefsSet;
    SmallVector<llvm::Constant *, 16> ProtocolRefs;
    
-   CollectProtocolIDs( ProtocolRefsSet, begin, end);
+   CollectProtocols( ProtocolRefsSet, begin, end);
    
    // Just return null for empty protocol lists
    if (ProtocolRefsSet.empty())
-      return llvm::Constant::getNullValue(ObjCTypes.ProtocolIDPtrTy);
+      return llvm::Constant::getNullValue(ObjCTypes.ProtocolListPtrTy);
 
    for( auto ref = ProtocolRefsSet.begin(); ref != ProtocolRefsSet.end(); ++ref)
       ProtocolRefs.push_back( *ref);
-   
+
+   // and sort'em although this is a bit superflous, since the runtime
+   // also sorts em
    llvm::array_pod_sort( ProtocolRefs.begin(), ProtocolRefs.end(),
-                         constant_uintptr_comparator);
+                         uniqueid_comparator);
+   
+   llvm::Constant *Values[2];
+   Values[0] = llvm::ConstantInt::get(ObjCTypes.IntTy, ProtocolRefs.size());
+   llvm::ArrayType *AT = llvm::ArrayType::get(ObjCTypes.ProtocolTy,
+                                              ProtocolRefs.size());
 
-   // This list is null terminated.
-   ProtocolRefs.push_back(llvm::Constant::getNullValue(ObjCTypes.ProtocolIDTy));
+   Values[1] = llvm::ConstantArray::get(AT, ProtocolRefs);
+   
+   llvm::Constant *Init = llvm::ConstantStruct::getAnon(Values);
 
-   llvm::Constant *Values[ 1];
-   Values[ 0] = llvm::ConstantArray::get(llvm::ArrayType::get(ObjCTypes.ProtocolIDTy,
-                                                              ProtocolRefs.size()),
-                                         ProtocolRefs);
-
-   llvm::Constant       *Init = llvm::ConstantStruct::getAnon(Values);
-   llvm::GlobalVariable *GV =
-   CreateMetadataVar(Name, Init, "__DATA,__protocolids,regular,no_dead_strip",
-                     4, false);
-   return llvm::ConstantExpr::getBitCast( GV, ObjCTypes.ProtocolIDPtrTy);
+   llvm::GlobalVariable *GV = CreateMetadataVar(Name, Init, "__DATA,__protocols,regular,no_dead_strip",
+                     4, true);
+   return llvm::ConstantExpr::getBitCast(GV, ObjCTypes.ProtocolListPtrTy);
 }
-
-
 
 
 /*
@@ -3925,7 +3979,7 @@ CGObjCMulleRuntime::EmitProtocolClassIDList(Twine Name,
    llvm::Constant       *Init = llvm::ConstantStruct::getAnon(Values);
    llvm::GlobalVariable *GV =
    CreateMetadataVar(Name, Init, "__DATA,__protoclassids,regular,no_dead_strip",
-                     4, false);
+                     4, true);
    return llvm::ConstantExpr::getBitCast( GV, ObjCTypes.ClassIDPtrTy);
 }
 
@@ -3947,37 +4001,6 @@ PushProtocolProperties(llvm::SmallPtrSet<const IdentifierInfo*,16> &PropertySet,
 
       Properties.push_back(llvm::ConstantStruct::get(ObjCTypes.PropertyTy, Prop));
    }
-}
-
-/*
- * in our uniform structs, the hash is always the first
- * entry in the struct
- */
-static int uniqueid_comparator( llvm::Constant * const *P1,
-                                llvm::Constant * const *P2)
-{
-   llvm::ConstantStruct   *methodA;
-   llvm::ConstantStruct   *methodB;
-   llvm::ConstantInt      *hashA;
-   llvm::ConstantInt      *hashB;
-   llvm::APInt            valueA;
-   llvm::APInt            valueB;
-   bool                   flag;
-
-   methodA = (llvm::ConstantStruct *) *P1;
-   methodB = (llvm::ConstantStruct *) *P2;
-
-   hashA = dyn_cast< llvm::ConstantInt>( methodA->getAggregateElement( 0U));
-   hashB = dyn_cast< llvm::ConstantInt>( methodB->getAggregateElement( 0U));
-
-   valueA = hashA->getUniqueInteger();
-   valueB = hashB->getUniqueInteger();
-
-   if( valueA == valueB)
-      return 0;
-
-   flag = valueA.ult( valueB);
-   return( flag ? -1 : +1);
 }
 
 
@@ -4144,8 +4167,8 @@ void CGObjCMulleRuntime::GenerateCategory(const ObjCCategoryImplDecl *OCD) {
       Values[ 7] = EmitPropertyList("OBJC_CATEGORY_PROP_LIST_" + ExtName.str(),
                                    OCD, Category, ObjCTypes);
       Values[ 8] =
-      EmitProtocolIDList("OBJC_CATEGORY_PROTOCOLS_" + ExtName.str(),
-                         Category->protocol_begin(), Category->protocol_end());
+      EmitProtocolList("OBJC_CATEGORY_PROTOCOLS_" + ExtName.str(),
+                       Category->protocol_begin(), Category->protocol_end());
       Values[ 9] =
       EmitProtocolClassIDList("OBJC_CATEGORY_PROTOCOLCLASSES_" + ExtName.str(),
                                Category->protocol_begin(), Category->protocol_end());
@@ -4157,7 +4180,7 @@ void CGObjCMulleRuntime::GenerateCategory(const ObjCCategoryImplDecl *OCD) {
 
       Values[ 7] = llvm::Constant::getNullValue(ObjCTypes.PropertyListPtrTy);
       Values[ 8] = llvm::Constant::getNullValue(ObjCTypes.ProtocolListPtrTy);
-      Values[ 9] = llvm::Constant::getNullValue(ObjCTypes.ProtocolListPtrTy);
+      Values[ 9] = llvm::Constant::getNullValue(ObjCTypes.ProtocolIDPtrTy);
    }
    if( CGM.getCodeGenOpts().getDebugInfo() != codegenoptions::NoDebugInfo)
    {
@@ -4197,7 +4220,7 @@ void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
    ObjCInterfaceDecl *Interface =
    const_cast<ObjCInterfaceDecl*>(ID->getClassInterface());
    llvm::Constant *Protocols =
-   EmitProtocolIDList("OBJC_CLASS_PROTOCOLS_" + ID->getName(),
+   EmitProtocolList("OBJC_CLASS_PROTOCOLS_" + ID->getName(),
                     Interface->all_referenced_protocol_begin(),
                     Interface->all_referenced_protocol_end());
    llvm::Constant *ProtocolClasses =
@@ -4598,6 +4621,7 @@ CGObjCCommonMulleRuntime::CreateCStringLiteral(StringRef Name, ObjCLabelType Typ
   case ObjCLabelType::PropertyName:  Label = "OBJC_PROP_NAME_ATTR_"; break;
   case ObjCLabelType::IvarName:      Label = "OBJC_IVAR_NAME_"; break;
   case ObjCLabelType::IvarType:      Label = "OBJC_IVAR_TYPE_"; break;
+  case ObjCLabelType::ProtocolName:  Label = "OBJC_PROTOCOL_TYPE_"; break;
   }
 
 
@@ -6086,6 +6110,14 @@ llvm::Constant *CGObjCCommonMulleRuntime::GetMethodVarType(const ObjCMethodDecl 
 }
 
 
+llvm::Constant *CGObjCCommonMulleRuntime::GetProtocolName(IdentifierInfo *Ident) {
+  llvm::GlobalVariable *&Entry = ProtocolNames[Ident];
+  if (!Entry)
+    Entry = CreateCStringLiteral(Ident->getName(), ObjCLabelType::ProtocolName);
+  return getConstantGEP(VMContext, Entry, 0, 0);
+}
+
+
 llvm::Constant *CGObjCCommonMulleRuntime::GetPropertyName(IdentifierInfo *Ident) {
    llvm::GlobalVariable *&Entry = PropertyNames[Ident];
 
@@ -6288,8 +6320,13 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
 
    // Protocol description structures
 
+   // struct _mulle_objc_protocol {
+   //   PROTOCOL protocolid;
+   //   char *name;
+   // }
    ProtocolTy =
-   llvm::StructType::create(VMContext, "struct._mulle_objc_protocol");
+   llvm::StructType::create("struct._mulle_objc_protocol",
+                            SelectorIDTy, Int8PtrTy, nullptr);
 
    ProtocolListTy =
    llvm::StructType::create(VMContext, "struct._mulle_objc_protocollist");
@@ -6356,7 +6393,7 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
 //      struct _mulle_objc_methodlist     *instancemethods;
 //      struct _mulle_objc_propertylist   *properties;
 //
-//      mulle_objc_protocolid_t           *protocolids;
+//      struct _mulle_objc_protocollist   *protocols;
 //      mulle_objc_classid_t              *protocolclassids;
 //
 //      char                              *origin;
@@ -6379,8 +6416,8 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
                     MethodListPtrTy,   // instance_methods
                     PropertyListPtrTy, // properties
 
-                    ProtocolIDPtrTy,
-                    ClassIDPtrTy,
+                    ProtocolListPtrTy, // protocols
+                    ClassIDPtrTy,      // protocolclassids
 
                     Int8PtrTy,         // origin,
                     nullptr);
@@ -6401,7 +6438,7 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
 //      struct _mulle_objc_methodlist     *instancemethods;
 //      struct _mulle_objc_propertylist   *properties;
 //
-//      mulle_objc_protocolid_t           *protocolids;
+//      struct _mulle_objc_protocollist   *protocols;
 //      mulle_objc_classid_t              *protocolclassids;
 //
 //      char                              *origin;
@@ -6420,7 +6457,7 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
                             MethodListPtrTy,
                             PropertyListPtrTy,
                             
-                            ProtocolIDPtrTy,
+                            ProtocolListPtrTy,
                             ClassIDPtrTy,
                             
                             Int8PtrTy,

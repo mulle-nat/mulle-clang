@@ -2,8 +2,9 @@
 
 # mulle-clang
 
-This is an Objective-C compiler based on clang 3.9, written for the [mulle-objc](//www.mulle-kybernetik.com/weblog/2015/mulle_objc_a_new_objective_c_.html)
-runtime.
+This is an Objective-C compiler based on clang 4.0, written for the
+[mulle-objc](//www.mulle-kybernetik.com/weblog/2015/mulle_objc_a_new_objective_c_.html)
+runtime. It corresponds to mulle-objc-runtime v0.8 or better.
 
 > See [README.txt](README.txt) for more information about clang
 
@@ -14,17 +15,22 @@ The compiler can be used to:
 
 It is not recommended to use it for C++, since that is not tested.
 It is not recommended to use it for other Objective-C runtimes, since there
-have been some changes, that could affect other runtimes.
+have been some changes, that affect other runtimes.
 
 
 ## Operation
 
-The compiler compiles Objective-C source for the **mulle-objc** runtime by default. When compiling for **mulle-objc** the compiler will use the [meta-ABI](//www.mulle-kybernetik.com/weblog/2015/mulle_objc_meta_call_convention.html) for all method calls. The resultant `.o` files should be linkable like any other compiled C code.
+The compiler compiles Objective-C source for the **mulle-objc** runtime by
+default. When compiling for **mulle-objc** the compiler will use the
+[meta-ABI](//www.mulle-kybernetik.com/weblog/2015/mulle_objc_meta_call_convention.html)
+for all method calls. The resultant `.o` files are linkable like any
+other compiled C code.
 
 
 ### AAM - Always Autorelease Mode
 
-The compiler has a special mode called AAM. This changes the Objective-C language in the following ways:
+The compiler has a special mode called AAM. This changes the Objective-C
+language in the following ways:
 
 1. There is a tranformation done on selector names
 
@@ -35,16 +41,22 @@ The compiler has a special mode called AAM. This changes the Objective-C languag
     copy           | immutableInstance
     mutableCopy    | mutableInstance
 2. You can not access instance variables directly, but must use properties (or methods)
-3. You can not do explicit memory management (like `-dealloc`, `-autorelease`, `-release`, `-retain`, `-retainCount` etc.)
+3. You can not do explicit memory management (like `-dealloc`, `-autorelease`,
+`-release`, `-retain`, `-retainCount` etc.)
 
-The transformed methods will return objects that are autoreleased. Hence the name of the mode. The net effect is, that you have a mode that is ARC-like, yet understandable and much simpler.
+The transformed methods will return objects that are autoreleased. Hence the
+name of the mode. The net effect is, that you have a mode that is ARC-like, yet
+understandable and much simpler.
 
-Your ARC code may not run in AAM, but AAM code should run in ARC with no problems. If you can't do something in AAM, put it in a category in regular Objective-C style.
+Your ARC code may not run in AAM, but AAM code should run in ARC with no
+problems. If you can't do something in AAM, put it in a category in regular
+Objective-C style.
 
 
 ## Additional File Types
 
-The compiler handles `.aam` files, which enables AAM ("Always Autoreleased Mode").
+The compiler handles `.aam` files, which enables AAM ("Always Autoreleased
+Mode").
 
 
 ## Additional Options
@@ -57,10 +69,18 @@ Name           | Description
 
 ## Additional Compiler defined Macros
 
-Name                 | Description
----------------------|--------------------------------------
-`__MULLE_OBJC__`     | Compiling for mulle-objc
-`__MULLE_OBJC_AAM__` | AAM is enabled
+In the cases where there exists a `_NO_` variant, the compiler always specifies 
+either of both but not both together or none of the two.
+
+Name                    | Description
+------------------------|--------------------------------------
+`__MULLE_OBJC__`        | Compiling for mulle-objc
+`__MULLE_OBJC_AAM__`    | AAM is enabled
+`__MULLE_OBJC_NO_AAM__` | AAM is not enabled 
+`__MULLE_OBJC_TPS__`    | TPS (tagged pointers) is enabled
+`__MULLE_OBJC_NO_TPS__` | TPS is not enabled 
+`__MULLE_OBJC_TRT__`    | TRT (thread-local runtime) is enabled
+`__MULLE_OBJC_NO_TRT__` | TRT is not enabled 
 
 
 ## Macros used in Code Generation
@@ -68,8 +88,8 @@ Name                 | Description
 
 The compiler output can be tweaked with the following preprocessor macros.
 All macros must be defined with a simple integer, no expressions. All of them
-are optional, unless indicated otherwise. The runtime, the Objective-C Foundation
-on top of the runtime and the user application, will define them.
+are optional, unless indicated otherwise. The runtime, the Objective-C
+Foundation on top of the runtime and the user application, will define them.
 
 
 Name                                  | Description
@@ -96,23 +116,23 @@ defined in the runtime.
 
 ### -O2
 
-* `mulle_objc_inline_unfailing_get_or_lookup_class`
-* `mulle_objc_class_inline_metacall_classid`
+* `mulle_objc_inline_unfailing_get_or_lookup_infraclass`
+* `mulle_objc_infraclass_inline_metacall_classid`
 * `mulle_objc_object_inline_constant_methodid_call`
 * `mulle_objc_object_retain`
 * `mulle_objc_object_release`
 
 ### -O1
 
-* `mulle_objc_inline_unfailing_get_or_lookup_class`
-* `mulle_objc_class_inline_metacall_classid`
+* `mulle_objc_inline_unfailing_get_or_lookup_infraclass`
+* `mulle_objc_infraclass_inline_metacall_classid`
 * `mulle_objc_object_constant_methodid_call`
 
 ### -O0, -Os
 
-* `mulle_objc_unfailing_get_or_lookup_class`
+* `mulle_objc_unfailing_get_or_lookup_cinfralass`
 * `mulle_objc_object_call`
-* `mulle_objc_class_metacall_classid`
+* `mulle_objc_infraclass_metacall_classid`
 
 ### All
 
@@ -148,15 +168,15 @@ into `/usr/bin`:
 #### Ubuntu 16.04 LTS / Debian xenial 64 bit
 
 ```
-curl -O -L http://download.codeon.de/bottles/mulle-clang-3.9.0-xenial-amd64.deb
-sudo dpkg --install mulle-clang-3.9.0-xenial-amd64.deb
+curl -O -L http://download.codeon.de/bottles/mulle-clang-4.0.0.4-xenial-amd64.deb
+sudo dpkg --install mulle-clang-4.0.0.4-xenial-amd64.deb
 ```
 
 #### Ubuntu 14.04 LTS / Debian trusty 64 bit
 
 ```
-curl -O -L http://download.codeon.de/bottles/mulle-clang-3.9.0-trusty-amd64.deb
-sudo dpkg --install mulle-clang-3.9.0-trusty-amd64.deb
+curl -O -L http://download.codeon.de/bottles/mulle-clang-4.0.0.4-trusty-amd64.deb
+sudo dpkg --install mulle-clang-4.0.0.4-trusty-amd64.deb
 ```
 
 

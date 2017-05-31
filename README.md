@@ -69,18 +69,18 @@ Name           | Description
 
 ## Additional Compiler defined Macros
 
-In the cases where there exists a `_NO_` variant, the compiler always specifies 
+In the cases where there exists a `_NO_` variant, the compiler always specifies
 either of both but not both together or none of the two.
 
 Name                    | Description
 ------------------------|--------------------------------------
 `__MULLE_OBJC__`        | Compiling for mulle-objc
 `__MULLE_OBJC_AAM__`    | AAM is enabled
-`__MULLE_OBJC_NO_AAM__` | AAM is not enabled 
+`__MULLE_OBJC_NO_AAM__` | AAM is not enabled
 `__MULLE_OBJC_TPS__`    | TPS (tagged pointers) is enabled
-`__MULLE_OBJC_NO_TPS__` | TPS is not enabled 
+`__MULLE_OBJC_NO_TPS__` | TPS is not enabled
 `__MULLE_OBJC_TRT__`    | TRT (thread-local runtime) is enabled
-`__MULLE_OBJC_NO_TRT__` | TRT is not enabled 
+`__MULLE_OBJC_NO_TRT__` | TRT is not enabled
 
 
 ## Macros used in Code Generation
@@ -103,7 +103,6 @@ Name                                  | Description
 `MULLE_OBJC_USER_VERSION_MAJOR`       | User supplied version
 `MULLE_OBJC_USER_VERSION_MINOR`       | User supplied of the Foundation
 `MULLE_OBJC_USER_VERSION_PATCH`       | User supplied of the Foundation, all these version information values will be stored in the emitted object file.
-`MULLE_OBJC_NO_TAGGED_POINTERS`       | Disable the emission of tagged pointer code
 `MULLE_OBJC_FASTCLASSHASH_0`          | First unique ID of a fast class
 ... | ...
 `MULLE_OBJC_FASTCLASSHASH_63`         | Last unique ID of a fast class
@@ -130,7 +129,7 @@ defined in the runtime.
 
 ### -O0, -Os
 
-* `mulle_objc_unfailing_get_or_lookup_cinfralass`
+* `mulle_objc_unfailing_get_or_lookup_infraclass`
 * `mulle_objc_object_call`
 * `mulle_objc_infraclass_metacall_classid`
 
@@ -165,6 +164,14 @@ brew install codeon-gmbh/software/mulle-clang
 This will install the compiler into `/opt/mulle-clang` and a symlink
 into `/usr/bin`:
 
+#### Ubuntu 17.04 / Debian zesty 64 bit
+
+```
+curl -O -L http://download.codeon.de/bottles/mulle-clang-4.0.0.4-zesty-amd64.deb
+sudo dpkg --install mulle-clang-4.0.0.4-zesty-amd64.deb
+```
+
+
 #### Ubuntu 16.04 LTS / Debian xenial 64 bit
 
 ```
@@ -179,6 +186,12 @@ curl -O -L http://download.codeon.de/bottles/mulle-clang-4.0.0.4-trusty-amd64.de
 sudo dpkg --install mulle-clang-4.0.0.4-trusty-amd64.deb
 ```
 
+#### Ubuntu 12.04.5 LTS / Debian precise 64 bit
+
+```
+curl -O -L http://download.codeon.de/bottles/mulle-clang-4.0.0.4-precise-amd64.deb
+sudo dpkg --install mulle-clang-4.0.0.4-precise-amd64.deb
+```
 
 ### Manually
 
@@ -186,7 +199,8 @@ Otherwise read:
 
 * [How to Build](BUILD_MULLE_CLANG.md)
 
-Afterwards head on over to [mulle-objc](//github.com/mulle-objc) to get the Objective-C libraries.
+Afterwards head on over to [mulle-objc](//github.com/mulle-objc) to get the
+Objective-C libraries.
 
 
 ## Author

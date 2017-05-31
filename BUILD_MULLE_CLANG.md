@@ -10,11 +10,12 @@
 You need a fairly current Unix, like Linux, OS X or FreeBSD. Or you can use
 [MINGW](http://mingw.org/) on Windows.
 
-Locate a place on your filesystem, where you have at least 20GB space free. You
-probably need not bother to try, if you have less than 6GB of RAM. Or you risk
-seeing `virtual memory exhausted: Cannot allocate memory`.
+Locate a place on your filesystem, where you have at least 8 GB disk space free 
+after installing all pre-requisites. You probably need not bother to try, if 
+you have less than 6 GB of RAM. Or you risk seeing 
+`virtual memory exhausted: Cannot allocate memory`.
 
-A docker container usually only has 10 GB of space. That is not enough to build
+A docker container usually only has 10 GB of space. That may not be enough to build
 the compiler!
 
 If you are configuring a virtual machine, give it some more cores!

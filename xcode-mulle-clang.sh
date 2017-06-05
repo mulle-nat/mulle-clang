@@ -16,11 +16,12 @@ get_mulle_clang_version()
       fail "mulle-clang not downloaded yet"
    fi
 
-   if [ ! -f "${src}/MULLE_CLANG_VERSION" ]
+   if [ ! -f "${src}/install-mulle-clang.sh" ]
    then
       fail "No MULLE_CLANG_VERSION version found in \"${src}\""
    fi
-   cat "${src}/MULLE_CLANG_VERSION"
+
+   grep MULLE_CLANG_VERSION "${src}/install-mulle-clang.sh" | head -1 | sed 's/.*\"\(.*\)\"/\1/'
 }
 
 

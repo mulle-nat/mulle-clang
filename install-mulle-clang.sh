@@ -4,16 +4,18 @@
 # (c) 2016 Codeon GmbH, coded by Nat!
 # BSD-3 License
 
-# various versions
-MULLE_OBJC_VERSION_BRANCH="40"
+# our compiler version
+MULLE_CLANG_VERSION="4.0.0.4"
+
+# required LLVM version
 LLVM_VERSION="4.0.0"
-CLANG_VERSION="4.0.0.0"
+
 
 CMAKE_VERSION_MAJOR="3"
 CMAKE_VERSION_MINOR="5"
 CMAKE_VERSION_PATCH="2"
 
-CLANG_ARCHIVE="https://github.com/Codeon-GmbH/mulle-clang/archive/${CLANG_VERSION}.tar.gz"
+MULLE_CLANG_ARCHIVE="https://github.com/Codeon-GmbH/mulle-clang/archive/${MULLE_CLANG_VERSION}.tar.gz"
 LLVM_ARCHIVE="http://www.llvm.org/releases/${LLVM_VERSION}/llvm-${LLVM_VERSION}.src.tar.xz"
 LIBCXX_ARCHIVE="http://llvm.org/releases/${LLVM_VERSION}/libcxx-${LLVM_VERSION}.src.tar.xz"
 LIBCXXABI_ARCHIVE="http://llvm.org/releases/${LLVM_VERSION}/libcxxabi-${LLVM_VERSION}.src.tar.xz"
@@ -608,22 +610,22 @@ download_llvm()
 
 download_clang()
 {
-   if [ ! -d "${CLANG_DIR}" ]
+   if [ ! -d "${MULLE_CLANG_DIR}" ]
    then
       if [ ! -f mulle-clang.tgz ]
       then
-         log_verbose "Downloading mulle-clang from \"${CLANG_ARCHIVE}\" ..."
-         exekutor curl -L -C- -o _mulle-clang.tgz "${CLANG_ARCHIVE}"  || fail "curl failed"
+         log_verbose "Downloading mulle-clang from \"${MULLE_CLANG_ARCHIVE}\" ..."
+         exekutor curl -L -C- -o _mulle-clang.tgz "${MULLE_CLANG_ARCHIVE}"  || fail "curl failed"
          exekutor tar tfz _mulle-clang.tgz > /dev/null || fail "tar archive corrupt"
          exekutor mv _mulle-clang.tgz mulle-clang.tgz  || exit 1
       fi
 
-      log_verbose "Unpacking into \"${CLANG_DIR}\" ..."
+      log_verbose "Unpacking into \"${MULLE_CLANG_DIR}\" ..."
       exekutor tar xfz mulle-clang.tgz || fail "tar archive corrupt"
-      exekutor mkdir -p "`dirname -- "${CLANG_DIR}"`" 2> /dev/null || exit 1
-      exekutor mv mulle-clang-${CLANG_VERSION} "${CLANG_DIR}" || exit 1
+      exekutor mkdir -p "`dirname -- "${MULLE_CLANG_DIR}"`" 2> /dev/null || exit 1
+      exekutor mv mulle-clang-${CLANG_VERSION} "${MULLE_CLANG_DIR}" || exit 1
    else
-      log_fluff "\"${CLANG_DIR}\" already exists"
+      log_fluff "\"${MULLE_CLANG_DIR}\" already exists"
    fi
 }
 
@@ -680,32 +682,32 @@ _build_clang()
    #
    # Build mulle-clang
    #
-   if [ ! -f "${CLANG_BUILD_DIR}/Makefile" ]
+   if [ ! -f "${MULLE_CLANG_BUILD_DIR}/Makefile" ]
    then
-      exekutor mkdir -p "${CLANG_BUILD_DIR}" 2> /dev/null
+      exekutor mkdir -p "${MULLE_CLANG_BUILD_DIR}" 2> /dev/null
 
       set -e
-         exekutor cd "${CLANG_BUILD_DIR}"
+         exekutor cd "${MULLE_CLANG_BUILD_DIR}"
 
             PATH="${LLVM_BIN_DIR}:$PATH"
 
 
-            # cmake -DCMAKE_BUILD_TYPE=Debug "../${CLANG_DIR}"
+            # cmake -DCMAKE_BUILD_TYPE=Debug "../${MULLE_CLANG_DIR}"
             # try to build cmake with cmake
             CC="${C_COMPILER}" CXX="${CXX_COMPILER}" \
                exekutor cmake \
                   -Wno-dev \
                   -G "${CMAKE_GENERATOR}" \
                   -DCLANG_VENDOR="${CLANG_VENDOR}" \
-                  -DCMAKE_BUILD_TYPE="${CLANG_BUILD_TYPE}" \
+                  -DCMAKE_BUILD_TYPE="${MULLE_CLANG_BUILD_TYPE}" \
                   -DCMAKE_INSTALL_PREFIX="${MULLE_CLANG_INSTALL_PREFIX}" \
                   ${CMAKE_FLAGS} \
-                  "${BUILD_RELATIVE}/../${CLANG_DIR}"
+                  "${BUILD_RELATIVE}/../${MULLE_CLANG_DIR}"
          exekutor cd "${OWD}"
       set +e
    fi
 
-   exekutor cd "${CLANG_BUILD_DIR}" || fail "build_clang: ${CLANG_BUILD_DIR} missing"
+   exekutor cd "${MULLE_CLANG_BUILD_DIR}" || fail "build_clang: ${MULLE_CLANG_BUILD_DIR} missing"
       exekutor ${MAKE} ${MAKE_FLAGS} "$@" || fail "build_clang: ${MAKE} failed"
    exekutor cd "${OWD}"
 }
@@ -733,8 +735,8 @@ download_mulle_clang()
       #
       # now we can derive some more values
       #
-      MULLE_CLANG_VERSION="`get_mulle_clang_version "${CLANG_DIR}"`" || exit 1
-      CLANG_VENDOR="`get_clang_vendor "${CLANG_DIR}"`" || exit 1
+      MULLE_CLANG_VERSION="`get_mulle_clang_version "${MULLE_CLANG_DIR}"`" || exit 1
+      CLANG_VENDOR="`get_clang_vendor "${MULLE_CLANG_DIR}"`" || exit 1
 
       log_verbose "CLANG_VENDOR=${CLANG_VENDOR}"
       log_verbose "MULLE_CLANG_VERSION=${MULLE_CLANG_VERSION}"
@@ -927,7 +929,7 @@ main()
          ;;
 
          --clang-debug)
-            CLANG_BUILD_TYPE=Debug
+            MULLE_CLANG_BUILD_TYPE=Debug
          ;;
 
          --prefix)
@@ -1005,30 +1007,21 @@ main()
    fi
 
    #
-   # these parameters are rarely needed
-   #
-   LLVM_BRANCH="release_${MULLE_OBJC_VERSION_BRANCH}"
-   CLANG_BRANCH="${LLVM_BRANCH}"
-
-   # "mulle_objcclang_${MULLE_OBJC_VERSION_BRANCH}"
-   MULLE_CLANG_BRANCH="mulle_objclang_${MULLE_OBJC_VERSION_BRANCH}"
-
-   #
    # it makes little sense to change these
    #
    SRC_DIR="src"
 
    LLVM_BUILD_TYPE="${LLVM_BUILD_TYPE:-Release}"
-   CLANG_BUILD_TYPE="${CLANG_BUILD_TYPE:-Release}"
+   MULLE_CLANG_BUILD_TYPE="${MULLE_CLANG_BUILD_TYPE:-Release}"
 
    LLVM_DIR="${SRC_DIR}/llvm"
-   CLANG_DIR="${SRC_DIR}/mulle-clang"
+   MULLE_CLANG_DIR="${SRC_DIR}/mulle-clang"
 
    BUILD_DIR="build"
    BUILD_RELATIVE=".."
 
    LLVM_BUILD_DIR="${BUILD_DIR}/llvm.d"
-   CLANG_BUILD_DIR="${BUILD_DIR}/mulle-clang.d"
+   MULLE_CLANG_BUILD_DIR="${BUILD_DIR}/mulle-clang.d"
 
    # override this to use pre-installed llvm
 
@@ -1042,7 +1035,6 @@ main()
 
    # blurb a little, this has some advantages
 
-   log_verbose "MULLE_OBJC_VERSION_BRANCH=${MULLE_OBJC_VERSION_BRANCH}"
    log_verbose "SYMLINK_PREFIX=${SYMLINK_PREFIX}"
 
    setup_build_environment

@@ -171,6 +171,10 @@ curl -O -L http://download.codeon.de/bottles/mulle-clang-4.0.0.4-zesty-amd64.deb
 sudo dpkg --install mulle-clang-4.0.0.4-zesty-amd64.deb
 ```
 
+Checksum         | Result
+-----------------|------------------
+shasum -b -a 256 | abe84134ac65bcba65a77d74d7b0c99d939132f65e79d309b534681ff1348b6e
+
 
 #### Ubuntu 16.04 LTS / Debian xenial 64 bit
 
@@ -179,6 +183,11 @@ curl -O -L http://download.codeon.de/bottles/mulle-clang-4.0.0.4-xenial-amd64.de
 sudo dpkg --install mulle-clang-4.0.0.4-xenial-amd64.deb
 ```
 
+Checksum         | Result
+-----------------|------------------
+shasum -b -a 256 | e881271925a0ddb3c49d0d413063badfa36bde1051161bf6164cc17517f42816
+
+
 #### Ubuntu 14.04 LTS / Debian trusty 64 bit
 
 ```
@@ -186,12 +195,20 @@ curl -O -L http://download.codeon.de/bottles/mulle-clang-4.0.0.4-trusty-amd64.de
 sudo dpkg --install mulle-clang-4.0.0.4-trusty-amd64.deb
 ```
 
+Checksum         | Result
+-----------------|------------------
+shasum -b -a 256 | 2eb6146bf3c073ae1f4d2c6ce6a69bb4e134cba371036c082cae4b1b8762d94a
+
 #### Ubuntu 12.04.5 LTS / Debian precise 64 bit
 
 ```
 curl -O -L http://download.codeon.de/bottles/mulle-clang-4.0.0.4-precise-amd64.deb
 sudo dpkg --install mulle-clang-4.0.0.4-precise-amd64.deb
 ```
+
+Checksum         | Result
+-----------------|------------------
+shasum -b -a 256 | 2ae3f4f6eb1513a6b0837c2b72606d8cdc0ede4d1f0361039c135efc85bbf5eb
 
 ### Manually
 

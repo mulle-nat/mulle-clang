@@ -623,7 +623,7 @@ download_clang()
       log_verbose "Unpacking into \"${MULLE_CLANG_DIR}\" ..."
       exekutor tar xfz mulle-clang.tgz || fail "tar archive corrupt"
       exekutor mkdir -p "`dirname -- "${MULLE_CLANG_DIR}"`" 2> /dev/null || exit 1
-      exekutor mv mulle-clang-${CLANG_VERSION} "${MULLE_CLANG_DIR}" || exit 1
+      exekutor mv mulle-clang-${MULLE_CLANG_VERSION} "${MULLE_CLANG_DIR}" || exit 1
    else
       log_fluff "\"${MULLE_CLANG_DIR}\" already exists"
    fi

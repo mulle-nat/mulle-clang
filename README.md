@@ -169,8 +169,8 @@ sudo apt-get update &&
 sudo apt-get install curl 
 
 curl -sS https://www.codeon.de/dists/nat-codeon.asc | sudo apt-key add -
+sudo echo "deb [arch=amd64] http://download.codeon.de `lsb_release -c -s` main" > /etc/apt/sources.list.d/codeon.de-main.list 
 
-sudo echo "deb http://download.codeon.de `lsb_release -c -s` main" > /etc/apt/sources.list.d/codeon.de-main.list &&
 sudo apt-get update &&
 sudo apt-get install mulle-clang
 ```

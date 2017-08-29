@@ -291,8 +291,14 @@ Decl *Parser::ParseObjCAtInterfaceDeclaration(SourceLocation AtLoc,
         EndProtoLoc, attrs.getList());
 
     if (Tok.is(tok::l_brace))
-      ParseObjCClassInstanceVariables(CategoryType, tok::objc_private, AtLoc);
-      
+    {
+       // @mulle-objc@ language: no class extensions
+       if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+          Diag(Tok, diag::err_mulle_objc_no_class_extension);
+       else
+       ParseObjCClassInstanceVariables(CategoryType, tok::objc_private, AtLoc);
+    }
+     
     ParseObjCInterfaceDeclList(tok::objc_not_keyword, CategoryType);
 
     return CategoryType;
@@ -443,6 +449,11 @@ ObjCTypeParamList *Parser::parseObjCTypeParamListOrProtocolRefs(
   SmallVector<Decl *, 4> typeParams;
   auto makeProtocolIdentsIntoTypeParameters = [&]() {
     unsigned index = 0;
+
+    // @mulle-objc@ language: turn off generics
+    if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+      Diag(Tok, diag::err_mulle_objc_no_cpp_generics);
+    else
     for (const auto &pair : protocolIdents) {
       DeclResult typeParam = Actions.actOnObjCTypeParam(
           getCurScope(), ObjCTypeParamVariance::Invariant, SourceLocation(),
@@ -860,6 +871,26 @@ void Parser::ParseObjCPropertyAttribute(ObjCDeclSpec &DS) {
 
     SourceLocation AttrName = ConsumeToken(); // consume last attribute name
 
+    // @mulle-objc@ language: remove strong, weak and friends
+    if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+    {
+      //  check that we know it, could also issue a warning maybe ?
+      if( ! (II->isStr("readonly") ||
+             II->isStr("assign") ||
+             II->isStr("retain") ||
+             II->isStr("copy") ||
+             II->isStr("nonnull") ||
+             II->isStr("nonatomic") ||
+             II->isStr("getter") ||
+             II->isStr("setter")))
+      {
+        Diag(Tok, diag::err_mulle_objc_no_support_for_property_modifier)
+          << II->getNameStart();
+        SkipUntil(tok::r_paren, StopAtSemi);
+        return;
+      }
+    }
+    
     if (II->isStr("readonly"))
       DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_readonly);
     else if (II->isStr("assign"))
@@ -1175,12 +1206,18 @@ void Parser::ParseObjCTypeQualifierList(ObjCDeclSpec &DS,
         Nullability = NullabilityKind::NonNull;
         break;
 
-      case objc_nullable: 
-        Qual = ObjCDeclSpec::DQ_CSNullability;
-        Nullability = NullabilityKind::Nullable;
-        break;
+      case objc_nullable:
+        // @mulle-objc@ language: remove nullable which is the wrong philosophy
+        if( ! getLangOpts().ObjCRuntime.hasMulleMetaABI())
+        {
+           Qual = ObjCDeclSpec::DQ_CSNullability;
+           Nullability = NullabilityKind::Nullable;
+           break;
+        }
+        Diag(Tok, diag::err_mulle_objc_no_nullable);
+        // fallthru to unspecified
 
-      case objc_null_unspecified: 
+      case objc_null_unspecified:
         Qual = ObjCDeclSpec::DQ_CSNullability;
         Nullability = NullabilityKind::Unspecified;
         break;
@@ -1938,10 +1975,15 @@ void Parser::ParseObjCClassInstanceVariables(Decl *interfaceDecl,
       }
       
       switch (Tok.getObjCKeywordID()) {
+      case tok::objc_package:
+         if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+         {
+            Diag(Tok, diag::err_mulle_objc_no_package);
+            continue;
+         }
       case tok::objc_private:
       case tok::objc_public:
       case tok::objc_protected:
-      case tok::objc_package:
         visibility = Tok.getObjCKeywordID();
         ConsumeToken();
         continue;
@@ -3285,6 +3327,33 @@ Parser::ParseObjCMessageExpressionBody(SourceLocation LBracLoc,
 
   unsigned nKeys = KeyIdents.size();
   if (nKeys == 0) {
+     // @mulle-objc@ AAM:  replace alloc/copy/mutableCopy with instantiate & Co
+    if( getLangOpts().ObjCAllocsAutoreleasedObjects && selIdent)
+    {
+       StringRef   s;
+       
+       s = selIdent->getName();
+       if( s == "alloc")
+       {
+          Diag( Loc, diag::warn_mulle_aam_rename_selector) << s << "instantiate";
+          selIdent = &PP.getIdentifierTable().get( "instantiate");
+       }
+       else if( s == "new")
+       {
+          Diag( Loc, diag::warn_mulle_aam_rename_selector) << s << "instantiatedObject";
+          selIdent = &PP.getIdentifierTable().get( "instantiatedObject");
+       }
+       else if( s == "copy")
+       {
+          Diag( Loc, diag::warn_mulle_aam_rename_selector) << s << "immutableInstance";
+          selIdent = &PP.getIdentifierTable().get( "immutableInstance");
+       }
+       else if( s == "mutableCopy")
+       {
+          Diag( Loc, diag::warn_mulle_aam_rename_selector) << s << "mutableInstance";
+          selIdent = &PP.getIdentifierTable().get( "mutableInstance");
+       }
+    }
     KeyIdents.push_back(selIdent);
     KeyLocs.push_back(Loc);
   }

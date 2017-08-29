@@ -6115,6 +6115,41 @@ def warn_objc_unsafe_perform_selector : Warning<
 def note_objc_unsafe_perform_selector_method_declared_here :  Note<
   "method %0 that returns %1 declared here">;
 
+// @mulle-objc@ compiler: error message definitions begin
+def error_mulle_aam_ivar_access : Error<"in AAM instance variables such as %0 are not accessible">, AccessControl;
+def err_mulle_aam_unsupported_method_family : Error<
+"in AAM method %0 can not be defined, use a non AAM category">;
+def err_mulle_aam_illegal_explicit_message : Error<
+"in AAM method %0 is not available">;
+def err_mulle_aam_illegal_retained_message : Error<
+"in AAM method %0 is not available, because it returns a retained object">;
+def err_mulle_aam_illegal_consumed_message : Error<
+"in AAM method %0 is not available, because it needs a retained argument">;
+def err_mulle_objc_runtime_function_missing : Error<
+"the mulle-objc runtime function %0 has not been declared yet">;
+def err_mulle_objc_property_synthesize_wrong_name : Error<
+"the mulle-objc runtime synthesized instance variable name must be the name of the property, prefixed by an underscrore.">;
+def err_mulle_objc_no_property_dot_expression : Error<
+"the mulle-objc runtime does not support . expressions with properties, use regular method calls">;
+def err_mulle_error_missing_property_ivar_decl : Error<
+  "synthesized property %0 needs a compatible"
+  " instance variable of the same name, prefixed with an underscore.">;
+// these are really CodeGen errors
+def err_mulle_objc_preprocessor_not_integer_value : Error<
+  "special preprocessor directives for the mulle-objc runtime must be integers only">;
+def err_mulle_objc_preprocessor_missing_include : Error<
+  "missing #include <mulle_objc_runtime/mulle_objc_runtime> in compilation. Can not emit runtime information">;
+def err_mulle_objc_runtime_version_mismatch: Error<
+   "the runtime load version %0 is not compatible with this compiler %1">;
+def err_mulle_objc_hash_invalid: Error<
+   "Your string '%0' hashed to an invalid value. Please tweet it to @mulle_nat then reword it">;
+def err_mulle_objc_setjmp_not_included: Error<
+   "include <setjmp.h> before using Mulle ObjC exceptions">;
+def err_mulle_objc_jmpbuf_size_unknown: Error<
+   "the compiler failed to figure out sizeof( struct jmpbuf)">;
+   
+// @mulle-objc@ compiler: error message definitions end
+  
 def warn_setter_getter_impl_required : Warning<
   "property %0 requires method %1 to be defined - "
   "use @synthesize, @dynamic or provide a method implementation "

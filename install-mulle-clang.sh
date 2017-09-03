@@ -16,19 +16,28 @@ CMAKE_VERSION_MAJOR="3"
 CMAKE_VERSION_MINOR="5"
 CMAKE_VERSION_PATCH="2"
 
+# compile it like LLVM does (everything all the time)
+# only useful if you're creating installers IMO
+BY_THE_BOOK="YES"
+
 
 MULLE_CLANG_ARCHIVE="https://github.com/Codeon-GmbH/mulle-clang/archive/${MULLE_CLANG_VERSION}.tar.gz"
 
-# regular releases
-# LLVM_ARCHIVE="http://llvm.org/releases/${LLVM_VERSION}/llvm-${LLVM_VERSION}.src.tar.xz"
-# LIBCXX_ARCHIVE="http://llvm.org/releases/${LLVM_VERSION}/libcxx-${LLVM_VERSION}.src.tar.xz"
-# LIBCXXABI_ARCHIVE="http://llvm.org/releases/${LLVM_VERSION}/libcxxabi-${LLVM_VERSION}.src.tar.xz"
-
+if [ -z "${LLVM_RC}" ]
+then
+   #regular releases
+   LLVM_ARCHIVE="http://llvm.org/releases/${LLVM_VERSION}/llvm-${LLVM_VERSION}.src.tar.xz"
+   LIBCXX_ARCHIVE="http://llvm.org/releases/${LLVM_VERSION}/libcxx-${LLVM_VERSION}.src.tar.xz"
+   LIBCXXABI_ARCHIVE="http://llvm.org/releases/${LLVM_VERSION}/libcxxabi-${LLVM_VERSION}.src.tar.xz"
+else
 # prereleases
-LLVM_ARCHIVE="http://prereleases.llvm.org/releases/${LLVM_VERSION}/rc${LLVM_RC}/llvm-${LLVM_VERSION}rc${LLVM_RC}.src.tar.xz"
-LIBCXX_ARCHIVE="http://prereleases.llvm.org/releases/${LLVM_VERSION}/rc${LLVM_RC}/libcxx-${LLVM_VERSION}rc${LLVM_RC}.src.tar.xz"
-LIBCXXABI_ARCHIVE="http://prereleases.llvm.org/releases/${LLVM_VERSION}/rc${LLVM_RC}/libcxxabi-${LLVM_VERSION}rc${LLVM_RC}.src.tar.xz"
+   LLVM_ARCHIVE="http://prereleases.llvm.org/releases/${LLVM_VERSION}/rc${LLVM_RC}/llvm-${LLVM_VERSION}rc${LLVM_RC}.src.tar.xz"
+   LIBCXX_ARCHIVE="http://prereleases.llvm.org/releases/${LLVM_VERSION}/rc${LLVM_RC}/libcxx-${LLVM_VERSION}rc${LLVM_RC}.src.tar.xz"
+   LIBCXXABI_ARCHIVE="http://prereleases.llvm.org/releases/${LLVM_VERSION}/rc${LLVM_RC}/libcxxabi-${LLVM_VERSION}rc${LLVM_RC}.src.tar.xz"
+fi
 
+#
+#
 #
 CMAKE_VERSION="${CMAKE_VERSION_MAJOR}.${CMAKE_VERSION_MINOR}"
 CMAKE_PATCH_VERSION="${CMAKE_VERSION}.${CMAKE_VERSION_PATCH}"
@@ -154,6 +163,21 @@ fail()
 internal_fail()
 {
    fail "$@"
+}
+
+
+
+tar_fail()
+{
+   case "${UNAME}" in
+      MINGW*)
+         log_warning "%@" "ignored, because we're on MinGW and crossing fingers, that just tests are affected"
+      ;;
+
+      *)
+         fail "$@"
+      ;;
+   esac
 }
 
 
@@ -410,25 +434,25 @@ get_core_count()
 {
    local count
 
-    command -v "nproc" > /dev/null 2>&1
-    if [ $? -ne 0 ]
-    then
-       command -v "sysctl" > /dev/null 2>&1
-       if [ $? -ne 0 ]
-       then
-          log_fluff "can't figure out core count, assume 4"
-       else
-          count="`sysctl -n hw.ncpu`"
-       fi
-    else
-       count="`nproc`"
-    fi
+   command -v "nproc" > /dev/null 2>&1
+   if [ $? -ne 0 ]
+   then
+      command -v "sysctl" > /dev/null 2>&1
+      if [ $? -ne 0 ]
+      then
+         log_fluff "can't figure out core count, assume 4"
+      else
+         count="`sysctl -n hw.ncpu`"
+      fi
+   else
+      count="`nproc`"
+   fi
 
-    if [ -z "$count" ]
-    then
-       count=4
-    fi
-    echo $count
+   if [ -z "$count" ]
+   then
+      count=4
+   fi
+   echo $count
 }
 
 
@@ -440,6 +464,7 @@ get_core_count()
 get_mulle_clang_version()
 {
    local src="$1"
+   local fallback="$2"
 
    if [ ! -d "${src}" ]
    then
@@ -451,7 +476,20 @@ get_mulle_clang_version()
       fail "No MULLE_CLANG_VERSION version found in \"${src}\""
    fi
 
-   grep MULLE_CLANG_VERSION "${src}/install-mulle-clang.sh" | head -1 | sed 's/.*\"\(.*\)\"/\1/'
+   local  version
+
+   version="`head -50 "${src}/install-mulle-clang.sh" \
+      | egrep '^MULLE_CLANG_VERSION=' \
+      | head -1 \
+      | sed 's/.*\"\(.*\)\".*/\1/'`"
+
+   if [ -z "${version}" ]
+   then
+      log_warning "Could not find MULLE_CLANG_VERSION in download, using default"
+      echo "${fallback}"
+   else
+      echo "${version}"
+   fi
 }
 
 
@@ -467,18 +505,11 @@ get_runtime_load_version()
 
 get_clang_vendor()
 {
-   local src
-
-   src="$1"
+   local src="$1"
+   local compiler_version="$2"
 
    local compiler_version
    local runtime_load_version
-
-   compiler_version="`get_mulle_clang_version "${src}"`"
-   if [ -z "${compiler_version}" ]
-   then
-      fail "Could not determine mulle-clang version"
-   fi
 
    runtime_load_version="`get_runtime_load_version "${src}"`"
    if [ -z "${runtime_load_version}" ]
@@ -510,6 +541,8 @@ setup_build_environment()
          PATH="$PATH:/c/Program Files/CMake/bin/cmake:/c/Program Files (x86)/Microsoft Visual Studio 14.0/VC/bin"
 
          install_binary_if_missing "nmake" "https://www.visualstudio.com/de-de/downloads/download-visual-studio-vs.aspx and then add the directory containing nmake to your %PATH%"
+
+         install_binary_if_missing "xz" "https://tukaani.org/xz and then add the directory containing xz to your %PATH%"
 
          CMAKE_GENERATOR="NMake Makefiles"
          MAKE=nmake.exe
@@ -558,13 +591,9 @@ setup_build_environment()
 
 _llvm_module_download()
 {
-   local name
-   local archive
-   local dst
-
-   name="$1"
-   archive="$2"
-   dst="$3"
+   local name="$1"
+   local archive="$2"
+   local dst="$3"
 
    local filename
    local extractname
@@ -574,12 +603,17 @@ _llvm_module_download()
 
    if [ ! -f "${filename}" ]
    then
+      log_verbose "Downloading \"${name}\" from \"${archive}\" ..."
+
       exekutor curl -L -C- -o "_${filename}" "${archive}"  || fail "curl failed"
-      exekutor tar tfJ "_${filename}" > /dev/null || fail "tar archive corrupt"
+      exekutor tar tfJ "_${filename}" > /dev/null || tar_fail "tar archive corrupt"
       exekutor mv "_${filename}" "${filename}" || exit 1
    fi
 
-   exekutor tar xfJ "${filename}" || fail "tar failed"
+   log_verbose "Unpacking into \"${dst}/${name}\" ..."
+
+   exekutor tar xfJ "${filename}" || tar_fail "tar failed"
+   exekutor mkdir -p "${dst}" 2> /dev/null
    exekutor mv "${extractname}" "${dst}/${name}" || exit 1
 }
 
@@ -590,7 +624,7 @@ download_llvm()
 
    if [ ! -d "${LLVM_DIR}" ]
    then
-      log_verbose "Downloading llvm from \"${LLVM_ARCHIVE}\" ..."
+      exekutor mkdir -p "`dirname -- "${SRC_DIR}"`" 2> /dev/null || exit 1
 
       _llvm_module_download "llvm" "${LLVM_ARCHIVE}" "${SRC_DIR}"
    fi
@@ -628,19 +662,18 @@ download_clang()
       then
          log_verbose "Downloading mulle-clang from \"${MULLE_CLANG_ARCHIVE}\" ..."
          exekutor curl -L -C- -o _mulle-clang.tgz "${MULLE_CLANG_ARCHIVE}"  || fail "curl failed"
-         exekutor tar tfz _mulle-clang.tgz > /dev/null || fail "tar archive corrupt"
+         exekutor tar tfz _mulle-clang.tgz > /dev/null || tar_fail "tar archive corrupt"
          exekutor mv _mulle-clang.tgz mulle-clang.tgz  || exit 1
       fi
 
       log_verbose "Unpacking into \"${MULLE_CLANG_DIR}\" ..."
-      exekutor tar xfz mulle-clang.tgz || fail "tar archive corrupt"
+      exekutor tar xfz mulle-clang.tgz || tar_fail "tar archive corrupt"
       exekutor mkdir -p "`dirname -- "${MULLE_CLANG_DIR}"`" 2> /dev/null || exit 1
       exekutor mv mulle-clang-${MULLE_CLANG_VERSION} "${MULLE_CLANG_DIR}" || exit 1
    else
       log_fluff "\"${MULLE_CLANG_DIR}\" already exists"
    fi
 }
-
 
 
 #
@@ -661,6 +694,7 @@ _build_llvm()
             exekutor cmake \
                -Wno-dev \
                -G "${CMAKE_GENERATOR}" \
+               -DCLANG_VENDOR="${CLANG_VENDOR}" \
                -DCMAKE_BUILD_TYPE="${LLVM_BUILD_TYPE}" \
                -DCMAKE_INSTALL_PREFIX="${MULLE_LLVM_INSTALL_PREFIX}" \
                -DLLVM_ENABLE_CXX1Y:BOOL=OFF \
@@ -736,19 +770,27 @@ build_clang()
 
 download_mulle_clang()
 {
+#
 # try to download most problematic first
 # instead of downloading llvm first for an hour...
+# but this won't work if we are doing it by the book
+#
+   if [ "${BUILD_LLVM}" = "YES" -a "${BY_THE_BOOK}" = "YES" ]
+   then
+      download_llvm
+   fi
+
    log_info "Downloading mulle-clang ${MULLE_CLANG_VERSION}..."
 
-   if [ "${BUILD_CLANG}" != "NO" ]
+   if [ "${BUILD_CLANG}" = "YES" ]
    then
       download_clang
 
       #
       # now we can derive some more values
       #
-      MULLE_CLANG_VERSION="`get_mulle_clang_version "${MULLE_CLANG_DIR}"`" || exit 1
-      CLANG_VENDOR="`get_clang_vendor "${MULLE_CLANG_DIR}"`" || exit 1
+      MULLE_CLANG_VERSION="`get_mulle_clang_version "${MULLE_CLANG_DIR}" "${MULLE_CLANG_VERSION}"`" || exit 1
+      CLANG_VENDOR="`get_clang_vendor "${MULLE_CLANG_DIR}" "${MULLE_CLANG_VERSION}"`" || exit 1
 
       log_verbose "CLANG_VENDOR=${CLANG_VENDOR}"
       log_verbose "MULLE_CLANG_VERSION=${MULLE_CLANG_VERSION}"
@@ -756,7 +798,7 @@ download_mulle_clang()
 
 # should check if llvm is installed, if yes
 # check proper version and then use it
-   if [ "${BUILD_LLVM}" != "NO" ]
+   if [ "${BUILD_LLVM}" = "YES" -a "${BY_THE_BOOK}" = "NO" ]
    then
       download_llvm
    fi
@@ -790,9 +832,9 @@ is likely to get reused. If this is not what you want, [CTRL]-[C] now and do:
 
 # should check if llvm is installed, if yes
 # check proper version and then use it
-   if [ "${BUILD_LLVM}" != "NO" ]
+   if [ "${BUILD_LLVM}" = "YES" ]
    then
-      if [ "${INSTALL_LLVM}" != "NO" ]
+      if [ "${INSTALL_LLVM}" = "YES" ]
       then
          build_llvm install
       else
@@ -800,7 +842,7 @@ is likely to get reused. If this is not what you want, [CTRL]-[C] now and do:
       fi
    fi
 
-   if [ "${BUILD_CLANG}" != "NO" ]
+   if [ "${BUILD_CLANG}" = "YES" -a "${BY_THE_BOOK}" = "NO" ]
    then
       build_clang install
    fi
@@ -811,9 +853,9 @@ _build_mulle_clang()
 {
 # should check if llvm is installed, if yes
 # check proper version and then use it
-   if [ "${BUILD_LLVM}" != "NO" ]
+   if [ "${BUILD_LLVM}" = "YES" ]
    then
-      if [ "${INSTALL_LLVM}" != "NO" ]
+      if [ "${INSTALL_LLVM}" = "YES" ]
       then
          _build_llvm install
       else
@@ -821,7 +863,7 @@ _build_mulle_clang()
       fi
    fi
 
-   if [ "${BUILD_CLANG}" != "NO" ]
+   if [ "${BUILD_CLANG}" = "YES" -a "${BY_THE_BOOK}" = "NO" ]
    then
       _build_clang install
    fi
@@ -906,6 +948,10 @@ main()
    OWD="`pwd -P`"
    PREFIX="${OWD}"
 
+   local BUILD_CLANG="${BUILD_CLANG:-YES}"
+   local BUILD_LLVM="${BUILD_LLVM:-YES}"
+   local INSTALL_LLVM="${INSTALL_LLVM:-YES}"
+
    while [ $# -ne 0 ]
    do
       case "$1" in
@@ -930,6 +976,14 @@ main()
             FLUFF="YES"
             VERBOSE="YES"
             MULLE_FLAG_LOG_EXECUTOR="YES"
+         ;;
+
+         --all-in-one)
+            BY_THE_BOOK="YES"
+         ;;
+
+         --separate)
+            BY_THE_BOOK="NO"
          ;;
 
          --build-cmake)
@@ -1026,7 +1080,12 @@ main()
    MULLE_CLANG_BUILD_TYPE="${MULLE_CLANG_BUILD_TYPE:-Release}"
 
    LLVM_DIR="${SRC_DIR}/llvm"
-   MULLE_CLANG_DIR="${SRC_DIR}/mulle-clang"
+   if [ "${BY_THE_BOOK}" = "YES" ]
+   then
+      MULLE_CLANG_DIR="${LLVM_DIR}/tools/mulle-clang"
+   else
+      MULLE_CLANG_DIR="${SRC_DIR}/mulle-clang"
+   fi
 
    BUILD_DIR="build"
    BUILD_RELATIVE=".."

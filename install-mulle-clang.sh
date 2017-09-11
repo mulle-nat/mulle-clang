@@ -9,7 +9,7 @@ MULLE_CLANG_VERSION="5.0.0.5"
 
 # required LLVM version
 LLVM_VERSION="5.0.0"
-LLVM_RC="3"
+#LLVM_RC="3"
 
 
 CMAKE_VERSION_MAJOR="3"

@@ -1670,7 +1670,7 @@ void CompilerInvocation::setLangDefaults(LangOptions &Opts, InputKind IK,
   }
 
    // @mulle-objc@ AAM:  .aam filename extension support
-  if( IK == IK_ObjCAAM)
+  if( IK.getLanguage() == InputKind::ObjCAAM)
   {
      Opts.ObjCAllocsAutoreleasedObjects = 1;
      Opts.ObjC1 = Opts.ObjC2 = 1;

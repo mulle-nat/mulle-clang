@@ -1490,7 +1490,7 @@ void CodeGenFunction::emitObjCSetterBodyStatement( ObjCIvarRefExpr &ivarRef, Qua
    
    BinaryOperator assign(&ivarRef, finalArg, BO_Assign,
                          ivarRef.getType(), VK_RValue, OK_Ordinary,
-                         SourceLocation(), false);
+                         SourceLocation(), FPOptions());
    EmitStmt(&assign);
 }
 
@@ -1630,7 +1630,7 @@ CodeGenFunction::generateObjCSetterBody(const ObjCImplementationDecl *classImpl,
 
   
   //
-  // @mulle-objc@ MetaABI: property setter accesses paramDecl
+  // @mulle-objc@ MetaABI: property setter accesses paramDecl >
   //
   // this code really should be runtime specific
   //
@@ -1653,11 +1653,32 @@ CodeGenFunction::generateObjCSetterBody(const ObjCImplementationDecl *classImpl,
       emitObjCSetterBodyStatement( ivarRef, argType, &memberExpr);
       return;
   }
-  ParmVarDecl *argDecl = *setterMethod->param_begin();
-  QualType argType = argDecl->getType().getNonReferenceType();
+  // @mulle-objc@ MetaABI: property setter accesses paramDecl <
+
   DeclRefExpr arg(argDecl, false, argType, VK_LValue, SourceLocation());
-  // need this duplicate function, because otherwise arg vanishes
-  emitObjCSetterBodyStatement( ivarRef, argType, &arg);
+  ImplicitCastExpr argLoad(ImplicitCastExpr::OnStack,
+                           argType.getUnqualifiedType(), CK_LValueToRValue,
+                           &arg, VK_RValue);
+    
+  // The property type can differ from the ivar type in some situations with
+  // Objective-C pointer types, we can always bit cast the RHS in these cases.
+  // The following absurdity is just to ensure well-formed IR.
+  CastKind argCK = CK_NoOp;
+  if (ivarRef.getType()->isObjCObjectPointerType()) {
+    if (argLoad.getType()->isObjCObjectPointerType())
+      argCK = CK_BitCast;
+    else if (argLoad.getType()->isBlockPointerType())
+      argCK = CK_BlockPointerToObjCPointerCast;
+    else
+      argCK = CK_CPointerToObjCPointerCast;
+  } else if (ivarRef.getType()->isBlockPointerType()) {
+     if (argLoad.getType()->isBlockPointerType())
+      argCK = CK_BitCast;
+    else
+      argCK = CK_AnyPointerToBlockPointerCast;
+  } else if (ivarRef.getType()->isPointerType()) {
+    argCK = CK_BitCast;
+  }
   ImplicitCastExpr argCast(ImplicitCastExpr::OnStack,
                            ivarRef.getType(), argCK, &argLoad,
                            VK_RValue);
@@ -1672,6 +1693,7 @@ CodeGenFunction::generateObjCSetterBody(const ObjCImplementationDecl *classImpl,
                         SourceLocation(), FPOptions());
   EmitStmt(&assign);
 }
+
 
 /// \brief Generate an Objective-C property setter function.
 ///

@@ -2909,9 +2909,10 @@ clang::CodeGen::CreateGNUObjCRuntime(CodeGenModule &CGM) {
   case ObjCRuntime::MacOSX:
   case ObjCRuntime::iOS:
   case ObjCRuntime::WatchOS:
-// @mulle-objc@ compiler: ugliness add ObjCRuntime::Mulle to other runtime code
+// @mulle-objc@ compiler: ugliness add ObjCRuntime::Mulle to other runtime code >
   case ObjCRuntime::Mulle:
     llvm_unreachable("these runtimes are not GNU runtimes");
+// @mulle-objc@ compiler: ugliness add ObjCRuntime::Mulle to other runtime code <
   }
   llvm_unreachable("bad runtime");
 }

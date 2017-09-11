@@ -1117,7 +1117,7 @@ void ObjCMethodDecl::createImplicitParams(ASTContext &Context,
   setSelfDecl(Self);
   // @mulle-objc@ declare self as non-null >
   if( Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
-      self->addAttr( NonNullAttr::CreateImplicit( Context, 0, 0));
+      Self->addAttr( NonNullAttr::CreateImplicit( Context, 0, 0));
   // @mulle-objc@ declare self as non-null <
   
   if (selfIsConsumed)

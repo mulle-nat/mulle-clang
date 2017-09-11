@@ -107,9 +107,9 @@ namespace {
          C  =  CGM.CreateRuntimeFunction(llvm::FunctionType::get(ObjectPtrTy,
                                                               params, false),
                                          name,
-                                         llvm::AttributeSet::get(CGM.getLLVMContext(),
-                                                                 llvm::AttributeSet::FunctionIndex,
-                                                                 llvm::Attribute::NonLazyBind));
+                                         llvm::AttributeList::get(CGM.getLLVMContext(),
+                                                   llvm::AttributeList::FunctionIndex,
+                                                   llvm::Attribute::NonLazyBind));
          return( C);
       }
 
@@ -132,8 +132,8 @@ namespace {
          C  =  CGM.CreateRuntimeFunction(llvm::FunctionType::get(ObjectPtrTy,
                                                               params, false),
                                          name,
-                                         llvm::AttributeSet::get(CGM.getLLVMContext(),
-                                                                 llvm::AttributeSet::FunctionIndex,
+                                         llvm::AttributeList::get(CGM.getLLVMContext(),
+                                                                 llvm::AttributeList::FunctionIndex,
                                                                  llvm::Attribute::NonLazyBind));
          return( C);
       }
@@ -184,8 +184,8 @@ namespace {
          C  =  CGM.CreateRuntimeFunction(llvm::FunctionType::get(ObjectPtrTy,
                                                               params, false),
                                          name,
-                                         llvm::AttributeSet::get(CGM.getLLVMContext(),
-                                                                 llvm::AttributeSet::FunctionIndex,
+                                         llvm::AttributeList::get(CGM.getLLVMContext(),
+                                                                 llvm::AttributeList::FunctionIndex,
                                                                  llvm::Attribute::NonLazyBind));
 
 
@@ -294,11 +294,11 @@ namespace {
          case 0  : name = "mulle_objc_unfailingfastlookup_infraclass"; break;
          }
 
-         llvm::AttributeSet   attributes = llvm::AttributeSet::get(CGM.getLLVMContext(),
-                                                                  llvm::AttributeSet::FunctionIndex,
+         llvm::AttributeList   attributes = llvm::AttributeList::get(CGM.getLLVMContext(),
+                                                                  llvm::AttributeList::FunctionIndex,
                                                                   llvm::Attribute::ReadNone);
          attributes.addAttribute(CGM.getLLVMContext(),
-                                                                  llvm::AttributeSet::FunctionIndex,
+                                                                  llvm::AttributeList::FunctionIndex,
                                                                   llvm::Attribute::NoUnwind);
          fn = CGM.CreateRuntimeFunction(llvm::FunctionType::get( ObjectPtrTy,
 
@@ -637,8 +637,8 @@ namespace {
          CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.Int32Ty,
                                                            params, false),
                                    "_setjmp",
-                                   llvm::AttributeSet::get(CGM.getLLVMContext(),
-                                                           llvm::AttributeSet::FunctionIndex,
+                                   llvm::AttributeList::get(CGM.getLLVMContext(),
+                                                           llvm::AttributeList::FunctionIndex,
                                                            llvm::Attribute::NonLazyBind));
       }
 
@@ -6389,8 +6389,7 @@ ObjCCommonTypesHelper::ObjCCommonTypesHelper(CodeGen::CodeGenModule &cgm)
                                          Int8PtrTy,
                                          SelectorIDTy,
                                          SelectorIDTy,
-                                         SelectorIDTy,
-                                         nullptr);
+                                         SelectorIDTy);
 
    // struct _mulle_objc_propertylist
    // {
@@ -6399,7 +6398,7 @@ ObjCCommonTypesHelper::ObjCCommonTypesHelper(CodeGen::CodeGenModule &cgm)
    // };
    PropertyListTy =
    llvm::StructType::create("struct._mulle_objc_propertylist", IntTy,
-                            llvm::ArrayType::get(PropertyTy, 0), nullptr);
+                            llvm::ArrayType::get(PropertyTy, 0));
    // struct _prop_list_t *
    PropertyListPtrTy = llvm::PointerType::getUnqual(PropertyListTy);
 
@@ -6417,8 +6416,7 @@ ObjCCommonTypesHelper::ObjCCommonTypesHelper(CodeGen::CodeGenModule &cgm)
    // };
 
    MethodTy = llvm::StructType::create("struct._mulle_objc_method",
-                                       SelectorIDTy, Int8PtrTy, Int8PtrTy, IntTy, Int8PtrTy,
-                                       nullptr);
+                                       SelectorIDTy, Int8PtrTy, Int8PtrTy, IntTy, Int8PtrTy);
 
    // struct _objc_cache *
    CacheTy = llvm::StructType::create(VMContext, "struct._mulle_objc_cache");
@@ -6435,7 +6433,7 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
    // }
    MethodDescriptionTy =
    llvm::StructType::create("struct._mulle_objc_methoddescriptor",
-                            SelectorIDTy, Int8PtrTy, nullptr);
+                            SelectorIDTy, Int8PtrTy);
 
    // struct _objc_method_description_list {
    //   int count;
@@ -6443,7 +6441,7 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
    // }
    MethodDescriptionListTy = llvm::StructType::create(
                                                       "struct._mulle_objc_methoddescriptorlist", IntTy,
-                                                      llvm::ArrayType::get(MethodDescriptionTy, 0), nullptr);
+                                                      llvm::ArrayType::get(MethodDescriptionTy, 0));
 
    // struct _objc_method_description_list *
    MethodDescriptionListPtrTy =  llvm::PointerType::getUnqual(MethodDescriptionListTy);
@@ -6456,14 +6454,14 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
    // }
    SuperTy =
    llvm::StructType::create("struct._mulle_objc_super",
-                            SuperIDTy, Int8PtrTy, ClassIDTy, SelectorIDTy, nullptr);
+                            SuperIDTy, Int8PtrTy, ClassIDTy, SelectorIDTy);
 
    // struct _mulle_objc_superlist {
    //   int count;
    //   struct _mulle_objc_super[1];
    // }
    SuperListTy = llvm::StructType::create( "struct._mulle_objc_superlist", IntTy,
-                                                      llvm::ArrayType::get(SuperTy, 0), nullptr);
+                                                      llvm::ArrayType::get(SuperTy, 0));
 
    // struct _mulle_objc_superlistlist *
    SuperListPtrTy =llvm::PointerType::getUnqual(SuperListTy);
@@ -6477,14 +6475,13 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
    // }
    ProtocolTy =
    llvm::StructType::create("struct._mulle_objc_protocol",
-                            SelectorIDTy, Int8PtrTy, nullptr);
+                            SelectorIDTy, Int8PtrTy);
 
    ProtocolListTy =
    llvm::StructType::create(VMContext, "struct._mulle_objc_protocollist");
    ProtocolListTy->setBody(llvm::PointerType::getUnqual(ProtocolListTy),
                            LongTy,
-                           llvm::ArrayType::get(ProtocolTy, 0),
-                           nullptr);
+                           llvm::ArrayType::get(ProtocolTy, 0));
 
    // struct _objc_protocol_list *
    ProtocolListPtrTy = llvm::PointerType::getUnqual(ProtocolListTy);
@@ -6503,8 +6500,8 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
                     IvarIDTy,    // ivar_id
                     Int8PtrTy,   // name
                     Int8PtrTy,   // signature
-                    IntTy,       // offset
-                    nullptr);
+                    IntTy       // offset
+                    );
 
    // struct _objc_ivar_list *
    IvarListTy =
@@ -6519,7 +6516,7 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
    // struct _objc_class_extension *
    ClassExtensionTy =
    llvm::StructType::create("struct._objc_classextension",
-                            IntTy, Int8PtrTy, PropertyListPtrTy, nullptr);
+                            IntTy, Int8PtrTy, PropertyListPtrTy);
    ClassExtensionPtrTy = llvm::PointerType::getUnqual(ClassExtensionTy);
 
    ClassTy = llvm::StructType::create(VMContext, "struct._mulle_objc_loadclass");
@@ -6570,8 +6567,8 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
                     ProtocolListPtrTy, // protocols
                     ClassIDPtrTy,      // protocolclassids
 
-                    Int8PtrTy,         // origin,
-                    nullptr);
+                    Int8PtrTy         // origin,
+                    );
 
    ClassPtrTy = llvm::PointerType::getUnqual(ClassTy);
 
@@ -6611,8 +6608,8 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
                             ProtocolListPtrTy,
                             ClassIDPtrTy,
                             
-                            Int8PtrTy,
-                            nullptr);
+                            Int8PtrTy
+                            );
 
    //   struct _mulle_objc_loadstaticstring
    //   {
@@ -6621,7 +6618,7 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
 
    StaticStringTy =
    llvm::StructType::create("struct._mulle_objc_loadstaticstring",
-                            Int8PtrTy, nullptr);
+                            Int8PtrTy);
 
    //   struct _mulle_objc_loadhashname
    //   {
@@ -6631,7 +6628,7 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
 
    HashNameTy =
    llvm::StructType::create("struct._mulle_objc_loadhashname",
-                            ClassIDTy, Int8PtrTy, nullptr);
+                            ClassIDTy, Int8PtrTy);
 
    // Global metadata structures
 
@@ -6645,7 +6642,7 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
    SymtabTy =
    llvm::StructType::create("struct._objc_symtab",
                             LongTy, SelectorIDTy, ShortTy, ShortTy,
-                            llvm::ArrayType::get(Int8PtrTy, 0), nullptr);
+                            llvm::ArrayType::get(Int8PtrTy, 0));
    SymtabPtrTy = llvm::PointerType::getUnqual(SymtabTy);
 
    // struct _objc_module {
@@ -6656,7 +6653,7 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
    //  }
    ModuleTy =
    llvm::StructType::create("struct._objc_module",
-                            LongTy, LongTy, Int8PtrTy, SymtabPtrTy, nullptr);
+                            LongTy, LongTy, Int8PtrTy, SymtabPtrTy);
 
 
    //
@@ -6664,20 +6661,16 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
    //
    ClassListTy = llvm::StructType::create("struct._mulle_objc_loadclasslist",
                             IntTy,
-                            llvm::PointerType::getUnqual( ClassPtrTy),
-                            nullptr);
+                            llvm::PointerType::getUnqual( ClassPtrTy));
    CategoryListTy = llvm::StructType::create("struct._mulle_objc_loadcategorylist",
                             IntTy,
-                            llvm::PointerType::getUnqual( llvm::PointerType::getUnqual( CategoryTy)),
-                            nullptr);
+                            llvm::PointerType::getUnqual( llvm::PointerType::getUnqual( CategoryTy)));
    StaticStringListTy = llvm::StructType::create("struct._mulle_objc_loadcategorylist",
                                              IntTy,
-                                             llvm::PointerType::getUnqual( llvm::PointerType::getUnqual( StaticStringTy)),
-                                             nullptr);
+                                             llvm::PointerType::getUnqual( llvm::PointerType::getUnqual( StaticStringTy)));
    HashNameListTy = llvm::StructType::create("struct._mulle_objc_loadhashnamelist",
                                              IntTy,
-                                             llvm::PointerType::getUnqual( llvm::PointerType::getUnqual( HashNameTy)),
-                                             nullptr);
+                                             llvm::PointerType::getUnqual( llvm::PointerType::getUnqual( HashNameTy)));
 
    LoadInfoTy = llvm::StructType::create("struct._mulle_objc_loadinfo",
                             IntTy,
@@ -6689,8 +6682,7 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
                             llvm::PointerType::getUnqual( CategoryListTy),
                             llvm::PointerType::getUnqual( SuperListTy),
                             llvm::PointerType::getUnqual( StaticStringListTy),
-                            llvm::PointerType::getUnqual( HashNameListTy),
-                            nullptr);
+                            llvm::PointerType::getUnqual( HashNameListTy));
 
    ExceptionDataTy = nullptr; // later on demand
 }
@@ -6731,8 +6723,7 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
    ExceptionDataTy =
    llvm::StructType::create("struct._mulle_objc_exception_data",
                             StackPtrTy,
-                            llvm::ArrayType::get(CGM.Int32Ty,SetJmpBufferInts),
-                            nullptr);
+                            llvm::ArrayType::get(CGM.Int32Ty,SetJmpBufferInts));
    return( ExceptionDataTy);
 }
 

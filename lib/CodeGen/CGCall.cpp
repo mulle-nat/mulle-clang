@@ -2396,9 +2396,7 @@ void CodeGenFunction::EmitFunctionProlog(const CGFunctionInfo &FI,
          {
             if (const ImplicitParamDecl *IPD = dyn_cast<ImplicitParamDecl>(Arg)) {
                if (IPD->getAttr<NonNullAttr>())
-                  AI->addAttr(llvm::AttributeSet::get(getLLVMContext(),
-                                                      AI->getArgNo() + 1,
-                                                      llvm::Attribute::NonNull));
+                  AI->addAttr( llvm::Attribute::NonNull);
             }
          }
 

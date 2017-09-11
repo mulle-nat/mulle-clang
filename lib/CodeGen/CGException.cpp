@@ -149,9 +149,10 @@ static const EHPersonality &getObjCPersonality(const llvm::Triple &T,
     else if (useLibGCCSEHPersonality(T))
       return EHPersonality::GNU_ObjC_SEH;
     return EHPersonality::GNU_ObjC;
-   // @mulle-objc@ compiler: exception personality
+   // @mulle-objc@ compiler: exception personality >
   case ObjCRuntime::Mulle:
     return EHPersonality::Mulle_ObjC;
+   // @mulle-objc@ compiler: exception personality <
   }
   llvm_unreachable("bad runtime kind");
 }
@@ -190,9 +191,10 @@ static const EHPersonality &getObjCXXPersonality(const llvm::Triple &T,
     return getObjCPersonality(T, L);
   case ObjCRuntime::GNUstep:
     return EHPersonality::GNU_ObjCXX;
-   // @mulle-objc@ compiler: exception personality
+   // @mulle-objc@ compiler: exception personality >
   case ObjCRuntime::Mulle:
     return EHPersonality::Mulle_ObjC;
+   // @mulle-objc@ compiler: exception personality <
   }
   llvm_unreachable("bad runtime kind");
 }

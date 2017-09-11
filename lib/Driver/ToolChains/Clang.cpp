@@ -4549,10 +4549,9 @@ ObjCRuntime Clang::AddObjCRuntimeArgs(const ArgList &args,
       getToolChain().getDriver().Diag(diag::err_drv_clang_unsupported) << value;
   } else {
     // Otherwise, determine if we are using the non-fragile ABI.
-    bool nonFragileABIIsDefault =
-        (rewriteKind == RK_NonFragile ||
-         (rewriteKind == RK_None &&
-          getToolChain().IsObjCNonFragileABIDefault()));
+    // @mulle-objc@ nonFragile is always default false >
+    bool nonFragileABIIsDefault = false;
+    // @mulle-objc@ nonFragile is always default false <
     if (args.hasFlag(options::OPT_fobjc_nonfragile_abi,
                      options::OPT_fno_objc_nonfragile_abi,
                      nonFragileABIIsDefault)) {

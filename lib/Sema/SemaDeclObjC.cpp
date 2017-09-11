@@ -4549,7 +4549,8 @@ void   Sema::SetMulleObjCParam( ObjCMethodDecl *ObjCMethod,
                                                          ObjCMethod,
                                                          Loc,
                                                          &Context.Idents.get("_param"),
-                                                         PtrTy);
+                                                         PtrTy,
+                                                         ImplicitParamDecl::ImplicitParamKind::Other);
    
    ObjCMethod->setParamDecl( Param);
    // this is implicitly done later in ActOnStartOfObjCMethodDef

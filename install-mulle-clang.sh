@@ -4,24 +4,25 @@
 # (c) 2016 Codeon GmbH, coded by Nat!
 # BSD-3 License
 
+# compile it like LLVM does (everything all the time)
+# only useful if you're creating installers IMO
+BY_THE_BOOK="YES"
+
 # our compiler version
-MULLE_CLANG_VERSION="5.0.0.5"
+MULLE_CLANG_VERSION="5.0.0.0"
+MULLE_LLDB_VERSION="5.0.0.0"
 
 # required LLVM version
 LLVM_VERSION="5.0.0"
-#LLVM_RC="3"
-
+#LLVM_RC="3" # leave empty for releases
 
 CMAKE_VERSION_MAJOR="3"
 CMAKE_VERSION_MINOR="5"
 CMAKE_VERSION_PATCH="2"
 
-# compile it like LLVM does (everything all the time)
-# only useful if you're creating installers IMO
-BY_THE_BOOK="YES"
-
 
 MULLE_CLANG_ARCHIVE="https://github.com/Codeon-GmbH/mulle-clang/archive/${MULLE_CLANG_VERSION}.tar.gz"
+MULLE_LLDB_ARCHIVE="https://github.com/Codeon-GmbH/mulle-lldb/archive/${MULLE_LLDB_VERSION}.tar.gz"
 
 if [ -z "${LLVM_RC}" ]
 then
@@ -768,7 +769,7 @@ build_clang()
 
 
 
-download_mulle_clang()
+download()
 {
 #
 # try to download most problematic first
@@ -796,6 +797,20 @@ download_mulle_clang()
       log_verbose "MULLE_CLANG_VERSION=${MULLE_CLANG_VERSION}"
    fi
 
+   if [ "${BUILD_LLDB}" = "YES" ]
+   then
+      download_lldb
+
+      #
+      # now we can derive some more values
+      #
+#      MULLE_LLDB_VERSION="`get_mulle_lldb_version "${MULLE_LLDB_DIR}" "${MULLE_LLDB_VERSION}"`" || exit 1
+#      LLDB_VENDOR="`get_lldb_vendor "${MULLE_LLDB_DIR}" "${MULLE_LLDB_VERSION}"`" || exit 1
+
+#      log_verbose "LLDB_VENDOR=${LLDB_VENDOR}"
+      log_verbose "MULLE_LLDB_VERSION=${MULLE_LLDB_VERSION}"
+   fi
+
 # should check if llvm is installed, if yes
 # check proper version and then use it
    if [ "${BUILD_LLVM}" = "YES" -a "${BY_THE_BOOK}" = "NO" ]
@@ -805,27 +820,27 @@ download_mulle_clang()
 }
 
 
-build_mulle_clang()
+build()
 {
    log_info "Building mulle-clang ${MULLE_CLANG_VERSION} ..."
 
-   if [ -d lib -o \
-        -d include -o \
-        -d bin -o \
-        -d libexec -o \
-        -d share ]
+   if [ -d ${PREFIX}/lib -o \
+        -d ${PREFIX}/include -o \
+        -d ${PREFIX}/bin -o \
+        -d ${PREFIX}/libexec -o \
+        -d ${PREFIX}/share ]
    then
       log_warning "There are artifacts left over from a previous run.
 If you are upgrading to a new version of llvm, you
 should [CTRL]-[C] now and do:
-   ${C_RESET}${C_BOLD}sudo rm -rf ./bin ./build ./include ./lib ./libexec ./share"
+   ${C_RESET}${C_BOLD}sudo rm -rf ${PREFIX}/bin ${BUILD_DIR} ${PREFIX}/include ${PREFIX}/lib ${PREFIX}/libexec ${PREFIX}/share"
       sleep 8
    else
-      if [ -d "${BUILDDIR}" ]
+      if [ -d "${BUILD_DIR}" ]
       then
-         log_warning "As there is an old ${BUILDDIR} folder here, the previous build
+         log_warning "As there is an old ${BUILD_DIR} folder here, the previous build
 is likely to get reused. If this is not what you want, [CTRL]-[C] now and do:
-   ${C_RESET}${C_BOLD}sudo rm -rf ${BUILDDIR}"
+   ${C_RESET}${C_BOLD}sudo rm -rf ${BUILD_DIR}"
          sleep 4
       fi
    fi
@@ -846,10 +861,15 @@ is likely to get reused. If this is not what you want, [CTRL]-[C] now and do:
    then
       build_clang install
    fi
+
+   if [ "${BUILD_LLDB}" = "YES" -a "${BY_THE_BOOK}" = "NO" ]
+   then
+      build_lldb install
+   fi
 }
 
 
-_build_mulle_clang()
+_build()
 {
 # should check if llvm is installed, if yes
 # check proper version and then use it
@@ -866,6 +886,11 @@ _build_mulle_clang()
    if [ "${BUILD_CLANG}" = "YES" -a "${BY_THE_BOOK}" = "NO" ]
    then
       _build_clang install
+   fi
+
+   if [ "${BUILD_LLDB}" = "YES" -a "${BY_THE_BOOK}" = "NO" ]
+   then
+      _build_lldb install
    fi
 }
 
@@ -908,6 +933,23 @@ before you can install"
 }
 
 
+install_mulle_lldb_link()
+{
+   log_info "Installing mulle-lldb link ..."
+
+   if [ ! -f "${MULLE_CLANG_INSTALL_PREFIX}/bin/lldb${EXE_EXTENSION}" ]
+   then
+      fail "download and build mulle-lldb with
+   ./install-mulle-clang.sh
+before you can install"
+   fi
+
+   install_executable "${MULLE_LLDB_INSTALL_PREFIX}/bin/lldb${CLANG_SUFFIX}${EXE_EXTENSION}" mulle-lldb${CLANG_SUFFIX}${EXE_EXTENSION}
+   install_executable "${MULLE_LLDB_INSTALL_PREFIX}/bin/lldb-mi${CLANG_SUFFIX}${EXE_EXTENSION}" mulle-lldb-mi${CLANG_SUFFIX}${EXE_EXTENSION}
+}
+
+
+
 uninstall_executable()
 {
    local path
@@ -943,6 +985,35 @@ uninstall_mulle_clang_link()
 }
 
 
+
+uninstall_mulle_lldb_link()
+{
+   local prefix
+
+   log_info "Uninstalling mulle-lldb link ..."
+
+   prefix="${1:-${MULLE_CLANG_INSTALL_PREFIX}}"
+
+   uninstall_executable "${prefix}/bin/mulle-lldb${CLANG_SUFFIX}"
+   uninstall_executable "${prefix}/bin/mulle-lldb-mi${CLANG_SUFFIX}"
+}
+
+
+install_links()
+{
+   install_mulle_clang_link
+   install_mulle_lldb_link
+}
+
+
+uninstall_links()
+{
+   uninstall_mulle_clang_link
+   uninstall_mulle_lldb_link
+}
+
+
+
 main()
 {
    OWD="`pwd -P`"
@@ -950,6 +1021,7 @@ main()
 
    local BUILD_CLANG="${BUILD_CLANG:-YES}"
    local BUILD_LLVM="${BUILD_LLVM:-YES}"
+   local BUILD_LLDB="${BUILD_LLDB:-NO}"
    local INSTALL_LLVM="${INSTALL_LLVM:-YES}"
 
    while [ $# -ne 0 ]
@@ -990,6 +1062,10 @@ main()
             BUILD_CMAKE="YES"
          ;;
 
+         --build-lldb)
+            BUILD_LLDB="YES"
+         ;;
+
          --debug)
             LLVM_BUILD_TYPE="Debug"
             MULLE_CLANG_BUILD_TYPE="Debug"
@@ -1001,6 +1077,10 @@ main()
 
          --clang-debug)
             MULLE_CLANG_BUILD_TYPE="Debug"
+         ;;
+
+         --lldb-debug)
+            LLDB_BUILD_TYPE="Debug"
          ;;
 
          --prefix)
@@ -1019,6 +1099,12 @@ main()
             [ $# -eq 1 ] && fail "missing argument to $1"
             shift
             MULLE_LLVM_INSTALL_PREFIX="$1"
+         ;;
+
+         --lldb-prefix)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+            MULLE_LLDB_INSTALL_PREFIX="$1"
          ;;
 
          --symlink-prefix)
@@ -1077,14 +1163,17 @@ main()
    SRC_DIR="src"
 
    LLVM_BUILD_TYPE="${LLVM_BUILD_TYPE:-Release}"
+   LLDB_BUILD_TYPE="${LLDB_BUILD_TYPE:-Release}"
    MULLE_CLANG_BUILD_TYPE="${MULLE_CLANG_BUILD_TYPE:-Release}"
 
    LLVM_DIR="${SRC_DIR}/llvm"
    if [ "${BY_THE_BOOK}" = "YES" ]
    then
       MULLE_CLANG_DIR="${LLVM_DIR}/tools/mulle-clang"
+      MULLE_LLDB_DIR="${LLVM_DIR}/tools/mulle-lldb"
    else
       MULLE_CLANG_DIR="${SRC_DIR}/mulle-clang"
+      MULLE_LLDB_DIR="${SRC_DIR}/mulle-lldb"
    fi
 
    BUILD_DIR="build"
@@ -1109,9 +1198,11 @@ main()
 
    MULLE_LLVM_INSTALL_PREFIX="${MULLE_LLVM_INSTALL_PREFIX:-${PREFIX}}"
    MULLE_CLANG_INSTALL_PREFIX="${MULLE_CLANG_INSTALL_PREFIX:-${PREFIX}}"
+   MULLE_LLDB_INSTALL_PREFIX="${MULLE_LLDB_INSTALL_PREFIX:-${PREFIX}}"
 
    LLVM_BUILD_DIR="${BUILD_DIR}/llvm.d"
    MULLE_CLANG_BUILD_DIR="${BUILD_DIR}/mulle-clang.d"
+   MULLE_LLDB_BUILD_DIR="${BUILD_DIR}/mulle-lldb.d"
 
    # override this to use pre-installed llvm
 
@@ -1131,28 +1222,28 @@ main()
 
    case "$COMMAND" in
       install)
-         install_mulle_clang_link "$@"
+         install_links "$@"
       ;;
 
       default)
-         download_mulle_clang
-         build_mulle_clang
+         download
+         build
       ;;
 
       download)
-         download_mulle_clang
+         download
       ;;
 
       build)
-         build_mulle_clang
+         build
       ;;
 
       _build)
-         _build_mulle_clang
+         _build
       ;;
 
       uninstall)
-         uninstall_mulle_clang_link
+         uninstall_links
       ;;
    esac
 }

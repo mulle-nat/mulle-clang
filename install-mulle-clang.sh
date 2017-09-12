@@ -10,7 +10,9 @@ BY_THE_BOOK="YES"
 
 # our compiler version
 MULLE_CLANG_VERSION="5.0.0.0"
+MULLE_CLANG_RC="1"
 MULLE_LLDB_VERSION="5.0.0.0"
+
 
 # required LLVM version
 LLVM_VERSION="5.0.0"
@@ -21,7 +23,14 @@ CMAKE_VERSION_MINOR="5"
 CMAKE_VERSION_PATCH="2"
 
 
-MULLE_CLANG_ARCHIVE="https://github.com/Codeon-GmbH/mulle-clang/archive/${MULLE_CLANG_VERSION}.tar.gz"
+if [ -z "${MULLE_CLANG_RC}" ]
+then
+   MULLE_CLANG_ARCHIVENAME="${MULLE_CLANG_VERSION}"
+else
+   MULLE_CLANG_ARCHIVENAME="${MULLE_CLANG_VERSION}-RC${MULLE_CLANG_RC}"
+fi
+
+MULLE_CLANG_ARCHIVE="https://github.com/Codeon-GmbH/mulle-clang/archive/${MULLE_CLANG_ARCHIVENAME}.tar.gz"
 MULLE_LLDB_ARCHIVE="https://github.com/Codeon-GmbH/mulle-lldb/archive/${MULLE_LLDB_VERSION}.tar.gz"
 
 if [ -z "${LLVM_RC}" ]
@@ -477,10 +486,16 @@ get_mulle_clang_version()
       fail "No MULLE_CLANG_VERSION version found in \"${src}\""
    fi
 
-   local  version
+   local version
+   local rc
 
    version="`head -50 "${src}/install-mulle-clang.sh" \
       | egrep '^MULLE_CLANG_VERSION=' \
+      | head -1 \
+      | sed 's/.*\"\(.*\)\".*/\1/'`"
+
+   rc="`head -50 "${src}/install-mulle-clang.sh" \
+      | egrep '^MULLE_CLANG_RC=' \
       | head -1 \
       | sed 's/.*\"\(.*\)\".*/\1/'`"
 
@@ -489,7 +504,12 @@ get_mulle_clang_version()
       log_warning "Could not find MULLE_CLANG_VERSION in download, using default"
       echo "${fallback}"
    else
-      echo "${version}"
+      if [ -z "${rc}" ]
+      then
+         echo "${version}"
+      else
+         echo "${version}-RC${rc}"
+      fi
    fi
 }
 
@@ -670,7 +690,7 @@ download_clang()
       log_verbose "Unpacking into \"${MULLE_CLANG_DIR}\" ..."
       exekutor tar xfz mulle-clang.tgz || tar_fail "tar archive corrupt"
       exekutor mkdir -p "`dirname -- "${MULLE_CLANG_DIR}"`" 2> /dev/null || exit 1
-      exekutor mv mulle-clang-${MULLE_CLANG_VERSION} "${MULLE_CLANG_DIR}" || exit 1
+      exekutor mv mulle-clang-${MULLE_CLANG_ARCHIVENAME} "${MULLE_CLANG_DIR}" || exit 1
    else
       log_fluff "\"${MULLE_CLANG_DIR}\" already exists"
    fi
@@ -781,7 +801,7 @@ download()
       download_llvm
    fi
 
-   log_info "Downloading mulle-clang ${MULLE_CLANG_VERSION}..."
+   log_info "Downloading mulle-clang ${MULLE_CLANG_ARCHIVENAME}..."
 
    if [ "${BUILD_CLANG}" = "YES" ]
    then

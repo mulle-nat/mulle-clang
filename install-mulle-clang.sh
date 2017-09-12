@@ -10,7 +10,7 @@ BY_THE_BOOK="YES"
 
 # our compiler version
 MULLE_CLANG_VERSION="5.0.0.0"
-MULLE_CLANG_RC="1"
+MULLE_CLANG_RC="2"
 MULLE_LLDB_VERSION="5.0.0.0"
 
 
@@ -51,7 +51,6 @@ fi
 #
 CMAKE_VERSION="${CMAKE_VERSION_MAJOR}.${CMAKE_VERSION_MINOR}"
 CMAKE_PATCH_VERSION="${CMAKE_VERSION}.${CMAKE_VERSION_PATCH}"
-
 
 
 environment_initialize()
@@ -552,6 +551,18 @@ setup_build_environment()
    local major
 
    #
+   # Ninja is probably preferable if installed
+   # Should configure this though somewhere
+   # Unfortunately on mingw, compile errors in libcxx
+   # as ninja picks up the wrong c.
+   #
+   if [ "${OPTION_NO_NINJA}" != "YES" -a ! -z "`command -v ninja`" ]
+   then
+      CMAKE_GENERATOR="Ninja"
+      MAKE=ninja
+   fi
+
+   #
    # make sure cmake and git and gcc are present (and in the path)
    # should check version
    # Set some defaults so stuff possibly just magically works.
@@ -561,24 +572,32 @@ setup_build_environment()
          log_fluff "Detected MinGW on Windows"
          PATH="$PATH:/c/Program Files/CMake/bin/cmake:/c/Program Files (x86)/Microsoft Visual Studio 14.0/VC/bin"
 
-         install_binary_if_missing "nmake" "https://www.visualstudio.com/de-de/downloads/download-visual-studio-vs.aspx and then add the directory containing nmake to your %PATH%"
-
          install_binary_if_missing "xz" "https://tukaani.org/xz and then add the directory containing xz to your %PATH%"
 
-         CMAKE_GENERATOR="NMake Makefiles"
-         MAKE=nmake.exe
+         if [ -z "${MAKE}" ]
+         then
+            install_binary_if_missing "nmake" "https://www.visualstudio.com/de-de/downloads/download-visual-studio-vs.aspx and then add the directory containing nmake to your %PATH%"
+
+            CMAKE_GENERATOR="NMake Makefiles"
+            MAKE=nmake.exe
+         fi
+
          CXX_COMPILER=cl.exe
          C_COMPILER=cl.exe
       ;;
 
       *)
          log_fluff "Detected ${UNAME}"
-         install_binary_if_missing "make" "somewhere"
          install_binary_if_missing "python" "https://www.python.org/downloads/release"
 
-         CMAKE_GENERATOR="Unix Makefiles"
-         MAKE=make
-         MAKE_FLAGS="${MAKE_FLAGS} -j `get_core_count`"
+         if [ -z "${MAKE}" ]
+         then
+            install_binary_if_missing "make" "somewhere"
+
+            CMAKE_GENERATOR="Unix Makefiles"
+            MAKE=make
+            MAKE_FLAGS="${MAKE_FLAGS} -j `get_core_count`"
+         fi
       ;;
    esac
 
@@ -712,10 +731,11 @@ _build_llvm()
 
       set -e
          exekutor cd "${LLVM_BUILD_DIR}"
-            exekutor cmake \
+            CC="${C_COMPILER}" CXX="${CXX_COMPILER}" exekutor cmake \
                -Wno-dev \
                -G "${CMAKE_GENERATOR}" \
                -DCLANG_VENDOR="${CLANG_VENDOR}" \
+               -DCLANG_LINKS_TO_CREATE="mulle-clang;mulle-clang-cl;mulle-clang-cpp" \
                -DCMAKE_BUILD_TYPE="${LLVM_BUILD_TYPE}" \
                -DCMAKE_INSTALL_PREFIX="${MULLE_LLVM_INSTALL_PREFIX}" \
                -DLLVM_ENABLE_CXX1Y:BOOL=OFF \
@@ -727,7 +747,7 @@ _build_llvm()
 
    exekutor cd "${LLVM_BUILD_DIR}" || fail "build_llvm: ${LLVM_BUILD_DIR} missing"
    # hmm
-      exekutor ${MAKE} ${MAKE_FLAGS} "$@" || fail "build_llvm: ${MAKE} failed"
+   CC="${C_COMPILER}" CXX="${CXX_COMPILER}" exekutor ${MAKE} ${MAKE_FLAGS} "$@" || fail "build_llvm: ${MAKE} failed"
    exekutor cd "${OWD}"
 }
 
@@ -766,6 +786,7 @@ _build_clang()
                   -Wno-dev \
                   -G "${CMAKE_GENERATOR}" \
                   -DCLANG_VENDOR="${CLANG_VENDOR}" \
+                  -DCLANG_LINKS_TO_CREATE="mulle-clang;mulle-clang-cl;mulle-clang-cpp" \
                   -DCMAKE_BUILD_TYPE="${MULLE_CLANG_BUILD_TYPE}" \
                   -DCMAKE_INSTALL_PREFIX="${MULLE_CLANG_INSTALL_PREFIX}" \
                   ${CMAKE_FLAGS} \
@@ -775,7 +796,7 @@ _build_clang()
    fi
 
    exekutor cd "${MULLE_CLANG_BUILD_DIR}" || fail "build_clang: ${MULLE_CLANG_BUILD_DIR} missing"
-      exekutor ${MAKE} ${MAKE_FLAGS} "$@" || fail "build_clang: ${MAKE} failed"
+   CC="${C_COMPILER}" CXX="${CXX_COMPILER}" exekutor ${MAKE} ${MAKE_FLAGS} "$@" || fail "build_clang: ${MAKE} failed"
    exekutor cd "${OWD}"
 }
 
@@ -948,8 +969,17 @@ install_mulle_clang_link()
 before you can install"
    fi
 
-   install_executable "${MULLE_CLANG_INSTALL_PREFIX}/bin/clang${CLANG_SUFFIX}${EXE_EXTENSION}" mulle-clang${CLANG_SUFFIX}${EXE_EXTENSION}
-   install_executable "${MULLE_CLANG_INSTALL_PREFIX}/bin/scan-build${CLANG_SUFFIX}${EXE_EXTENSION}" mulle-scan-build${CLANG_SUFFIX}${EXE_EXTENSION}
+   if [ -z "${CLANG_SUFFIX}" ]
+   then
+      install_executable "${MULLE_CLANG_INSTALL_PREFIX}/bin/mulle-clang${CLANG_SUFFIX}${EXE_EXTENSION}" \
+                         "mulle-clang${CLANG_SUFFIX}${EXE_EXTENSION}"
+      install_executable "${MULLE_CLANG_INSTALL_PREFIX}/bin/scan-build${CLANG_SUFFIX}${EXE_EXTENSION}" \
+                         "mulle-scan-build${CLANG_SUFFIX}${EXE_EXTENSION}"
+   fi
+   install_executable "${MULLE_CLANG_INSTALL_PREFIX}/bin/mulle-clang${CLANG_SUFFIX}${EXE_EXTENSION}" \
+                      "mulle-clang${EXE_EXTENSION}"
+   install_executable "${MULLE_CLANG_INSTALL_PREFIX}/bin/scan-build${CLANG_SUFFIX}${EXE_EXTENSION}" \
+                      "mulle-scan-build${EXE_EXTENSION}"
 }
 
 
@@ -1000,8 +1030,13 @@ uninstall_mulle_clang_link()
 
    prefix="${1:-${MULLE_CLANG_INSTALL_PREFIX}}"
 
-   uninstall_executable "${prefix}/bin/mulle-clang${CLANG_SUFFIX}"
-   uninstall_executable "${prefix}/bin/mulle-scan-build${CLANG_SUFFIX}"
+   if [ -z "${CLANG_SUFFIX}" ]
+   then
+      uninstall_executable "${prefix}/bin/mulle-clang${CLANG_SUFFIX}${EXE_EXTENSION}"
+      uninstall_executable "${prefix}/bin/scan-build${CLANG_SUFFIX}${EXE_EXTENSION}"
+   fi
+   uninstall_executable "${prefix}/bin/mulle-clang${CLANG_SUFFIX}${EXE_EXTENSION}"
+   uninstall_executable "${prefix}/bin/scan-build${CLANG_SUFFIX}${EXE_EXTENSION}"
 }
 
 
@@ -1043,6 +1078,7 @@ main()
    local BUILD_LLVM="${BUILD_LLVM:-YES}"
    local BUILD_LLDB="${BUILD_LLDB:-NO}"
    local INSTALL_LLVM="${INSTALL_LLVM:-YES}"
+   local OPTION_NO_NINJA="NO"
 
    while [ $# -ne 0 ]
    do
@@ -1131,6 +1167,11 @@ main()
             [ $# -eq 1 ] && fail "missing argument to $1"
             shift
             SYMLINK_PREFIX="$1"
+         ;;
+
+
+         --no-ninja)
+            OPTION_NO_NINJA="YES"
          ;;
 
          --no-libcxx)

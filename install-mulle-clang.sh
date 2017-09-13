@@ -711,6 +711,20 @@ setup_build_environment()
    if [ "${BUILD_LLDB}" = "YES" ]
    then
       install_binary_if_missing "swig" "http://swig.org/download.html"
+
+      case "${UNAME}" in
+         Darwin)
+         ;;
+    
+         Linux)
+            install_binary_if_missing "python-dev" "https://www.python.org/downloads/release"
+            install_binary_if_missing "ncurses-dev" "https://www.gnu.org/software/ncurses"
+            install_binary_if_missing "libxml2-dev" "http://xmlsoft.org"
+         ;;
+
+	 *)
+         ;;
+      esac
    fi
 }
 
@@ -747,10 +761,19 @@ incremental_download()
 
       log_verbose "Downloading \"${name}\" from \"${url}\" ..."
       exekutor curl -L -C- -o "${partialfilename}" "${url}"  || fail "curl failed"
-      exekutor tar tfz "${partialfilename}" > /dev/null || tar_fail "tar archive corrupt"
+      case "${filename}" in
+         *gz)
+            exekutor tar tfz "${partialfilename}" > /dev/null || tar_fail "tar archive corrupt"
+         ;;
+
+         *xz)
+            exekutor tar tfJ "${partialfilename}" > /dev/null || tar_fail "tar archive corrupt"
+         ;;
+      esac
       exekutor mv "${partialfilename}" "${filename}"  || exit 1
    fi
 }
+
 
 extract_tar_gz_archive()
 {

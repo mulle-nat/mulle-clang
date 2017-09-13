@@ -190,7 +190,7 @@ tar_fail()
 {
    case "${UNAME}" in
       MINGW*)
-         log_warning "%@" "ignored, because we're on MinGW and crossing fingers, that just tests are affected"
+         log_warning "$@" "ignored, because we're on MinGW and crossing fingers, that just tests are affected"
       ;;
 
       *)
@@ -715,7 +715,7 @@ setup_build_environment()
       case "${UNAME}" in
          Darwin)
          ;;
-    
+
          Linux)
             install_binary_if_missing "python-dev" "https://www.python.org/downloads/release"
             install_binary_if_missing "ncurses-dev" "https://www.gnu.org/software/ncurses"
@@ -906,6 +906,15 @@ _build_llvm()
    if [ ! -f "${LLVM_BUILD_DIR}/Makefile" -o "${RUN_LLVM_CMAKE}" = "YES" ]
    then
       exekutor mkdir -p "${LLVM_BUILD_DIR}" 2> /dev/null
+
+      #
+      # FreeBSD needs rpath set for c++ libraries
+      #
+      case "${UNAME}" in
+         FreeBSD)
+            CMAKE_FLAGS="${CMAKE_FLAGS} -DCMAKE_SHARED_LINKER_FLAGS=-Wl,-rpath,\$ORIGIN/../lib"
+         ;;
+      esac
 
       set -e
          exekutor cd "${LLVM_BUILD_DIR}"

@@ -3339,7 +3339,7 @@ ExprResult Sema::ActOnInstanceMessage(Scope *S,
   // lookup and error facilities easily available
    if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
    {
-      if( ! CheckMulleObjCFunctionDefined( S, LBracLoc, (char *) "mulle_objc_object_call"))
+      if( ! CheckMulleObjCFunctionDefined( S, LBracLoc, const_cast< char *> "mulle_objc_object_call"))
          return ExprError();
    }
 

@@ -703,7 +703,6 @@ void   CodeGenFunction::EmitMetaABIWriteReturnValue( const Decl *FuncDecl, const
    RecordDecl             *RD;
    QualType               recordTy;
    QualType               recordPtrTy;
-   llvm::Type             *llvmRecType;
    llvm::Value            *paramAddr;
    CharUnits              alignment;
    

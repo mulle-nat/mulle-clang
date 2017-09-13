@@ -166,7 +166,7 @@ namespace {
       ///
       /// The messenger used for super calls from instance methods
       /// and class methods too
-      
+
       llvm::Constant *getMessageSendSuperFn( int optLevel) const
       {
          StringRef    name;
@@ -940,7 +940,7 @@ namespace {
       llvm::Constant *GetProtocolRef(const ObjCProtocolDecl *PD);
 
 #pragma mark - FNV1 hashing + conveniences
-      
+
       // common helper function, turning names into abbreviated hashes
       uint32_t          UniqueIdHashForString( std::string s);
       llvm::ConstantInt *__HashConstantForString( std::string s);
@@ -1062,7 +1062,7 @@ namespace {
                                         IdentifierInfo *identifier,
                                         llvm::ConstantInt *classid,
                                         llvm::ConstantInt *methodid);
- 
+
       /// EmitMethodList - Emit the method list for the given
       /// implementation. The return value has type MethodListPtrTy.
       llvm::Constant *EmitMethodList(Twine Name,
@@ -1735,8 +1735,7 @@ llvm::Constant *CGObjCMulleRuntime::GetEHType(QualType T) {
    llvm_unreachable("asking for catch type for ObjC type in fragile runtime");
 }
 
-#pragma mark -
-#pragma mark ConstantString
+#pragma mark - ConstantString
 
 ///  Generate a constant NSString object.
 //
@@ -1847,8 +1846,7 @@ CGObjCCommonMulleRuntime::GetNSConstantStringMapEntry( const StringLiteral *Lite
    return( GetConstantStringEntry( NSConstantStringMap, Literal, StringLength));
 }
 
-#pragma mark -
-#pragma mark mulle_char5
+#pragma mark - mulle_char5
 
 static int   mulle_char5_encode_character( int c)
 {
@@ -2084,16 +2082,16 @@ ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
          uint32_t   value;
 
          value = 0;
-         if( mulle_char7_is32bit( (char *) str.data(), StringLength))
+         if( mulle_char7_is32bit( const_cast< char *> str.data(), StringLength))
          {
-            value = mulle_char7_encode32_ascii( (char *) str.data(), StringLength);
+            value = mulle_char7_encode32_ascii( const_cast< char *> str.data(), StringLength);
             value <<= 2;
             value |= 0x3;
          }
          else
-            if( mulle_char5_is32bit( (char *) str.data(), StringLength))
+            if( mulle_char5_is32bit( const_cast< char *> str.data(), StringLength))
             {
-               value = mulle_char5_encode32_ascii( (char *) str.data(), StringLength);
+               value = mulle_char5_encode32_ascii( const_cast< char *> str.data(), StringLength);
 
                // shift up and tag as string
                value <<= 2;
@@ -2105,7 +2103,7 @@ ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
             llvm::APInt APValue( 32, value);
             llvm::Constant  *pointerValue = llvm::Constant::getIntegerValue( CGM.Int32Ty, APValue);
             llvm::Constant  *pointer = llvm::ConstantExpr::getIntToPtr( pointerValue, CGM.VoidPtrTy);
-            //fprintf( stderr, "Created tagged 32 bit pointer for \"%.*s\"\n", (int) StringLength, (char *) str.data());
+            //fprintf( stderr, "Created tagged 32 bit pointer for \"%.*s\"\n", (int) StringLength, const_cast< char *> str.data());
 
             return ConstantAddress( pointer, Align);
          }
@@ -2115,16 +2113,16 @@ ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
          uint64_t   value;
 
          value = 0;
-         if( mulle_char7_is64bit( (char *) str.data(), StringLength))
+         if( mulle_char7_is64bit( const_cast< char *> str.data(), StringLength))
          {
-            value = mulle_char7_encode64_ascii( (char *) str.data(), StringLength);
+            value = mulle_char7_encode64_ascii( const_cast< char *> str.data(), StringLength);
             value <<= 3;
             value |= 0x3;
          }
          else
-            if( mulle_char5_is64bit( (char *) str.data(), StringLength))
+            if( mulle_char5_is64bit( const_cast< char *> str.data(), StringLength))
             {
-               value = mulle_char5_encode64_ascii( (char *) str.data(), StringLength);
+               value = mulle_char5_encode64_ascii( const_cast< char *> str.data(), StringLength);
 
                // shift up and tag as string
                value <<= 3;
@@ -2136,7 +2134,7 @@ ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
             llvm::APInt APValue( 64, value);
             llvm::Constant  *pointerValue = llvm::Constant::getIntegerValue( CGM.Int64Ty, APValue);
             llvm::Constant  *pointer = llvm::ConstantExpr::getIntToPtr( pointerValue, CGM.VoidPtrTy);
-            //fprintf( stderr, "Created tagged 64 bit pointer for \"%.*s\"\n", (int) StringLength, (char *) str.data());
+            //fprintf( stderr, "Created tagged 64 bit pointer for \"%.*s\"\n", (int) StringLength, const_cast< char *> str.data());
             return ConstantAddress( pointer, Align);
          }
       }
@@ -2168,13 +2166,12 @@ ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
                                                        C,
                                                        &CGM.getModule());
    Entry.second = GA;
-   //   fprintf( stderr, "Created constant string for \"%.*s\"\n", (int) StringLength, (char *) str.data());
+   //   fprintf( stderr, "Created constant string for \"%.*s\"\n", (int) StringLength, const_cast< char *> str.data());
    return ConstantAddress( GA, Align);
 }
 
 
-#pragma mark -
-#pragma mark message sending
+#pragma mark - message sending
 
 // @mulle-objc@ MetaABI: CommonFunctionCall, send message to self and super
 CodeGen::RValue   CGObjCMulleRuntime::CommonFunctionCall(CodeGen::CodeGenFunction &CGF,
@@ -2231,9 +2228,9 @@ CodeGen::RValue CGObjCMulleRuntime::CommonMessageSend(CodeGen::CodeGenFunction &
       /* if we have no method, we should construct a default ObjCMethodDecl
          from the selector with all ids
        */
-       
+
    }
-   
+
    //
    // this runs through patched code, to produce what we need
    //
@@ -2443,7 +2440,7 @@ CGObjCMulleRuntime::GenerateMessageSendSuper(CodeGen::CodeGenFunction &CGF,
    llvm::ConstantInt   *classID;
    llvm::ConstantInt   *superID;
    IdentifierInfo      *superInfo;
-   
+
    Arg0 = CGF.Builder.CreateBitCast(Receiver, ObjCTypes.ObjectPtrTy);
    ActualArgs.add(RValue::get( Arg0), CGF.getContext().getObjCInstanceType());
 
@@ -2466,10 +2463,10 @@ CGObjCMulleRuntime::GenerateMessageSendSuper(CodeGen::CodeGenFunction &CGF,
    }
 
    superInfo = GetSuperIdentifier( CGF, Class, Sel);
-   
+
    classID = EmitClassID( CGF, Class);
    superID = EmitSuperID( CGF, superInfo, classID, selID);
-   
+
    // @mulle-objc@ uniqueid: make it 32 bit here
    ActualArgs.add(RValue::get( superID), CGF.getContext().getIntTypeForBitwidth( 32, false));
 
@@ -2579,8 +2576,7 @@ CGObjCMulleRuntime::EmitFastEnumeratorCall( CodeGen::CodeGenFunction &CGF,
    return( CountRV);
 }
 
-#pragma mark -
-#pragma mark AST analysis for _param reuse
+#pragma mark - AST analysis for _param reuse
 /*
  * Analyze AST for parameter usage.
  */
@@ -2883,8 +2879,8 @@ public:
 
       // fprintf( stderr, "%s %p (%s)\n", E->getStmtClassName(), E, __PRETTY_FUNCTION__);
 
-      checkDereferencingExpr( (Expr *) E->getLHS());
-      checkDereferencingExpr( (Expr *) E->getRHS());
+      checkDereferencingExpr( const_cast< Expr *> E->getLHS());
+      checkDereferencingExpr( const_cast< Expr *> E->getRHS());
       return( true);
    }
 
@@ -3524,7 +3520,7 @@ bool CGObjCMulleRuntime::OptimizeReuseParam( CodeGenFunction &CGF,
    // _param but not necessarily _rval (which is in a union with _param)
    //
 
-   if( ! param_unused_after_expr( (ObjCMethodDecl *) parent, (ObjCMessageExpr *) Expr))
+   if( ! param_unused_after_expr( const_cast< ObjCMethodDecl *> parent, const_cast<ObjCMessageExpr *> Expr))
    {
       // fprintf( stderr, "reuse denied\n");
       return( false);
@@ -3611,7 +3607,7 @@ void  CGObjCMulleRuntime::PushArgumentsIntoRecord( CodeGenFunction &CGF,
       arg   = Method->getArg( i);
 
       LValue LV = CGF.EmitLValueForFieldInitialization( Record, Field);
-      CGF.EmitInitializerForField( Field, LV, (Expr *) arg);
+      CGF.EmitInitializerForField( Field, LV, const_cast< Expr *> arg);
 
       ++i;
    }
@@ -3630,7 +3626,7 @@ void   CGObjCMulleRuntime::EmitVoidPtrExpression( CodeGenFunction &CGF,
                                     CGM.getContext().VoidPtrTy,
                                     VK_RValue,
                                     CK_IntegralToPointer,
-                                    (Expr *) Arg,
+                                    const_cast< Expr *> Arg,
                                     NULL,
                                     TInfo,
                                     SourceLocation(),
@@ -3704,19 +3700,19 @@ CGObjCRuntimeLifetimeMarker   CGObjCMulleRuntime::ConvertToMetaABIArgsIfNeeded( 
 bool   CGObjCMulleRuntime::metaABIForwardAsStruct( llvm::ArrayRef<const Expr*> &Exprs)
 {
    QualType    type;
-   
+
    switch( Exprs.size())
    {
    case 0 :
       return( false);
-      
+
    case 1 :
       type = Exprs[ 0]->getType();
       if( type->isIncompleteType( 0))  // hm can't be
          llvm_unreachable( "incomplete type at call site?");
 
       return( CGM.getContext().typeNeedsMetaABIAlloca( type));
-      
+
    default :
       return( true);
    }
@@ -3800,8 +3796,7 @@ CGObjCRuntimeLifetimeMarker  CGObjCMulleRuntime::GenerateCallArgs( CodeGenFuncti
 }
 
 
-# pragma mark -
-# pragma mark protocols
+#pragma mark - protocols
 
 llvm::Value *CGObjCMulleRuntime::GenerateProtocolRef(CodeGenFunction &CGF,
                                             const ObjCProtocolDecl *PD) {
@@ -3927,7 +3922,7 @@ llvm::Constant *
                                               Supers.size());
 
    Values[1] = llvm::ConstantArray::get(AT, Supers);
-   
+
    llvm::Constant *Init = llvm::ConstantStruct::getAnon(Values);
 
    llvm::GlobalVariable *GV = CreateMetadataVar(Name, Init, "__DATA,__supers,regular,no_dead_strip",
@@ -3977,9 +3972,9 @@ CGObjCMulleRuntime::EmitProtocolList(Twine Name,
 {
    llvm::SmallPtrSet<llvm::Constant *, 16> ProtocolRefsSet;
    SmallVector<llvm::Constant *, 16> ProtocolRefs;
-   
+
    CollectProtocols( ProtocolRefsSet, begin, end);
-   
+
    // Just return null for empty protocol lists
    if (ProtocolRefsSet.empty())
       return llvm::Constant::getNullValue(ObjCTypes.ProtocolListPtrTy);
@@ -3990,14 +3985,14 @@ CGObjCMulleRuntime::EmitProtocolList(Twine Name,
    // and sort'em
    llvm::array_pod_sort( ProtocolRefs.begin(), ProtocolRefs.end(),
                          uniqueid_comparator);
-   
+
    llvm::Constant *Values[2];
    Values[0] = llvm::ConstantInt::get(ObjCTypes.IntTy, ProtocolRefs.size());
    llvm::ArrayType *AT = llvm::ArrayType::get(ObjCTypes.ProtocolTy,
                                               ProtocolRefs.size());
 
    Values[1] = llvm::ConstantArray::get(AT, ProtocolRefs);
-   
+
    llvm::Constant *Init = llvm::ConstantStruct::getAnon(Values);
 
    llvm::GlobalVariable *GV = CreateMetadataVar(Name, Init, "__DATA,__protocols,regular,no_dead_strip",
@@ -4022,7 +4017,7 @@ CGObjCMulleRuntime::EmitProtocolClassIDList(Twine Name,
    StringRef            name;
    StringRef            otherName;
    IdentifierInfo       *identifier;
-   
+
    for (; begin != end; ++begin)
    {
       identifier = (*begin)->getIdentifier();
@@ -4162,9 +4157,9 @@ llvm::Constant *CGObjCCommonMulleRuntime::EmitPropertyList(Twine Name,
 llvm::Constant *CGObjCCommonMulleRuntime::GetSourceLocationDescription( SourceLocation  loc)
 {
    PresumedLoc PLoc = CGM.getContext().getSourceManager().getPresumedLoc( loc);
-   
+
    SmallString<128> FN;
-   
+
    FN += PLoc.getFilename();
    llvm::GlobalVariable *Entry = CreateCStringLiteral( FN, "OBJC_DEBUG_INFO_");
    return( getConstantGEP(VMContext, Entry, 0, 0));
@@ -4273,8 +4268,7 @@ void CGObjCMulleRuntime::GenerateCategory(const ObjCCategoryImplDecl *OCD) {
 }
 
 
-# pragma mark -
-# pragma mark class
+#pragma mark - class
 
 
 enum FragileClassFlags {
@@ -4438,7 +4432,7 @@ void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
       Values[ i++] = GetSourceLocationDescription( ID->getLocation());
    else
       Values[ i++] = llvm::Constant::getNullValue(ObjCTypes.Int8PtrTy);
-   
+
    assert( i == sizeof( Values) / sizeof( llvm::Constant *));
 
    llvm::Constant *Init = llvm::ConstantStruct::get(ObjCTypes.ClassTy,
@@ -4616,7 +4610,7 @@ llvm::Constant *CGObjCMulleRuntime::EmitMethodList(Twine Name,
    Values[1] = llvm::Constant::getNullValue( ObjCTypes.Int8PtrTy);
 
    Values[2] = llvm::ConstantArray::get(AT, Methods);
-   
+
    llvm::Constant *Init = llvm::ConstantStruct::getAnon(Values);
 
    llvm::GlobalVariable *GV = CreateMetadataVar(Name, Init, Section, 4, true);
@@ -4665,7 +4659,7 @@ CGObjCCommonMulleRuntime::CreateCStringLiteral(StringRef Name,
                                                StringRef Label,
                                                bool NullTerminate) {
    StringRef  Section;
-   
+
    Section = "__TEXT,__cstring,cstring_literals";
    llvm::Constant *Value =
    llvm::ConstantDataArray::getString(VMContext, Name, NullTerminate);
@@ -4678,7 +4672,7 @@ CGObjCCommonMulleRuntime::CreateCStringLiteral(StringRef Name,
    GV->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
    GV->setAlignment(CharUnits::One().getQuantity());
    CGM.addCompilerUsedGlobal(GV);
-   
+
    return GV;
 }
 
@@ -4902,7 +4896,7 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
 
    // always emit to check for code compatability
    // supers w/o classes or categories are uninteresting
-   
+
    if( ! LoadClasses.size() && ! LoadCategories.size() && \
        ! LoadStrings.size() && ! EmitHashes.size())
    {
@@ -4929,7 +4923,7 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
       // fprintf( stderr, "version found: 0x%x\n", (int) runtime_version);
       sprintf( buf1, "%u", (unsigned) load_version);
       sprintf( buf2, "%u", (unsigned) COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION);
-      
+
       CGM.getDiags().Report( diag::err_mulle_objc_runtime_version_mismatch) <<
                             buf1 << buf2;
    }
@@ -5008,8 +5002,7 @@ void CGObjCMulleRuntime::EmitSynchronizedStmt(CodeGenFunction &CGF,
    return EmitTryOrSynchronizedStmt(CGF, S);
 }
 
-#pragma mark -
-#pragma mark Fragile Exception Helper
+#pragma mark - Fragile Exception Helper
 
 namespace {
    struct PerformFragileFinally final : EHScopeStack::Cleanup {
@@ -5226,8 +5219,7 @@ llvm::FunctionType *FragileHazards::GetAsmFnType() {
 }
 
 
-#pragma mark -
-#pragma mark Objective-C setjmp-longjmp (sjlj) Exception Handling
+#pragma mark - Objective-C setjmp-longjmp (sjlj) Exception Handling
 
 /*
 
@@ -5992,8 +5984,7 @@ llvm::Value *CGObjCMulleRuntime::EmitNSAutoreleasePoolClassRef(CodeGenFunction &
 }
 
 
-#pragma mark -
-#pragma mark Hash Selectors, ClassIDs and friends
+#pragma mark - Hash Selectors, ClassIDs and friends
 
 extern "C"
 {
@@ -6048,7 +6039,7 @@ static uint32_t  MulleObjCUniqueIdHashForString( std::string s)
 {
    uint32_t   value;
    char       *c_str;
-   
+
    c_str = (char *) s.c_str();
    value = mulle_objc_fnv1a_32( (void *) c_str, s.length());
    //   fprintf( stderr, "%s = %08lx\n", c_str, (long) value);
@@ -6060,13 +6051,13 @@ static uint32_t  MulleObjCUniqueIdHashForString( std::string s)
    return( value);
 }
 
-}; // extern "C"
+} // extern "C"
 
 
 uint32_t   CGObjCCommonMulleRuntime::UniqueIdHashForString( std::string s)
 {
    uint32_t   hash;
-   
+
    hash = MulleObjCUniqueIdHashForString( s);
    if( ! hash || hash == (uint32_t) -1)
    {
@@ -6078,7 +6069,7 @@ uint32_t   CGObjCCommonMulleRuntime::UniqueIdHashForString( std::string s)
       CGM.getDiags().Report( diag::err_mulle_objc_hash_invalid)
           << s;
    }
-   
+
    return( hash);
 }
 
@@ -6144,13 +6135,13 @@ llvm::ConstantInt *CGObjCMulleRuntime::EmitSuperID( CodeGenFunction &CGF,
                                                     llvm::ConstantInt *methodid)
 {
    llvm::ConstantInt   *superid;
-   
+
    superid = (llvm::ConstantInt *) _HashConstantForString( info->getName());
-   
+
    llvm::Constant *&Entry = SuperIdentifiers[ info];
    if( ! Entry)
-      Entry = GetSuperConstant( superid, (IdentifierInfo *) info, classid, methodid);
-   
+      Entry = GetSuperConstant( superid, const_cast<IdentifierInfo *> info, classid, methodid);
+
    return( superid);
 }
 
@@ -6596,18 +6587,18 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
    llvm::StructType::create("struct._mulle_objc_loadcategory",
                             ClassIDTy,
                             Int8PtrTy,
-                            
+
                             ClassIDTy,
                             Int8PtrTy,
                             ClassIDTy,
-                            
+
                             MethodListPtrTy,
                             MethodListPtrTy,
                             PropertyListPtrTy,
-                            
+
                             ProtocolListPtrTy,
                             ClassIDPtrTy,
-                            
+
                             Int8PtrTy
                             );
 

@@ -3163,7 +3163,7 @@ static uint32_t  MulleObjCUniqueIdHashForString( std::string s)
    uint32_t   value;
    char       *c_str;
    
-   c_str = (char *) s.c_str();
+   c_str = const_cast< char *> s.c_str();
    value = mulle_objc_fnv1a_32( (void *) c_str, s.length());
    //   fprintf( stderr, "%s = %08lx\n", c_str, (long) value);
 
@@ -3174,7 +3174,7 @@ static uint32_t  MulleObjCUniqueIdHashForString( std::string s)
    return( value);
 }
 
-};
+}
 // @mulle-objc@: <<
 
 

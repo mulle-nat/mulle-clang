@@ -375,6 +375,70 @@ install_with_brew()
 }
 
 
+install_library_if_missing()
+{
+   # we just install if there is no sudo needed
+   case "${UNAME}" in
+      Darwin)
+         install_with_brew "$@" || exit 1
+      ;;
+
+      Linux)
+         if command -v "brew" > /dev/null 2>&1
+         then
+            install_with_brew "$@" || exit 1
+         else
+            if command -v "apt-get" > /dev/null 2>&1
+            then
+               if ! dpkg -s "$1" > /dev/null 2>&1
+               then
+                  log_info "You may get asked for your password to install $1"
+                  sudo_if_needed apt-get install "$1" || exit 1
+               fi
+            else
+               if command -v "yum" > /dev/null 2>&1
+               then
+                  if ! yum list installed "$1" > /dev/null 2>&1
+                  then
+                     log_info "You may get asked for your password to install $1"
+                     sudo_if_needed yum install "$1" || exit 1
+                  fi
+               else
+                  log_warning "You may need to install $1 manually from $2"
+               fi
+            fi
+         fi
+      ;;
+
+      FreeBSD)
+         if command -v "pkg" > /dev/null 2>&1
+         then
+            if ! pkg info"$1" > /dev/null 2>&1
+            then
+               log_info "You may get asked for your password to install $1"
+               sudo_if_needed pkg install "$1" || exit 1
+            fi
+         else
+            if command -v "pkg_add" > /dev/null 2>&1
+            then
+               if ! pkg_info "$1" > /dev/null 2>&1
+               then
+                  log_info "You may get asked for your password to install $1"
+                  sudo_if_needed pkg_add -r "$1" || exit 1
+               fi
+            else
+               fail "You need to install $1 manually from $2"
+            fi
+         fi
+      ;;
+
+      *)
+         fail "You need to install $1 manually from $2"
+      ;;
+   esac
+}
+
+
 install_binary_if_missing()
 {
    if command -v "$1" > /dev/null 2>&1
@@ -717,12 +781,13 @@ setup_build_environment()
          ;;
 
          Linux)
-            install_binary_if_missing "python-dev" "https://www.python.org/downloads/release"
-            install_binary_if_missing "ncurses-dev" "https://www.gnu.org/software/ncurses"
-            install_binary_if_missing "libxml2-dev" "http://xmlsoft.org"
+            install_library_if_missing "python-dev" "https://www.python.org/downloads/release"
+            install_library_if_missing "libncurses5-dev" "https://www.gnu.org/software/ncurses"
+            install_library_if_missing "libxml2-dev" "http://xmlsoft.org"
+            install_library_if_missing "libedit-dev" "http://thrysoee.dk/editline"
          ;;
 
-	 *)
+         *)
          ;;
       esac
    fi
@@ -913,6 +978,7 @@ _build_llvm()
       case "${UNAME}" in
          FreeBSD)
             CMAKE_FLAGS="${CMAKE_FLAGS} -DCMAKE_SHARED_LINKER_FLAGS=-Wl,-rpath,\$ORIGIN/../lib"
+            CMAKE_FLAGS="${CMAKE_FLAGS} -DCMAKE_EXE_LINKER_FLAGS=-Wl,-rpath,\$ORIGIN/../lib"
          ;;
       esac
 
@@ -1458,9 +1524,13 @@ main()
    #
    PATH="${PREFIX}/bin:$PATH"; export PATH
 
+   [ -z "${PREFIX}" ] && fail "PREFIX is empty"
+
    MULLE_LLVM_INSTALL_PREFIX="${MULLE_LLVM_INSTALL_PREFIX:-${PREFIX}}"
    MULLE_CLANG_INSTALL_PREFIX="${MULLE_CLANG_INSTALL_PREFIX:-${PREFIX}}"
    MULLE_LLDB_INSTALL_PREFIX="${MULLE_LLDB_INSTALL_PREFIX:-${PREFIX}}"
+
+   [ -z "${MULLE_LLVM_INSTALL_PREFIX}" ] && fail "MULLE_LLVM_INSTALL_PREFIX is empty"
 
    LLVM_BUILD_DIR="${BUILD_DIR}/llvm.d"
    MULLE_CLANG_BUILD_DIR="${BUILD_DIR}/mulle-clang.d"

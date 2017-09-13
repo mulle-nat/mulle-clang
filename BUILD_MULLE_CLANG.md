@@ -46,7 +46,7 @@ as this project is huge.
 ```
 mkdir mulle-clang
 cd mulle-clang
-curl -L -O "https://raw.githubusercontent.com/Codeon-GmbH/mulle-clang/mulle_objclang_40/install-mulle-clang.sh"
+curl -L -O "https://raw.githubusercontent.com/Codeon-GmbH/mulle-clang/mulle_objclang_50/install-mulle-clang.sh"
 ```
 
 2. Build the compiler. Here is an example, where the compiler is installed into

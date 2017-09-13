@@ -65,6 +65,7 @@ Name           | Description
 ---------------|--------------------------------------
 -fobjc-aam     | Enable AAM
 -fno-objc-tps  | Disable tagged pointers
+-fno-objc-fmc  | Disable fast method calls
 
 
 ## Additional Compiler defined Macros
@@ -81,6 +82,8 @@ Name                    | Description
 `__MULLE_OBJC_NO_TPS__` | TPS is not enabled
 `__MULLE_OBJC_TRT__`    | TRT (thread-local runtime) is enabled
 `__MULLE_OBJC_NO_TRT__` | TRT is not enabled
+`__MULLE_OBJC_FMC__`    | FMC (fast method calling) is enabled
+`__MULLE_OBJC_NO_FMC__` | FMC is not enabled
 
 
 ## Macros used in Code Generation
@@ -115,23 +118,23 @@ defined in the runtime.
 
 ### -O2
 
-* `mulle_objc_inline_unfailing_get_or_lookup_infraclass`
-* `mulle_objc_infraclass_inline_metacall_classid`
+* `mulle_objc_inline_unfailingfastlookup_infraclass`
 * `mulle_objc_object_inline_constant_methodid_call`
+* `_mulle_objc_object_inline_supercall`
 * `mulle_objc_object_retain`
 * `mulle_objc_object_release`
 
 ### -O1
 
-* `mulle_objc_inline_unfailing_get_or_lookup_infraclass`
-* `mulle_objc_infraclass_inline_metacall_classid`
+* `mulle_objc_inline_unfailingfastlookup_infraclass`
 * `mulle_objc_object_constant_methodid_call`
+* `_mulle_objc_object_partialinline_supercall`
 
 ### -O0, -Os
 
-* `mulle_objc_unfailing_get_or_lookup_infraclass`
+* `mulle_objc_unfailingfastlookup_infraclass`
 * `mulle_objc_object_call`
-* `mulle_objc_infraclass_metacall_classid`
+* `_mulle_objc_object_supercall`
 
 ### All
 
@@ -166,10 +169,10 @@ You can install mulle-clang via **apt-get**:
 
 ```
 sudo apt-get update &&
-sudo apt-get install curl 
+sudo apt-get install curl
 
 curl -sS https://www.codeon.de/dists/nat-codeon.asc | sudo apt-key add -
-sudo echo "deb [arch=amd64] http://download.codeon.de `lsb_release -c -s` main" > /etc/apt/sources.list.d/codeon.de-main.list 
+sudo echo "deb [arch=amd64] http://download.codeon.de `lsb_release -c -s` main" > /etc/apt/sources.list.d/codeon.de-main.list
 
 sudo apt-get update &&
 sudo apt-get install mulle-clang

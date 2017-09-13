@@ -253,6 +253,77 @@ sudo_if_needed()
 }
 
 
+emit_llvm_loop_utils_patch()
+{
+   cat <<EOF
+   --- lib/Transforms/Utils/LoopUtils.cpp 2017-09-13 15:16:32.000000000 +0200
++++ /tmp/LoopUtils.cpp  2017-09-13 15:14:27.000000000 +0200
+@@ -23,7 +23,6 @@
+ #include "llvm/Analysis/ScalarEvolutionExpander.h"
+ #include "llvm/Analysis/ScalarEvolutionExpressions.h"
+ #include "llvm/Analysis/TargetTransformInfo.h"
+-#include "llvm/Analysis/ValueTracking.h" // (nat) added this
+ #include "llvm/IR/Dominators.h"
+ #include "llvm/IR/Instructions.h"
+ #include "llvm/IR/Module.h"
+@@ -1118,8 +1117,6 @@
+
+ /// Returns true if the instruction in a loop is guaranteed to execute at least
+ /// once.
+-/// Returns true if the instruction in a loop is guaranteed to execute at least
+-/// once.
+ bool llvm::isGuaranteedToExecute(const Instruction &Inst,
+                                  const DominatorTree *DT, const Loop *CurLoop,
+                                  const LoopSafetyInfo *SafetyInfo) {
+@@ -1131,27 +1128,14 @@
+   // common), it is always guaranteed to dominate the exit blocks.  Since this
+   // is a common case, and can save some work, check it now.
+   if (Inst.getParent() == CurLoop->getHeader())
+-  {
+-    if( ! SafetyInfo->HeaderMayThrow)
+-      return true;
+-
+-    // find the place where we throw in the loop header and everything up till
+-    // then is guaranteed to execute. It would be nicer if we could memorize
+-    // isGuaranteedToTransferExecutionToSuccessor on a per instruction basis
+-
+-    BasicBlock *Header = CurLoop->getHeader();
+-    for (BasicBlock::const_iterator I = Header->begin(), E = Header->end();
+-         (I != E); ++I)
+-    {
+-      if( ! isGuaranteedToTransferExecutionToSuccessor(&*I))
+-        return( false);
+-      if( &*I == &Inst)
+-        break;
+-    }
+     // If there's a throw in the header block, we can't guarantee we'll reach
+-    // Inst. But all functions until the throw can be collected
+-    return( true);
+-  }
++    // Inst.
++    return !SafetyInfo->HeaderMayThrow;
++
++  // Somewhere in this loop there is an instruction which may throw and make us
++  // exit the loop.
++  if (SafetyInfo->MayThrow)
++    return false;
+
+   // Get the exit blocks for the current loop.
+   SmallVector<BasicBlock *, 8> ExitBlocks;
+EOF
+}
+
+
+patch_llvm()
+{
+   [ -d "${LLVM_DIR}" ] || fail "llvm did not unpack to expected \"${LLVM_DIR}\""
+   (
+      cd "${LLVM_DIR}"
+      emit_llvm_loop_utils_patch | patch -u -R "lib/Transforms/Utils/LoopUtils.cpp"
+   )
+}
+
+
 fetch_brew()
 {
    case "${UNAME}" in
@@ -667,6 +738,8 @@ download_llvm()
       exekutor mkdir -p "`dirname -- "${SRC_DIR}"`" 2> /dev/null || exit 1
 
       _llvm_module_download "llvm" "${LLVM_ARCHIVE}" "${SRC_DIR}"
+
+      patch_llvm "${LLVM_DIR}"
    fi
 
    if [ -z "${NO_LIBCXX}" ]

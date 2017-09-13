@@ -10,8 +10,9 @@ BY_THE_BOOK="YES"
 
 # our compiler version
 MULLE_CLANG_VERSION="5.0.0.0"
-MULLE_CLANG_RC="2"
+MULLE_CLANG_RC="3"
 MULLE_LLDB_VERSION="5.0.0.0"
+MULLE_LLDB_RC="3"
 
 
 # required LLVM version
@@ -29,9 +30,18 @@ then
 else
    MULLE_CLANG_ARCHIVENAME="${MULLE_CLANG_VERSION}-RC${MULLE_CLANG_RC}"
 fi
-
 MULLE_CLANG_ARCHIVE="https://github.com/Codeon-GmbH/mulle-clang/archive/${MULLE_CLANG_ARCHIVENAME}.tar.gz"
-MULLE_LLDB_ARCHIVE="https://github.com/Codeon-GmbH/mulle-lldb/archive/${MULLE_LLDB_VERSION}.tar.gz"
+MULLE_CLANG_UNPACKNAME="mulle-clang-${MULLE_CLANG_ARCHIVENAME}"
+
+if [ -z "${MULLE_LLDB_RC}" ]
+then
+   MULLE_LLDB_ARCHIVENAME="${MULLE_LLDB_VERSION}"
+else
+   MULLE_LLDB_ARCHIVENAME="${MULLE_LLDB_VERSION}-RC${MULLE_LLDB_RC}"
+fi
+MULLE_LLDB_ARCHIVE="https://github.com/Codeon-GmbH/mulle-lldb/archive/${MULLE_LLDB_ARCHIVENAME}.tar.gz"
+MULLE_LLDB_UNPACKNAME="mulle-lldb-${MULLE_LLDB_ARCHIVENAME}"
+
 
 if [ -z "${LLVM_RC}" ]
 then
@@ -627,7 +637,7 @@ setup_build_environment()
    # Unfortunately on mingw, compile errors in libcxx
    # as ninja picks up the wrong c.
    #
-   if [ "${OPTION_NO_NINJA}" != "YES" -a ! -z "`command -v ninja`" ]
+   if [ "${OPTION_NINJA}" = "YES" -a ! -z "`command -v ninja`" ]
    then
       CMAKE_GENERATOR="Ninja"
       MAKE=ninja
@@ -666,7 +676,7 @@ setup_build_environment()
             install_binary_if_missing "make" "somewhere"
 
             CMAKE_GENERATOR="Unix Makefiles"
-            MAKE=make
+            MAKE="make"
             MAKE_FLAGS="${MAKE_FLAGS} -j `get_core_count`"
          fi
       ;;
@@ -697,6 +707,88 @@ setup_build_environment()
          install_binary_if_missing "${C_COMPILER}" "somewhere (c compiler)"
       fi
    fi
+
+   if [ "${BUILD_LLDB}" = "YES" ]
+   then
+      install_binary_if_missing "swig" "http://swig.org/download.html"
+   fi
+}
+
+
+is_kosher_download()
+{
+   if [ ! -f "${1}" ]
+   then
+      return 0
+   fi
+
+   local size
+
+   size="`du -k "${1}" | awk '{ print $1}'`"
+   [ "${size}" -gt 16 ]
+}
+
+
+incremental_download()
+{
+   local filename="$1"
+   local url="$2"
+   local name="$3"
+
+   if [ ! -f "${filename}" ]
+   then
+      local partialfilename
+
+      partialfilename="_${filename}"
+      if ! is_kosher_download "${filename}"
+      then
+         exekutor rm "${partialfilename}"
+      fi
+
+      log_verbose "Downloading \"${name}\" from \"${url}\" ..."
+      exekutor curl -L -C- -o "${partialfilename}" "${url}"  || fail "curl failed"
+      exekutor tar tfz "${partialfilename}" > /dev/null || tar_fail "tar archive corrupt"
+      exekutor mv "${partialfilename}" "${filename}"  || exit 1
+   fi
+}
+
+extract_tar_gz_archive()
+{
+   local filename="$1"
+   local dst="$2"
+   local name="$3"
+
+   [ -d "${dst}" ] && fail "${dst} already exists"
+
+   log_verbose "Unpacking into \"${dst}\" ..."
+
+   local extractname
+
+   extractname="`basename -- "${filename}" ".tar.gz"`"
+
+   exekutor tar xfz "${filename}" || tar_fail ".tar.gz"
+   exekutor mkdir -p "`dirname -- "${dst}"`" 2> /dev/null
+   exekutor mv "${extractname}" "${dst}" || exit 1
+}
+
+
+extract_tar_xz_archive()
+{
+   local filename="$1"
+   local dst="$2"
+   local name="$3"
+
+   [ -d "${dst}" ] && fail "${dst} already exists"
+
+   log_verbose "Unpacking into \"${dst}\" ..."
+
+   local extractname
+
+   extractname="`basename -- "${filename}" ".tar.xz"`"
+
+   exekutor tar xfJ "${filename}" || tar_fail ".tar.xz"
+   exekutor mkdir -p "`dirname -- "${dst}"`" 2> /dev/null
+   exekutor mv "${extractname}" "${dst}" || exit 1
 }
 
 
@@ -707,57 +799,42 @@ _llvm_module_download()
    local dst="$3"
 
    local filename
-   local extractname
 
    filename="`basename -- "${archive}"`"
-   extractname="`basename -- "${filename}" .tar.xz`"
 
-   if [ ! -f "${filename}" ]
-   then
-      log_verbose "Downloading \"${name}\" from \"${archive}\" ..."
-
-      exekutor curl -L -C- -o "_${filename}" "${archive}"  || fail "curl failed"
-      exekutor tar tfJ "_${filename}" > /dev/null || tar_fail "tar archive corrupt"
-      exekutor mv "_${filename}" "${filename}" || exit 1
-   fi
-
-   log_verbose "Unpacking into \"${dst}/${name}\" ..."
-
-   exekutor tar xfJ "${filename}" || tar_fail "tar failed"
-   exekutor mkdir -p "${dst}" 2> /dev/null
-   exekutor mv "${extractname}" "${dst}/${name}" || exit 1
+   incremental_download "${filename}" "${archive}" "${name}" &&
+   extract_tar_xz_archive "${filename}" "${dst}" "${name}"
 }
 
 
 download_llvm()
 {
-   log_info "Downloading llvm ${LLVM_VERSION} ..."
-
    if [ ! -d "${LLVM_DIR}" ]
    then
+      log_info "mulle-llvm ${LLVM_VERSION}"
+
       exekutor mkdir -p "`dirname -- "${SRC_DIR}"`" 2> /dev/null || exit 1
 
-      _llvm_module_download "llvm" "${LLVM_ARCHIVE}" "${SRC_DIR}"
+      _llvm_module_download "llvm" "${LLVM_ARCHIVE}" "${SRC_DIR}/llvm"
 
-      patch_llvm "${LLVM_DIR}"
+      if [ "${OPTION_PATCH_LLVM}" = "YES" ]
+      then
+         patch_llvm "${LLVM_DIR}"
+      fi
    fi
 
    if [ -z "${NO_LIBCXX}" ]
    then
       if [ ! -d "${LLVM_DIR}/projects/libcxx" ]
       then
-         log_verbose "Downloading libcxx from \"${LIBCXX_ARCHIVE}\" ..."
-
-         _llvm_module_download "libcxx" "${LIBCXX_ARCHIVE}" "${LLVM_DIR}/projects"
+         _llvm_module_download "libcxx" "${LIBCXX_ARCHIVE}" "${LLVM_DIR}/projects/libcxx"
       else
          log_fluff "\"${LLVM_DIR}/projects/libcxx\" already exists"
       fi
 
       if [ ! -d "${LLVM_DIR}/projects/libcxxabi" ]
       then
-         log_verbose "Downloading libcxxabi from \"${LIBCXXABI_ARCHIVE}\" ..."
-
-         _llvm_module_download "libcxxabi" "${LIBCXXABI_ARCHIVE}" "${LLVM_DIR}/projects"
+         _llvm_module_download "libcxxabi" "${LIBCXXABI_ARCHIVE}" "${LLVM_DIR}/projects/libcxxabi"
       else
          log_fluff "\"${LLVM_DIR}/projects/libcxxabi\" already exists"
       fi
@@ -771,23 +848,28 @@ download_clang()
 {
    if [ ! -d "${MULLE_CLANG_DIR}" ]
    then
-      if [ ! -f mulle-clang.tgz ]
-      then
-         log_verbose "Downloading mulle-clang from \"${MULLE_CLANG_ARCHIVE}\" ..."
-         exekutor curl -L -C- -o _mulle-clang.tgz "${MULLE_CLANG_ARCHIVE}"  || fail "curl failed"
-         exekutor tar tfz _mulle-clang.tgz > /dev/null || tar_fail "tar archive corrupt"
-         exekutor mv _mulle-clang.tgz mulle-clang.tgz  || exit 1
-      fi
+      log_info "mulle-clang ${MULLE_CLANG_ARCHIVENAME}"
 
-      log_verbose "Unpacking into \"${MULLE_CLANG_DIR}\" ..."
-      exekutor tar xfz mulle-clang.tgz || tar_fail "tar archive corrupt"
-      exekutor mkdir -p "`dirname -- "${MULLE_CLANG_DIR}"`" 2> /dev/null || exit 1
-      exekutor mv mulle-clang-${MULLE_CLANG_ARCHIVENAME} "${MULLE_CLANG_DIR}" || exit 1
+      incremental_download "${MULLE_CLANG_UNPACKNAME}.tar.gz" "${MULLE_CLANG_ARCHIVE}" "mulle-clang" &&
+      extract_tar_gz_archive "${MULLE_CLANG_UNPACKNAME}.tar.gz" "${MULLE_CLANG_DIR}" "mulle-clang"
    else
       log_fluff "\"${MULLE_CLANG_DIR}\" already exists"
    fi
 }
 
+
+download_lldb()
+{
+   if [ ! -d "${MULLE_LLDB_DIR}" ]
+   then
+      log_info "mulle-lldb ${MULLE_LLDB_ARCHIVENAME}"
+
+      incremental_download "${MULLE_LLDB_UNPACKNAME}.tar.gz" "${MULLE_LLDB_ARCHIVE}" "mulle-lldb" &&
+      extract_tar_gz_archive "${MULLE_LLDB_UNPACKNAME}.tar.gz" "${MULLE_LLDB_DIR}" "mulle-lldb"
+   else
+      log_fluff "\"${MULLE_LLDB_DIR}\" already exists"
+   fi
+}
 
 #
 # on Debian, llvm doesn't build properly with clang
@@ -895,8 +977,6 @@ download()
       download_llvm
    fi
 
-   log_info "Downloading mulle-clang ${MULLE_CLANG_ARCHIVENAME}..."
-
    if [ "${BUILD_CLANG}" = "YES" ]
    then
       download_clang
@@ -922,7 +1002,6 @@ download()
 #      LLDB_VENDOR="`get_lldb_vendor "${MULLE_LLDB_DIR}" "${MULLE_LLDB_VERSION}"`" || exit 1
 
 #      log_verbose "LLDB_VENDOR=${LLDB_VENDOR}"
-      log_verbose "MULLE_LLDB_VERSION=${MULLE_LLDB_VERSION}"
    fi
 
 # should check if llvm is installed, if yes
@@ -938,24 +1017,27 @@ build()
 {
    log_info "Building mulle-clang ${MULLE_CLANG_VERSION} ..."
 
-   if [ -d ${PREFIX}/lib -o \
-        -d ${PREFIX}/include -o \
-        -d ${PREFIX}/bin -o \
-        -d ${PREFIX}/libexec -o \
-        -d ${PREFIX}/share ]
+   if [ "${OPTION_WARN}" = "YES" ]
    then
-      log_warning "There are artifacts left over from a previous run.
+      if [ -d ${PREFIX}/lib -o \
+           -d ${PREFIX}/include -o \
+           -d ${PREFIX}/bin -o \
+           -d ${PREFIX}/libexec -o \
+           -d ${PREFIX}/share ]
+      then
+         log_warning "There are artifacts left over from a previous run.
 If you are upgrading to a new version of llvm, you
 should [CTRL]-[C] now and do:
    ${C_RESET}${C_BOLD}sudo rm -rf ${PREFIX}/bin ${BUILD_DIR} ${PREFIX}/include ${PREFIX}/lib ${PREFIX}/libexec ${PREFIX}/share"
-      sleep 8
-   else
-      if [ -d "${BUILD_DIR}" ]
-      then
-         log_warning "As there is an old ${BUILD_DIR} folder here, the previous build
+         sleep 8
+      else
+         if [ -d "${BUILD_DIR}" ]
+         then
+            log_warning "As there is an old ${BUILD_DIR} folder here, the previous build
 is likely to get reused. If this is not what you want, [CTRL]-[C] now and do:
    ${C_RESET}${C_BOLD}sudo rm -rf ${BUILD_DIR}"
-         sleep 4
+            sleep 4
+         fi
       fi
    fi
 
@@ -1067,8 +1149,10 @@ install_mulle_lldb_link()
 before you can install"
    fi
 
-   install_executable "${MULLE_LLDB_INSTALL_PREFIX}/bin/lldb${CLANG_SUFFIX}${EXE_EXTENSION}" mulle-lldb${CLANG_SUFFIX}${EXE_EXTENSION}
-   install_executable "${MULLE_LLDB_INSTALL_PREFIX}/bin/lldb-mi${CLANG_SUFFIX}${EXE_EXTENSION}" mulle-lldb-mi${CLANG_SUFFIX}${EXE_EXTENSION}
+   install_executable "${MULLE_LLDB_INSTALL_PREFIX}/bin/lldb${CLANG_SUFFIX}${EXE_EXTENSION}" \
+                      mulle-lldb${CLANG_SUFFIX}${EXE_EXTENSION}
+   install_executable "${MULLE_LLDB_INSTALL_PREFIX}/bin/lldb-mi${CLANG_SUFFIX}${EXE_EXTENSION}" \
+                      mulle-lldb-mi${CLANG_SUFFIX}${EXE_EXTENSION}
 }
 
 
@@ -1149,9 +1233,11 @@ main()
 
    local BUILD_CLANG="${BUILD_CLANG:-YES}"
    local BUILD_LLVM="${BUILD_LLVM:-YES}"
-   local BUILD_LLDB="${BUILD_LLDB:-NO}"
+   local BUILD_LLDB="${BUILD_LLDB:-YES}"
    local INSTALL_LLVM="${INSTALL_LLVM:-YES}"
-   local OPTION_NO_NINJA="NO"
+   local OPTION_NINJA="YES"
+   local OPTION_PATCH_LLVM="YES"
+   local OPTION_WARN="YES"
 
    while [ $# -ne 0 ]
    do
@@ -1191,7 +1277,7 @@ main()
             BUILD_CMAKE="YES"
          ;;
 
-         --build-lldb)
+         --with-lldb|--build-lldb)
             BUILD_LLDB="YES"
          ;;
 
@@ -1210,6 +1296,10 @@ main()
 
          --lldb-debug)
             LLDB_BUILD_TYPE="Debug"
+         ;;
+
+         --no-patch-llvm)
+            OPTION_PATCH_LLVM="NO"
          ;;
 
          --prefix)
@@ -1244,11 +1334,15 @@ main()
 
 
          --no-ninja)
-            OPTION_NO_NINJA="YES"
+            OPTION_NINJA="NO"
          ;;
 
          --no-libcxx)
             NO_LIBCXX="YES"
+         ;;
+
+         --no-warn)
+            OPTION_WARN="NO"
          ;;
 
          -*)
@@ -1303,8 +1397,10 @@ main()
    LLVM_DIR="${SRC_DIR}/llvm"
    if [ "${BY_THE_BOOK}" = "YES" ]
    then
-      MULLE_CLANG_DIR="${LLVM_DIR}/tools/mulle-clang"
-      MULLE_LLDB_DIR="${LLVM_DIR}/tools/mulle-lldb"
+      # must use "clang" as name, because lldb will expect it there
+      # and then use lldb also for consistency
+      MULLE_CLANG_DIR="${LLVM_DIR}/tools/clang"
+      MULLE_LLDB_DIR="${LLVM_DIR}/tools/lldb"
    else
       MULLE_CLANG_DIR="${SRC_DIR}/mulle-clang"
       MULLE_LLDB_DIR="${SRC_DIR}/mulle-lldb"

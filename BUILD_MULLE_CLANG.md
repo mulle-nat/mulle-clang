@@ -7,20 +7,14 @@
 
 ### Prerequisites
 
-You need a fairly current Unix, like Linux, OS X or FreeBSD.
-
->
-> You can give [MINGW](http://mingw.org/) on Windows a try, but things will
-> be easier with [WSL/bash](https://msdn.microsoft.com/en-us/commandline/wsl/about].
->
+You need a fairly current Unix, like Linux, OS X or FreeBSD or you can use Windows.
 
 Locate a place on your filesystem, where you have at least 8 GB disk space free
 after installing all pre-requisites. You probably need not bother to try, if
 you have less than 6 GB of RAM. Or you risk seeing
-`virtual memory exhausted: Cannot allocate memory`.
+`virtual memory exhausted: Cannot allocate memory`, especially when building debug binaries.
 
-A docker container usually only has 10 GB of space. That may not be enough to build
-the compiler!
+A docker container usually only has 10 GB of space. That may not be enough to build the compiler!
 
 If you are configuring a virtual machine, give it some more cores!
 
@@ -63,14 +57,14 @@ Now be very, very patient.
 
 ### Windows: Installing further prerequisites
 
-Check the
-[mulle-build README.md](//www.mulle-kybernetik.com/software/git/mulle-build/README.md)
-for instructions how to get the "Git for Windows" bash going.
+>
+> This method uses [MINGW](http://mingw.org/) on Windows. Things will
+> be easier with [WSL/bash](https://msdn.microsoft.com/en-us/commandline/wsl/about)
+> but the resultant executables would not be usable with Visual Studio. With WSL/bash just use the [Common generic instructions](#common-generic).
+>
 
 
-### Installing on Windows 10
-
-Firstly ensure, that your username does not contain anything else than
+First, ensure that your username does not contain anything else than
 characters and underscores.
 
 * mulle_nat : good
@@ -78,7 +72,7 @@ characters and underscores.
 * Nat! : bad
 * i am nat : very bad
 
-You need to install some prerequisites first.
+### Installing on Windows 10 (probably also 7 and 8)
 
 * Install [Visual Studio 2015 Community Edition](//beta.visualstudio.com/downloads/) or better (free). Make sure that you install Windows C++ support. Also add git support.
 * [Git for Windows](//git-scm.com/download/win) is included in VS 2015, make sure it's there
@@ -90,8 +84,13 @@ Reboot, so that Windows picks up the **PATH** changes (Voodoo).
 Now the tricky part is to get the "Git bash" shell running with the proper VS
 environment.  Assuming you kept default settings the "Git bash" is
 `C:\Program Files\Git\git-bash.exe`. Open the "Developer Command Prompt for VS 2015"
-from the start menu and execute the git-bash from there. A second window with
-the bash should open.
+from the start menu and execute the git-bash from there. 
 
-Continue with [Common generic instructions](#common-generic).
+>
+> You can also just drah the Git bash icon into the 
+> developer command prompt.
+>
+ 
+A second window with the bash should open.
+Then continue with [Common generic instructions](#common-generic).
 

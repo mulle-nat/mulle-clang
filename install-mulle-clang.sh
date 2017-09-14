@@ -695,6 +695,8 @@ setup_build_environment()
    local minor
    local major
 
+   install_binary_if_missing "python" "https://www.python.org/downloads/release"
+
    #
    # Ninja is probably preferable if installed
    # Should configure this though somewhere
@@ -706,10 +708,11 @@ setup_build_environment()
       CMAKE_GENERATOR="Ninja"
       MAKE="ninja"
       MAKEFILE="build.ninja"
-   else
-      MAKE="make"
-      MAKFILE="Makefile"
+      MAKE_INSTALL_COMMAND="install"
+      MAKE_BUILD_COMMAND=""
    fi
+
+   CLANG_SYMLINKS="mulle-clang;mulle-clang-cpp"
 
    #
    # make sure cmake and git and gcc are present (and in the path)
@@ -723,16 +726,34 @@ setup_build_environment()
 
          install_binary_if_missing "xz" "https://tukaani.org/xz and then add the directory containing xz to your %PATH%"
 
+         if [ "${OPTION_VS32BIT}" = "YES" ]
+         then
+            # can't use ninja then though
+            CMAKE_FLAGS="${CMAKE_FLAGS} -Thost=x64"
+            if [ ! -z "${MAKE}" ]
+            then
+               log_verbose "Falling back to msbuild, as you can't use -Thost=x64 with ${MAKE}... 
+  But then may run into problems later with visual studio (maybe)."
+               MAKE=
+            fi
+         fi
+
          if [ -z "${MAKE}" ]
          then
-            install_binary_if_missing "nmake" "https://www.visualstudio.com/de-de/downloads/download-visual-studio-vs.aspx and then add the directory containing nmake to your %PATH%"
+            install_binary_if_missing "msbuild.exe" "https://www.visualstudio.com/de-de/downloads/download-visual-studio-vs.aspx and then add the directory containing nmake to your %PATH%"
 
-            CMAKE_GENERATOR="NMake Makefiles"
-            MAKE=nmake.exe
+            CMAKE_GENERATOR="Visual Studio 14 2015"
+            MAKEFILE="INSTALL.vcxproj" # hmm
+            MAKE="msbuild.exe"
+            MAKE_FLAGS="/maxcpucount:`get_core_count`"
+            MAKE_INSTALL_COMMAND="INSTALL.vcxproj"
+            MAKE_BUILD_COMMAND="ALL_BUILD.vcxproj"
          fi
 
          CXX_COMPILER=cl.exe
          C_COMPILER=cl.exe
+
+         CLANG_SYMLINKS="${CLANG_SYMLINKS};mulle-clang-cl;msbuild/cl.exe"
       ;;
 
       #
@@ -741,21 +762,19 @@ setup_build_environment()
       FreeBSD)
          CMAKE_FLAGS="${CMAKE_FLAGS} -DCMAKE_SHARED_LINKER_FLAGS=-Wl,-rpath,\\\$ORIGIN/../lib"
       ;;
-
-      *)
-         log_fluff "Detected ${UNAME}"
-         install_binary_if_missing "python" "https://www.python.org/downloads/release"
-
-         if [ -z "${MAKE}" ]
-         then
-            install_binary_if_missing "make" "somewhere"
-
-            CMAKE_GENERATOR="Unix Makefiles"
-            MAKE="make"
-            MAKE_FLAGS="${MAKE_FLAGS} -j `get_core_count`"
-         fi
-      ;;
    esac
+
+   if [ -z "${MAKE}" ]
+   then
+      install_binary_if_missing "make" "somewhere"
+
+      CMAKE_GENERATOR="Unix Makefiles"
+      MAKEFILE="Makefile"
+      MAKE="make"
+      MAKE_FLAGS="-B -j `get_core_count`"
+      MAKE_INSTALL_COMMAND="install"
+      MAKE_BUILD_COMMAND=""
+   fi
 
    check_and_build_cmake
 
@@ -970,6 +989,24 @@ download_lldb()
    fi
 }
 
+
+should_build()
+{
+   local directory="$1"
+
+   if [ ! -f "${directory}/${MAKEFILE}" ]
+   then
+      return 0
+   fi
+
+   if [ ! -f "${directory}/CMakeCache.txt" ]
+   then
+      return 0
+   fi
+
+   return 1
+}
+
 #
 # on Debian, llvm doesn't build properly with clang
 # use gcc, which is the default compiler for cmake
@@ -977,32 +1014,52 @@ download_lldb()
 _build_llvm()
 {
    #
+   # if on windows you notice that lldb doesnt compile
+   # you want to throw it away with --no-lldb
+   #
+   if [ "${BUILD_LLDB}" = "NO" -a "${BY_THE_BOOK}" = "YES" ]
+   then
+      if [ -d "${MULLE_LLDB_DIR}" ]
+      then
+         exekutor rm -rf "${MULLE_LLDB_DIR}"
+         if [ -f "${LLVM_BUILD_DIR}/CMakeCache.txt" ]
+         then
+            exekutor rm "${LLVM_BUILD_DIR}/CMakeCache.txt"
+         fi
+      fi
+   fi
+   #
    # Build llvm
    #
-   if [ ! -f "${LLVM_BUILD_DIR}/${MAKEFILE}" -o "${RUN_LLVM_CMAKE}" = "YES" ]
+   if should_build "${LLVM_BUILD_DIR}" || [ "${RUN_LLVM_CMAKE}" = "YES" ]
    then
-      exekutor mkdir -p "${LLVM_BUILD_DIR}" 2> /dev/null
+      (
+         # for msbuild
+         C_COMPILER="`command -v "${C_COMPILER}"`"
+         CXX_COMPILER="`command -v "${CXX_COMPILER}"`"
 
-      set -e
-         exekutor cd "${LLVM_BUILD_DIR}"
-            CC="${C_COMPILER}" CXX="${CXX_COMPILER}" exekutor cmake \
+         exekutor mkdir -p "${LLVM_BUILD_DIR}" 2> /dev/null
+         exekutor cd "${LLVM_BUILD_DIR}" &&
+         exekutor cmake \
                -Wno-dev \
                -G "${CMAKE_GENERATOR}" \
+               -DCMAKE_C_COMPILER="${C_COMPILER}" \
+               -DCMAKE_CXX_COMPILER="${CXX_COMPILER}" \
                -DCLANG_VENDOR="${CLANG_VENDOR}" \
-               -DCLANG_LINKS_TO_CREATE="mulle-clang;mulle-clang-cl;mulle-clang-cpp" \
+               -DCLANG_LINKS_TO_CREATE="${CLANG_SYMLINKS}" \
                -DCMAKE_BUILD_TYPE="${LLVM_BUILD_TYPE}" \
                -DCMAKE_INSTALL_PREFIX="${MULLE_LLVM_INSTALL_PREFIX}" \
                -DLLVM_ENABLE_CXX1Y:BOOL=OFF \
                ${CMAKE_FLAGS} \
                "${BUILD_RELATIVE}/../${LLVM_DIR}"
-         exekutor cd "${OWD}"
-      set +e
+      ) || exit 1
    fi
 
-   exekutor cd "${LLVM_BUILD_DIR}" || fail "build_llvm: ${LLVM_BUILD_DIR} missing"
+   (
+      exekutor cd "${LLVM_BUILD_DIR}" &&
    # hmm
-   CC="${C_COMPILER}" CXX="${CXX_COMPILER}" exekutor ${MAKE} ${MAKE_FLAGS} "$@" || fail "build_llvm: ${MAKE} failed"
-   exekutor cd "${OWD}"
+      exekutor ${MAKE} ${MAKE_FLAGS} "$@" 
+   ) || exit 1
 }
 
 
@@ -1023,35 +1080,37 @@ _build_clang()
    #
    # Build mulle-clang
    #
-   if [ ! -f "${MULLE_CLANG_BUILD_DIR}/${MAKEFILE}" ]
+   if should_build "${MULLE_CLANG_BUILD_DIR}" || [ "${RUN_CLANG_CMAKE}" = "YES" ]
    then
-      exekutor mkdir -p "${MULLE_CLANG_BUILD_DIR}" 2> /dev/null
+      ( 
+         # for msbuild
+         C_COMPILER="`command -v "${C_COMPILER}"`"
+         CXX_COMPILER="`command -v "${CXX_COMPILER}"`"
 
-      set -e
-         exekutor cd "${MULLE_CLANG_BUILD_DIR}"
+         exekutor mkdir -p "${MULLE_CLANG_BUILD_DIR}" 2> /dev/null
 
-            PATH="${LLVM_BIN_DIR}:$PATH"
-
+         exekutor cd "${MULLE_CLANG_BUILD_DIR}" &&
 
             # cmake -DCMAKE_BUILD_TYPE=Debug "../${MULLE_CLANG_DIR}"
             # try to build cmake with cmake
-            CC="${C_COMPILER}" CXX="${CXX_COMPILER}" \
-               exekutor cmake \
-                  -Wno-dev \
-                  -G "${CMAKE_GENERATOR}" \
-                  -DCLANG_VENDOR="${CLANG_VENDOR}" \
-                  -DCLANG_LINKS_TO_CREATE="mulle-clang;mulle-clang-cl;mulle-clang-cpp" \
-                  -DCMAKE_BUILD_TYPE="${MULLE_CLANG_BUILD_TYPE}" \
-                  -DCMAKE_INSTALL_PREFIX="${MULLE_CLANG_INSTALL_PREFIX}" \
-                  ${CMAKE_FLAGS} \
-                  "${BUILD_RELATIVE}/../${MULLE_CLANG_DIR}"
-         exekutor cd "${OWD}"
-      set +e
+         exekutor cmake \
+               -Wno-dev \
+               -G "${CMAKE_GENERATOR}" \
+               -DCMAKE_C_COMPILER="${C_COMPILER}" \
+               -DCMAKE_CXX_COMPILER="${CXX_COMPILER}" \
+               -DCLANG_VENDOR="${CLANG_VENDOR}" \
+                  -DCLANG_LINKS_TO_CREATE="${CLANG_SYMLINKS}" \
+               -DCMAKE_BUILD_TYPE="${MULLE_CLANG_BUILD_TYPE}" \
+               -DCMAKE_INSTALL_PREFIX="${MULLE_CLANG_INSTALL_PREFIX}" \
+               ${CMAKE_FLAGS} \
+               "${BUILD_RELATIVE}/../${MULLE_CLANG_DIR}"
+      ) || exit 1
    fi
 
-   exekutor cd "${MULLE_CLANG_BUILD_DIR}" || fail "build_clang: ${MULLE_CLANG_BUILD_DIR} missing"
-   CC="${C_COMPILER}" CXX="${CXX_COMPILER}" exekutor ${MAKE} ${MAKE_FLAGS} "$@" || fail "build_clang: ${MAKE} failed"
-   exekutor cd "${OWD}"
+   (
+      exekutor cd "${MULLE_CLANG_BUILD_DIR}" &&
+      exekutor ${MAKE} ${MAKE_FLAGS} "$@" 
+   ) || exit 1
 }
 
 
@@ -1146,15 +1205,15 @@ is likely to get reused. If this is not what you want, [CTRL]-[C] now and do:
    then
       if [ "${INSTALL_LLVM}" = "YES" ]
       then
-         build_llvm install
+         build_llvm "${MAKE_INSTALL_COMMAND}"
       else
-         build_llvm
+         build_llvm "${MAKE_BUILD_COMMAND}"
       fi
    fi
 
    if [ "${BUILD_CLANG}" = "YES" -a "${BY_THE_BOOK}" = "NO" ]
    then
-      build_clang install
+      build_clang "${MAKE_INSTALL_COMMAND}"
    fi
 }
 
@@ -1167,15 +1226,15 @@ _build()
    then
       if [ "${INSTALL_LLVM}" = "YES" ]
       then
-         _build_llvm install
+         _build_llvm "${MAKE_INSTALL_COMMAND}"
       else
-         _build_llvm
+         _build_llvm "${MAKE_BUILD_COMMAND}"
       fi
    fi
 
    if [ "${BUILD_CLANG}" = "YES" -a "${BY_THE_BOOK}" = "NO" ]
    then
-      _build_clang install
+      _build_clang "${MAKE_INSTALL_COMMAND}"
    fi
 }
 
@@ -1327,6 +1386,7 @@ main()
    local OPTION_NINJA="YES"
    local OPTION_PATCH_LLVM="YES"
    local OPTION_WARN="YES"
+   local OPTION_VS32BIT="NO"
 
    while [ $# -ne 0 ]
    do
@@ -1373,6 +1433,10 @@ main()
 
          --no-lldb)
             BUILD_LLDB="NO"
+         ;;
+
+         --vs32bit)
+            OPTION_VS32BIT="YES"
          ;;
 
          --debug)

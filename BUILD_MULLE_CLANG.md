@@ -84,13 +84,15 @@ Reboot, so that Windows picks up the **PATH** changes (Voodoo).
 Now the tricky part is to get the "Git bash" shell running with the proper VS
 environment.  Assuming you kept default settings the "Git bash" is
 `C:\Program Files\Git\git-bash.exe`. Open the "Developer Command Prompt for VS 2015"
-from the start menu and execute the git-bash from there. 
+from the start menu and execute the git-bash from there.
 
 >
-> You can also just drah the Git bash icon into the 
+> You can also just drah the Git bash icon into the
 > developer command prompt.
 >
- 
+> ![Screeny](git-bash-drop-fs8.png)
+>
+
 A second window with the bash should open.
 Then continue with [Common generic instructions](#common-generic).
 

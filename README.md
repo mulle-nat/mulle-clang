@@ -148,6 +148,8 @@ defined in the runtime.
 
 ## Install
 
+<!--
+
 ### OS X
 
 You can use [homebrew](//brew.sh) to install the library:
@@ -205,6 +207,7 @@ shasum -b -a 256 | 2eb6146bf3c073ae1f4d2c6ce6a69bb4e134cba371036c082cae4b1b8762d
 ### Manually
 
 Otherwise read:
+-->
 
 * [How to Build](BUILD_MULLE_CLANG.md)
 

@@ -10,7 +10,7 @@ BY_THE_BOOK="YES"
 
 # our compiler version
 MULLE_CLANG_VERSION="5.0.0.0"
-MULLE_CLANG_RC="3"
+MULLE_CLANG_RC="4"
 MULLE_LLDB_VERSION="5.0.0.0"
 MULLE_LLDB_RC="3"
 
@@ -731,6 +731,13 @@ setup_build_environment()
          C_COMPILER=cl.exe
       ;;
 
+      #
+      # FreeBSD needs rpath set for c++ libraries
+      #
+      FreeBSD)
+         CMAKE_FLAGS="${CMAKE_FLAGS} -DCMAKE_SHARED_LINKER_FLAGS=-Wl,-rpath,\\\$ORIGIN/../lib"
+      ;;
+
       *)
          log_fluff "Detected ${UNAME}"
          install_binary_if_missing "python" "https://www.python.org/downloads/release"
@@ -971,16 +978,6 @@ _build_llvm()
    if [ ! -f "${LLVM_BUILD_DIR}/Makefile" -o "${RUN_LLVM_CMAKE}" = "YES" ]
    then
       exekutor mkdir -p "${LLVM_BUILD_DIR}" 2> /dev/null
-
-      #
-      # FreeBSD needs rpath set for c++ libraries
-      #
-      case "${UNAME}" in
-         FreeBSD)
-            CMAKE_FLAGS="${CMAKE_FLAGS} -DCMAKE_SHARED_LINKER_FLAGS=-Wl,-rpath,\$ORIGIN/../lib"
-            CMAKE_FLAGS="${CMAKE_FLAGS} -DCMAKE_EXE_LINKER_FLAGS=-Wl,-rpath,\$ORIGIN/../lib"
-         ;;
-      esac
 
       set -e
          exekutor cd "${LLVM_BUILD_DIR}"

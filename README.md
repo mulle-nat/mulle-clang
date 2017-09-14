@@ -4,7 +4,7 @@
 
 This is an Objective-C compiler based on clang 5.0, written for the
 [mulle-objc](//www.mulle-kybernetik.com/weblog/2015/mulle_objc_a_new_objective_c_.html)
-runtime. It corresponds to mulle-objc-runtime v0.9 or better.
+runtime. It corresponds to mulle-objc-runtime v0.11 or better.
 
 > See [README.txt](README.txt) for more information about clang
 

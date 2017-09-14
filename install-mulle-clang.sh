@@ -10,7 +10,7 @@ BY_THE_BOOK="YES"
 
 # our compiler version
 MULLE_CLANG_VERSION="5.0.0.0"
-MULLE_CLANG_RC="4"
+MULLE_CLANG_RC="5"
 MULLE_LLDB_VERSION="5.0.0.0"
 MULLE_LLDB_RC="4"
 
@@ -704,7 +704,11 @@ setup_build_environment()
    if [ "${OPTION_NINJA}" = "YES" -a ! -z "`command -v ninja`" ]
    then
       CMAKE_GENERATOR="Ninja"
-      MAKE=ninja
+      MAKE="ninja"
+      MAKEFILE="build.ninja"
+   else
+      MAKE="make"
+      MAKFILE="Makefile"
    fi
 
    #
@@ -975,7 +979,7 @@ _build_llvm()
    #
    # Build llvm
    #
-   if [ ! -f "${LLVM_BUILD_DIR}/Makefile" -o "${RUN_LLVM_CMAKE}" = "YES" ]
+   if [ ! -f "${LLVM_BUILD_DIR}/${MAKEFILE}" -o "${RUN_LLVM_CMAKE}" = "YES" ]
    then
       exekutor mkdir -p "${LLVM_BUILD_DIR}" 2> /dev/null
 
@@ -1019,7 +1023,7 @@ _build_clang()
    #
    # Build mulle-clang
    #
-   if [ ! -f "${MULLE_CLANG_BUILD_DIR}/Makefile" ]
+   if [ ! -f "${MULLE_CLANG_BUILD_DIR}/${MAKEFILE}" ]
    then
       exekutor mkdir -p "${MULLE_CLANG_BUILD_DIR}" 2> /dev/null
 
@@ -1152,11 +1156,6 @@ is likely to get reused. If this is not what you want, [CTRL]-[C] now and do:
    then
       build_clang install
    fi
-
-   if [ "${BUILD_LLDB}" = "YES" -a "${BY_THE_BOOK}" = "NO" ]
-   then
-      build_lldb install
-   fi
 }
 
 
@@ -1177,11 +1176,6 @@ _build()
    if [ "${BUILD_CLANG}" = "YES" -a "${BY_THE_BOOK}" = "NO" ]
    then
       _build_clang install
-   fi
-
-   if [ "${BUILD_LLDB}" = "YES" -a "${BY_THE_BOOK}" = "NO" ]
-   then
-      _build_lldb install
    fi
 }
 
@@ -1366,6 +1360,7 @@ main()
 
          --separate)
             BY_THE_BOOK="NO"
+            BUILD_LLDB="NO"  # implies
          ;;
 
          --build-cmake)
@@ -1374,6 +1369,10 @@ main()
 
          --with-lldb|--build-lldb)
             BUILD_LLDB="YES"
+         ;;
+
+         --no-lldb)
+            BUILD_LLDB="NO"
          ;;
 
          --debug)
@@ -1541,6 +1540,12 @@ main()
    if [ "${LLVM_BUILD_TYPE}" != "Release" ]
    then
       RUN_LLVM_CMAKE="YES"
+   fi
+
+
+   if [ "${BUILD_LLDB}" = "YES" -a "${BY_THE_BOOK}" = "NO" ]
+   then
+      fail "You can't use --separate with --with-lldb"
    fi
 
    # blurb a little, this has some advantages

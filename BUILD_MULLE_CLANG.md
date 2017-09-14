@@ -52,7 +52,9 @@ chmod 755 install-mulle-clang.sh
 ./install-mulle-clang.sh install --symlink-prefix /usr/local
 ```
 
-Now be very, very patient.
+Depending on your platform, the script will ask you to install some more
+prerequisites.
+
 
 
 ### Windows: Installing further prerequisites
@@ -78,6 +80,7 @@ characters and underscores.
 * [Git for Windows](//git-scm.com/download/win) is included in VS 2015, make sure it's there
 * [Python 2 for Windows](//www.python.org/downloads/windows/). **Make sure that python is installed in **PATH**, which is not the default**
 * [CMake for Windows](//cmake.org/download/). CMake should also add itself to **PATH**.
+* [Ninja](https://github.com/ninja-build/ninja/releases). Get Ninja and put it in your **PATH**
 
 Reboot, so that Windows picks up the **PATH** changes (Voodoo).
 

@@ -70,6 +70,16 @@
 using namespace clang;
 using namespace CodeGen;
 
+
+// @mulle-objc@: >>
+// this is defined in AST for linkage reasons
+extern "C"
+{
+   extern uint32_t  MulleObjCUniqueIdHashForString( std::string s);
+}
+// @mulle-objc@: <<
+
+
 namespace {
 
    // FIXME: We should find a nicer way to make the labels for metadata, string
@@ -2082,16 +2092,16 @@ ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
          uint32_t   value;
 
          value = 0;
-         if( mulle_char7_is32bit( const_cast< char *> str.data(), StringLength))
+         if( mulle_char7_is32bit( const_cast< char *>( str.data()), StringLength))
          {
-            value = mulle_char7_encode32_ascii( const_cast< char *> str.data(), StringLength);
+            value = mulle_char7_encode32_ascii( const_cast< char *>( str.data()), StringLength);
             value <<= 2;
             value |= 0x3;
          }
          else
-            if( mulle_char5_is32bit( const_cast< char *> str.data(), StringLength))
+            if( mulle_char5_is32bit( const_cast< char *>( str.data()), StringLength))
             {
-               value = mulle_char5_encode32_ascii( const_cast< char *> str.data(), StringLength);
+               value = mulle_char5_encode32_ascii( const_cast< char *>( str.data()), StringLength);
 
                // shift up and tag as string
                value <<= 2;
@@ -2103,7 +2113,7 @@ ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
             llvm::APInt APValue( 32, value);
             llvm::Constant  *pointerValue = llvm::Constant::getIntegerValue( CGM.Int32Ty, APValue);
             llvm::Constant  *pointer = llvm::ConstantExpr::getIntToPtr( pointerValue, CGM.VoidPtrTy);
-            //fprintf( stderr, "Created tagged 32 bit pointer for \"%.*s\"\n", (int) StringLength, const_cast< char *> str.data());
+            //fprintf( stderr, "Created tagged 32 bit pointer for \"%.*s\"\n", (int) StringLength, const_cast< char *>( str.data()));
 
             return ConstantAddress( pointer, Align);
          }
@@ -2113,16 +2123,16 @@ ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
          uint64_t   value;
 
          value = 0;
-         if( mulle_char7_is64bit( const_cast< char *> str.data(), StringLength))
+         if( mulle_char7_is64bit( const_cast< char *>( str.data()), StringLength))
          {
-            value = mulle_char7_encode64_ascii( const_cast< char *> str.data(), StringLength);
+            value = mulle_char7_encode64_ascii( const_cast< char *>( str.data()), StringLength);
             value <<= 3;
             value |= 0x3;
          }
          else
-            if( mulle_char5_is64bit( const_cast< char *> str.data(), StringLength))
+            if( mulle_char5_is64bit( const_cast< char *>( str.data()), StringLength))
             {
-               value = mulle_char5_encode64_ascii( const_cast< char *> str.data(), StringLength);
+               value = mulle_char5_encode64_ascii( const_cast< char *>( str.data()), StringLength);
 
                // shift up and tag as string
                value <<= 3;
@@ -2134,7 +2144,7 @@ ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
             llvm::APInt APValue( 64, value);
             llvm::Constant  *pointerValue = llvm::Constant::getIntegerValue( CGM.Int64Ty, APValue);
             llvm::Constant  *pointer = llvm::ConstantExpr::getIntToPtr( pointerValue, CGM.VoidPtrTy);
-            //fprintf( stderr, "Created tagged 64 bit pointer for \"%.*s\"\n", (int) StringLength, const_cast< char *> str.data());
+            //fprintf( stderr, "Created tagged 64 bit pointer for \"%.*s\"\n", (int) StringLength, const_cast< char *>( str.data()));
             return ConstantAddress( pointer, Align);
          }
       }
@@ -2166,7 +2176,7 @@ ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
                                                        C,
                                                        &CGM.getModule());
    Entry.second = GA;
-   //   fprintf( stderr, "Created constant string for \"%.*s\"\n", (int) StringLength, const_cast< char *> str.data());
+   //   fprintf( stderr, "Created constant string for \"%.*s\"\n", (int) StringLength, const_cast< char *>( str.data()));
    return ConstantAddress( GA, Align);
 }
 
@@ -2879,8 +2889,8 @@ public:
 
       // fprintf( stderr, "%s %p (%s)\n", E->getStmtClassName(), E, __PRETTY_FUNCTION__);
 
-      checkDereferencingExpr( const_cast< Expr *> E->getLHS());
-      checkDereferencingExpr( const_cast< Expr *> E->getRHS());
+      checkDereferencingExpr( const_cast< Expr *>( E->getLHS()));
+      checkDereferencingExpr( const_cast< Expr *>( E->getRHS()));
       return( true);
    }
 
@@ -3520,7 +3530,8 @@ bool CGObjCMulleRuntime::OptimizeReuseParam( CodeGenFunction &CGF,
    // _param but not necessarily _rval (which is in a union with _param)
    //
 
-   if( ! param_unused_after_expr( const_cast< ObjCMethodDecl *> parent, const_cast<ObjCMessageExpr *> Expr))
+   if( ! param_unused_after_expr( const_cast< ObjCMethodDecl *>( parent),
+                                  const_cast<ObjCMessageExpr *>( Expr)))
    {
       // fprintf( stderr, "reuse denied\n");
       return( false);
@@ -3607,7 +3618,7 @@ void  CGObjCMulleRuntime::PushArgumentsIntoRecord( CodeGenFunction &CGF,
       arg   = Method->getArg( i);
 
       LValue LV = CGF.EmitLValueForFieldInitialization( Record, Field);
-      CGF.EmitInitializerForField( Field, LV, const_cast< Expr *> arg);
+      CGF.EmitInitializerForField( Field, LV, const_cast< Expr *>( arg));
 
       ++i;
    }
@@ -3626,7 +3637,7 @@ void   CGObjCMulleRuntime::EmitVoidPtrExpression( CodeGenFunction &CGF,
                                     CGM.getContext().VoidPtrTy,
                                     VK_RValue,
                                     CK_IntegralToPointer,
-                                    const_cast< Expr *> Arg,
+                                    const_cast< Expr *>( Arg),
                                     NULL,
                                     TInfo,
                                     SourceLocation(),
@@ -5986,73 +5997,6 @@ llvm::Value *CGObjCMulleRuntime::EmitNSAutoreleasePoolClassRef(CodeGenFunction &
 
 #pragma mark - Hash Selectors, ClassIDs and friends
 
-extern "C"
-{
-// this code is duplicated in ExprConstant.cpp
-// for some stupid C++ linker reasons, don't ask me!
-//
-// nm lib/libclangCodeGen.a | grep HashForString
-// 00000000000006e0 T _MulleObjCUniqueIdHashForString
-// nm lib/libclangAST.a | grep HashForString
-//                 U _MulleObjCUniqueIdHashForString
-// But:
-// Undefined symbols for architecture x86_64:
-//  "_MulleObjCUniqueIdHashForString", referenced from:
-// when linking libclang.dylib (using cmdline only)
-//
-#define FNV1A_32_PRIME             0x01000193
-#define MULLE_OBJC_FNV1A_32_INIT   0x811c9dc5
-
-
-static uint32_t   mulle_objc_chained_fnv1a_32( void *buf, size_t len, uint32_t hash)
-{
-   unsigned char   *s;
-   unsigned char   *sentinel;
-
-   s        = (unsigned char *) buf;
-   sentinel = &s[ len];
-
-    /*
-     * FNV-1 hash each octet in the buffer
-     */
-    while( s < sentinel)
-    {
-	hash ^= (uint32_t) *s++;
-	hash *= FNV1A_32_PRIME;
-    }
-
-    return( hash);
-}
-
-
-static inline uint32_t   mulle_objc_fnv1a_32( void *buf, size_t len)
-{
-   return( mulle_objc_chained_fnv1a_32( buf, len, MULLE_OBJC_FNV1A_32_INIT));
-}
-
-
-// global no more
-// uint32_t  MulleObjCUniqueIdHashForString( std::string s);
-
-
-static uint32_t  MulleObjCUniqueIdHashForString( std::string s)
-{
-   uint32_t   value;
-   char       *c_str;
-
-   c_str = (char *) s.c_str();
-   value = mulle_objc_fnv1a_32( (void *) c_str, s.length());
-   //   fprintf( stderr, "%s = %08lx\n", c_str, (long) value);
-
-   // if you change this, remember that there are duplicates in
-   // CGObjCMulleRuntime and SemaExpr.cpp and ExprConstant.cpp
-   value = (value << 4) | (value >> (32 - 4));
-
-   return( value);
-}
-
-} // extern "C"
-
 
 uint32_t   CGObjCCommonMulleRuntime::UniqueIdHashForString( std::string s)
 {
@@ -6140,7 +6084,7 @@ llvm::ConstantInt *CGObjCMulleRuntime::EmitSuperID( CodeGenFunction &CGF,
 
    llvm::Constant *&Entry = SuperIdentifiers[ info];
    if( ! Entry)
-      Entry = GetSuperConstant( superid, const_cast<IdentifierInfo *> info, classid, methodid);
+      Entry = GetSuperConstant( superid, const_cast<IdentifierInfo *>( info), classid, methodid);
 
    return( superid);
 }

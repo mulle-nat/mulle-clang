@@ -87,7 +87,7 @@ environment.  Assuming you kept default settings the "Git bash" is
 from the start menu and execute the git-bash from there.
 
 >
-> You can also just drah the Git bash icon into the
+> You can also just drag the Git bash icon into the
 > developer command prompt.
 >
 > ![Screeny](git-bash-drop-fs8.png)

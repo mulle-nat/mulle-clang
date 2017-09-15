@@ -5,14 +5,18 @@
 # BSD-3 License
 
 # compile it like LLVM does (everything all the time)
-# only useful if you're creating installers IMO
+# useful if you're creating installers and required
+# to build the debugger
+#
 BY_THE_BOOK="YES"
 
 # our compiler version
 MULLE_CLANG_VERSION="5.0.0.0"
-MULLE_CLANG_RC="5"
+#MULLE_CLANG_RC="5"
+
+# our debugger version
 MULLE_LLDB_VERSION="5.0.0.0"
-MULLE_LLDB_RC="4"
+#MULLE_LLDB_RC="4"
 
 
 # required LLVM version

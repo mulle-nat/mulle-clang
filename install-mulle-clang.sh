@@ -5,18 +5,14 @@
 # BSD-3 License
 
 # compile it like LLVM does (everything all the time)
-# useful if you're creating installers and required
-# to build the debugger
-#
+# only useful if you're creating installers IMO
 BY_THE_BOOK="YES"
 
 # our compiler version
 MULLE_CLANG_VERSION="5.0.0.0"
-#MULLE_CLANG_RC="5"
-
-# our debugger version
+MULLE_CLANG_RC="5"
 MULLE_LLDB_VERSION="5.0.0.0"
-#MULLE_LLDB_RC="4"
+MULLE_LLDB_RC="4"
 
 
 # required LLVM version
@@ -108,6 +104,7 @@ log_initialize()
          ;;
       esac
    fi
+
    C_ERROR="${C_RED}${C_BOLD}"
    C_WARNING="${C_RED}${C_BOLD}"
    C_INFO="${C_MAGENTA}${C_BOLD}"
@@ -716,8 +713,6 @@ setup_build_environment()
       MAKE_BUILD_COMMAND=""
    fi
 
-   CLANG_SYMLINKS="mulle-clang;mulle-clang-cpp"
-
    #
    # make sure cmake and git and gcc are present (and in the path)
    # should check version
@@ -756,8 +751,6 @@ setup_build_environment()
 
          CXX_COMPILER=cl.exe
          C_COMPILER=cl.exe
-
-         CLANG_SYMLINKS="${CLANG_SYMLINKS};mulle-clang-cl;msbuild/cl.exe"
       ;;
 
       #
@@ -1050,7 +1043,7 @@ _build_llvm()
                -DCMAKE_C_COMPILER="${C_COMPILER}" \
                -DCMAKE_CXX_COMPILER="${CXX_COMPILER}" \
                -DCLANG_VENDOR="${CLANG_VENDOR}" \
-               -DCLANG_LINKS_TO_CREATE="${CLANG_SYMLINKS}" \
+               -DCLANG_LINKS_TO_CREATE="mulle-clang;mulle-clang-cl;mulle-clang-cpp;../msbuild-bin/cl" \
                -DCMAKE_BUILD_TYPE="${LLVM_BUILD_TYPE}" \
                -DCMAKE_INSTALL_PREFIX="${MULLE_LLVM_INSTALL_PREFIX}" \
                -DLLVM_ENABLE_CXX1Y:BOOL=OFF \
@@ -1064,6 +1057,20 @@ _build_llvm()
    # hmm
       exekutor ${MAKE} ${MAKE_FLAGS} "$@" 
    ) || exit 1
+
+   case "${UNAME}" in
+      MINGW*)
+         if [ ! -x "${MULLE_CLANG_INSTALL_PREFIX}/bin/mulle-scan-build.bat" ]
+         then
+            log_verbose "Creating mulle-lldb link ..."
+            # todo need redirect_exekutor here
+            exekutor echo 'perl -S mulle-scan-build %*' > "${MULLE_CLANG_INSTALL_PREFIX}/bin/mulle-scan-build.bat" 
+
+            # this doesn't work and isn't necessary I think
+            exekutor chmod 755 "${MULLE_CLANG_INSTALL_PREFIX}/bin/mulle-scan-build.bat"
+         fi
+      ;;
+   esac
 }
 
 
@@ -1103,7 +1110,7 @@ _build_clang()
                -DCMAKE_C_COMPILER="${C_COMPILER}" \
                -DCMAKE_CXX_COMPILER="${CXX_COMPILER}" \
                -DCLANG_VENDOR="${CLANG_VENDOR}" \
-                  -DCLANG_LINKS_TO_CREATE="${CLANG_SYMLINKS}" \
+               -DCLANG_LINKS_TO_CREATE="mulle-clang;mulle-clang-cl;mulle-clang-cpp;../msbuild-bin/cl" \
                -DCMAKE_BUILD_TYPE="${MULLE_CLANG_BUILD_TYPE}" \
                -DCMAKE_INSTALL_PREFIX="${MULLE_CLANG_INSTALL_PREFIX}" \
                ${CMAKE_FLAGS} \
@@ -1116,6 +1123,7 @@ _build_clang()
       exekutor ${MAKE} ${MAKE_FLAGS} "$@" 
    ) || exit 1
 }
+
 
 
 build_clang()
@@ -1243,17 +1251,13 @@ _build()
 }
 
 
-install_executable()
+_install_file()
 {
-   local  src
-   local  dst
-   local  dstname
+   local src="$1"
+   local dstname="$2"
+   local dstdir="$3"
 
-   src="$1"
-   dstname="$2"
-   dstdir="${3:-${SYMLINK_PREFIX}/bin}"
-
-   log_fluff "Create symbolic link ${dstdir}/${dstname}"
+   log_info "Install ${dstdir}/${dstname}"
 
    if [ ! -w "${dstdir}" ]
    then
@@ -1265,34 +1269,76 @@ install_executable()
 }
 
 
+install_executable()
+{
+   local src="$1"
+   local dstname="$2"
+   local dstdir="${3:-${SYMLINK_PREFIX}/bin}"
+
+
+   if [ ! -x "${src}" ]
+   then
+      log_verbose "${src} absent, not installed."
+      return 1
+   fi
+
+   _install_file "${src}" "${dstname}" "${dstdir}"
+}
+
+
+install_file()
+{
+   local src="$1"
+   local dstname="$2"
+   local dstdir="${3:-${SYMLINK_PREFIX}/bin}"
+
+   if [ ! -f "${src}" ]
+   then
+      log_verbose "${src} absent, not installed."
+      return 1
+   fi
+
+   _install_file "${src}" "${dstname}" "${dstdir}"
+}
+
+
 install_mulle_clang_link()
 {
-   log_info "Installing mulle-clang (and mulle-scan-build) link ..."
+   log_info "Installing mulle-clang links ..."
 
    if [ ! -f "${MULLE_CLANG_INSTALL_PREFIX}/bin/clang${EXE_EXTENSION}" ]
    then
+      log_warning "\"${MULLE_CLANG_INSTALL_PREFIX}/bin/clang${EXE_EXTENSION}\" not built yet"
       fail "download and build mulle-clang with
    ./install-mulle-clang.sh
 before you can install"
    fi
 
-   if [ -z "${CLANG_SUFFIX}" ]
+   if [ ! -z "${CLANG_SUFFIX}" ]
    then
       install_executable "${MULLE_CLANG_INSTALL_PREFIX}/bin/mulle-clang${CLANG_SUFFIX}${EXE_EXTENSION}" \
                          "mulle-clang${CLANG_SUFFIX}${EXE_EXTENSION}"
-      install_executable "${MULLE_CLANG_INSTALL_PREFIX}/bin/scan-build${CLANG_SUFFIX}${EXE_EXTENSION}" \
-                         "mulle-scan-build${CLANG_SUFFIX}${EXE_EXTENSION}"
    fi
-   install_executable "${MULLE_CLANG_INSTALL_PREFIX}/bin/mulle-clang${CLANG_SUFFIX}${EXE_EXTENSION}" \
+   install_executable "${MULLE_CLANG_INSTALL_PREFIX}/bin/mulle-clang${EXE_EXTENSION}" \
                       "mulle-clang${EXE_EXTENSION}"
-   install_executable "${MULLE_CLANG_INSTALL_PREFIX}/bin/scan-build${CLANG_SUFFIX}${EXE_EXTENSION}" \
-                      "mulle-scan-build${EXE_EXTENSION}"
+   install_executable "${MULLE_CLANG_INSTALL_PREFIX}/bin/llvm-nm${EXE_EXTENSION}" \
+                      "mulle-nm${EXE_EXTENSION}"
+
+   install_executable "${MULLE_CLANG_INSTALL_PREFIX}/bin/scan-build" \
+                      "mulle-scan-build"
+
+   case "${UNAME}" in
+      MINGW*)
+         install_file "${MULLE_CLANG_INSTALL_PREFIX}/bin/mulle-scan-build.bat" \
+                            "mulle-scan-build.bat"
+      ;;
+   esac
 }
 
 
 install_mulle_lldb_link()
 {
-   log_info "Installing mulle-lldb link ..."
+   log_info "Installing mulle-lldb links ..."
 
    if [ ! -f "${MULLE_CLANG_INSTALL_PREFIX}/bin/lldb${EXE_EXTENSION}" ]
    then
@@ -1301,19 +1347,17 @@ install_mulle_lldb_link()
 before you can install"
    fi
 
-   install_executable "${MULLE_LLDB_INSTALL_PREFIX}/bin/lldb${CLANG_SUFFIX}${EXE_EXTENSION}" \
-                      mulle-lldb${CLANG_SUFFIX}${EXE_EXTENSION}
-   install_executable "${MULLE_LLDB_INSTALL_PREFIX}/bin/lldb-mi${CLANG_SUFFIX}${EXE_EXTENSION}" \
-                      mulle-lldb-mi${CLANG_SUFFIX}${EXE_EXTENSION}
+   install_executable "${MULLE_LLDB_INSTALL_PREFIX}/bin/lldb${EXE_EXTENSION}" \
+                      mulle-lldb${EXE_EXTENSION}
+   install_executable "${MULLE_LLDB_INSTALL_PREFIX}/bin/lldb-mi${EXE_EXTENSION}" \
+                      mulle-lldb-mi${EXE_EXTENSION}
 }
 
 
 
 uninstall_executable()
 {
-   local path
-
-   path="${1}${EXE_EXTENSION}"
+   local path="${1}${EXE_EXTENSION}"
 
    if [ -e "${path}" ]
    then
@@ -1333,33 +1377,32 @@ uninstall_executable()
 
 uninstall_mulle_clang_link()
 {
-   local prefix
+   local prefix="${1:-${MULLE_CLANG_INSTALL_PREFIX}}"
 
-   log_info "Uninstalling mulle-clang (and mulle-scan-build) link ..."
+   log_info "Uninstalling mulle-clang links ..."
 
-   prefix="${1:-${MULLE_CLANG_INSTALL_PREFIX}}"
-
-   if [ -z "${CLANG_SUFFIX}" ]
+   if [ ! -z "${CLANG_SUFFIX}" ]
    then
       uninstall_executable "${prefix}/bin/mulle-clang${CLANG_SUFFIX}${EXE_EXTENSION}"
-      uninstall_executable "${prefix}/bin/scan-build${CLANG_SUFFIX}${EXE_EXTENSION}"
    fi
-   uninstall_executable "${prefix}/bin/mulle-clang${CLANG_SUFFIX}${EXE_EXTENSION}"
-   uninstall_executable "${prefix}/bin/scan-build${CLANG_SUFFIX}${EXE_EXTENSION}"
+
+   uninstall_executable "${prefix}/bin/mulle-clang${EXE_EXTENSION}"
+   uninstall_executable "${prefix}/bin/mulle-nm${EXE_EXTENSION}"
+
+   uninstall_executable "${prefix}/bin/mulle-scan-build"
+   uninstall_executable "${prefix}/bin/mulle-scan-build.bat"
 }
 
 
 
 uninstall_mulle_lldb_link()
 {
-   local prefix
+   local prefix="${1:-${MULLE_CLANG_INSTALL_PREFIX}}"
 
-   log_info "Uninstalling mulle-lldb link ..."
+   log_info "Uninstalling mulle-lldb links ..."
 
-   prefix="${1:-${MULLE_CLANG_INSTALL_PREFIX}}"
-
-   uninstall_executable "${prefix}/bin/mulle-lldb${CLANG_SUFFIX}"
-   uninstall_executable "${prefix}/bin/mulle-lldb-mi${CLANG_SUFFIX}"
+   uninstall_executable "${prefix}/bin/mulle-lldb${EXE_EXTENSION}"
+   uninstall_executable "${prefix}/bin/mulle-lldb-mi${EXE_EXTENSION}"
 }
 
 
@@ -1488,7 +1531,7 @@ main()
             MULLE_LLDB_INSTALL_PREFIX="$1"
          ;;
 
-         --symlink-prefix)
+         --symlink-prefix|--install-prefix)
             [ $# -eq 1 ] && fail "missing argument to $1"
             shift
             SYMLINK_PREFIX="$1"
@@ -1620,7 +1663,6 @@ main()
 
    log_verbose "SYMLINK_PREFIX=${SYMLINK_PREFIX}"
 
-   setup_build_environment
 
    case "$COMMAND" in
       install)
@@ -1629,6 +1671,7 @@ main()
 
       default)
          download
+         setup_build_environment
          build
       ;;
 
@@ -1637,10 +1680,12 @@ main()
       ;;
 
       build)
+         setup_build_environment
          build
       ;;
 
       _build)
+         setup_build_environment
          _build
       ;;
 

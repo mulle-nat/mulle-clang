@@ -148,6 +148,7 @@ defined in the runtime.
 
 ## Install
 
+
 <!--
 
 ### OS X
@@ -162,6 +163,7 @@ brew install codeon-gmbh/software/mulle-clang
 > built from source. This takes a long time! On my Macbook Air the build
 > took about 30 minutes, even with the prerequisite llvm downloaded as a bottle.
 
+->
 
 ### Linux
 
@@ -183,31 +185,29 @@ sudo apt-get install mulle-clang
 #### Debian stretch 64 bit
 
 ```
-curl -O -L http://download.codeon.de/bottles/mulle-clang-4.0.0.4-zesty-amd64.deb
-sudo dpkg --install mulle-clang-4.0.0.4-zesty-amd64.deb
+curl -O -L http://download.codeon.de/dists/zesty/main/binary-amd64/mulle-clang-5.0.0.0-zesty-amd64.deb
+sudo dpkg --install mulle-clang-5.0.0.0-zesty-amd64.deb
 ```
 
 Checksum         | Result
 -----------------|------------------
-shasum -b -a 256 | abe84134ac65bcba65a77d74d7b0c99d939132f65e79d309b534681ff1348b6e
+shasum -b -a 256 | bc51e5111ff863d1aab6444c1e3d26be4f0d6644842eccb4aa2b3d62b4fa1c9e
 
 
 #### Debian jessie 64 bit
 
 ```
-curl -O -L http://download.codeon.de/bottles/mulle-clang-4.0.0.4-trusty-amd64.deb
-sudo dpkg --install mulle-clang-4.0.0.4-trusty-amd64.deb
+curl -O -L http://download.codeon.de/dists/zesty/main/binary-amd64/mulle-clang-5.0.0.0-trusty-amd64.deb
+sudo dpkg --install mulle-clang-5.0.0.0-trusty-amd64.deb
 ```
 
 Checksum         | Result
 -----------------|------------------
-shasum -b -a 256 | 2eb6146bf3c073ae1f4d2c6ce6a69bb4e134cba371036c082cae4b1b8762d94a
+shasum -b -a 256 | f4079655b71c7a407972dd0828d5343023f9c6c83c995602bf63d7ad68e15b8b
 
 
-### Manually
+### FreeBSD, Windows and others
 
-Otherwise read:
--->
 
 * [How to Build](BUILD_MULLE_CLANG.md)
 

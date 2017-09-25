@@ -1,0 +1,100 @@
+#! /bin/sh
+
+# (c) 2017 Nat!, Mulle kybernetiK
+#
+# Install this script into brew git hook post-commit,
+# minus the installer part. Why is this neccessary ?
+# When you do `brew update` homebrew wipes the shim directory clean.
+# It also remove local merges. So the easiest way is to install a
+# post-checkout hook into brew, and regenerate the shim whenever
+# homebrew updates.
+#
+
+hookdir="$1"
+if [ ! -d "${hookdir}" ]
+then
+   if [ -z "`command -v brew`" ]
+   then
+      echo "brew not in PATH" >&2
+      exit 1
+   fi
+
+   hookdir="`brew --repo`/.git/hooks"
+fi
+
+if [ ! -d "${hookdir}" ]
+then
+   echo 'brew git repo not found. Very unusual!!' >&2
+   exit 1
+fi
+
+hook="${hookdir}/post-checkout"
+if [ -x "${hook}" ] && grep "install_mulle_clang_shim" "${hook}" > /dev/null
+then
+   echo "Hook is already installed" >&2
+   exit 0
+fi
+
+if [ ! -x "${hook}" ]
+then
+   cat <<EOF > "${hook}"
+#!/bin/sh
+EOF
+fi
+
+sed '1,/^# --MARKER--$/d' "$0" >> "${hook}" &&
+chmod 755 "${hook}"
+
+exit $?
+
+# --MARKER--
+
+install_mulle_clang_shim()
+{
+   local prefix
+   local script
+
+   prefix="`dirname -- "${PWD}"`"
+   script="${prefix}/share/clang/mulle-clang-add-to-brew"
+
+   local directory
+
+   directory="`dirname -- "${GIT_DIR}"`"
+   case "${directory}" in
+      /*)
+      ;;
+
+      *)
+         directory="${PWD}/${directory}"
+      ;;
+   esac
+
+   local shimdir
+   local shim
+
+   shimdir="${directory}/Library/Homebrew/shims/super"
+   shim="${shimdir}/mulle-clang"
+
+   if [ ! -w "${shimdir}" ]
+   then
+      echo "git post-commit hook: can't write into \"${shimdir}\"" >&2
+      return 1
+   fi
+
+   if [ -x "${shim}" ]
+   then
+      # echo "Shim \"${shim}\" is already present" >&2
+      return 0
+   fi
+
+   if ! sed -e "s/\^clang/clang/" "${shimdir}/cc" > "${shim}"
+   then
+      echo "git post-commit hook: mulle-clang brew shim: \"${shim}\" creation failed" >&2
+   fi
+
+   chmod 755 "${shim}"
+#   echo "Shim \"${shim}\" was created" >&2
+}
+
+install_mulle_clang_shim
+

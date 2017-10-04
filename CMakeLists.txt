@@ -361,9 +361,6 @@ if (NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
     )
 
   install(PROGRAMS utils/bash-autocomplete.sh
-# @mulle-objc@ >
-                   utils/mulle-clang-add-brew-post-checkout-hook
-# @mulle-objc@ <
     DESTINATION share/clang
     )
 endif()

@@ -361,6 +361,9 @@ if (NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
     )
 
   install(PROGRAMS utils/bash-autocomplete.sh
+# @mulle-objc@ >
+                   utils/mulle-clang-add-brew-post-checkout-hook
+# @mulle-objc@ <
     DESTINATION share/clang
     )
 endif()
@@ -508,8 +511,8 @@ if (CLANG_ENABLE_BOOTSTRAP)
     set(NEXT_CLANG_STAGE ${NEXT_CLANG_STAGE}-instrumented)
   endif()
   message(STATUS "Setting next clang stage to: ${NEXT_CLANG_STAGE}")
-  
-  
+
+
   set(STAMP_DIR ${CMAKE_CURRENT_BINARY_DIR}/${NEXT_CLANG_STAGE}-stamps/)
   set(BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/${NEXT_CLANG_STAGE}-bins/)
 

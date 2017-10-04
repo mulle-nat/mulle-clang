@@ -64,7 +64,7 @@
 #include "llvm/Support/Compiler.h"
 
 
-#define COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION  11
+#define COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION  12
 
 
 using namespace clang;
@@ -4075,7 +4075,8 @@ PushProtocolProperties(llvm::SmallPtrSet<const IdentifierInfo*,16> &PropertySet,
       if (!PropertySet.insert(PD->getIdentifier()).second)
          continue;
 
-      llvm::Constant *Prop[6];
+      llvm::Constant *Prop[7];
+      
       SetPropertyInfoToEmit( PD, Container, Prop);
 
       Properties.push_back(llvm::ConstantStruct::get(ObjCTypes.PropertyTy, Prop));
@@ -4085,24 +4086,27 @@ PushProtocolProperties(llvm::SmallPtrSet<const IdentifierInfo*,16> &PropertySet,
 
 void  CGObjCCommonMulleRuntime::SetPropertyInfoToEmit( const ObjCPropertyDecl *PD,
                                                        const Decl *Container,
-                                                       llvm::Constant *Prop[ 6])
+                                                       llvm::Constant *Prop[ 7])
 {
    Selector   getter = PD->getGetterName();
    Selector   setter = PD->getSetterName();
    QualType   type;
    int        is_nonnull;
+   int        i;
    const llvm::APInt zero(32, 0);
    llvm::Constant  *zeroSel  = llvm::Constant::getIntegerValue(CGM.Int32Ty, zero);
-
-   Prop[ 0] = _HashConstantForString( PD->getIdentifier()->getNameStart());
-   Prop[ 1] = GetPropertyName(PD->getIdentifier());
-   Prop[ 2] = GetPropertyTypeString(PD, Container);
-   Prop[ 3] = ! getter.isNull() ? _HashConstantForString( getter.getAsString())
+   
+   i = 0;
+   Prop[ i++] = _HashConstantForString( PD->getIdentifier()->getNameStart());
+   Prop[ i++] = _HashConstantForString( PD->getPropertyIvarDecl()->getIdentifier()->getNameStart());
+   Prop[ i++] = GetPropertyName( PD->getIdentifier());
+   Prop[ i++] = GetPropertyTypeString(PD, Container);
+   Prop[ i++] = ! getter.isNull() ? _HashConstantForString( getter.getAsString())
                                 : zeroSel;
-   Prop[ 4] = (! setter.isNull() && ! PD->isReadOnly())
+   Prop[ i++] = (! setter.isNull() && ! PD->isReadOnly())
                 ? _HashConstantForString( setter.getAsString())
                 : zeroSel;
-   Prop[ 5] = zeroSel;
+   Prop[ i++] = zeroSel;
 
    // if its a pointer and not nonnull, we can clear it
    type       = PD->getType();
@@ -6311,6 +6315,7 @@ ObjCCommonTypesHelper::ObjCCommonTypesHelper(CodeGen::CodeGenModule &cgm)
    //   struct _mulle_objc_property
    //   {
    //      mulle_objc_propertyid_t    propertyid;
+   //      mulle_objc_ivarid_t        ivarid;
    //      char                       *name;
    //      char                       *signature;  // hmmm...
    //      mulle_objc_methodid_t      getter;
@@ -6320,6 +6325,7 @@ ObjCCommonTypesHelper::ObjCCommonTypesHelper(CodeGen::CodeGenModule &cgm)
 
    PropertyTy = llvm::StructType::create("struct._mulle_objc_property",
                                          PropertyIDTy,
+                                         IvarIDTy,
                                          Int8PtrTy,
                                          Int8PtrTy,
                                          SelectorIDTy,

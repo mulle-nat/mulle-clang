@@ -4097,6 +4097,9 @@ void  CGObjCCommonMulleRuntime::SetPropertyInfoToEmit( const ObjCPropertyDecl *P
    llvm::Constant  *setterSel;
    llvm::Constant  *clearerSel;
    llvm::Constant  *zeroSel;
+   llvm::Constant  *propertyid;
+   llvm::Constant  *ivarid;
+   
    const llvm::APInt zero(32, 0);
    
    zeroSel   = llvm::Constant::getIntegerValue(CGM.Int32Ty, zero);
@@ -4109,8 +4112,13 @@ void  CGObjCCommonMulleRuntime::SetPropertyInfoToEmit( const ObjCPropertyDecl *P
    
    type       = PD->getType();
    is_nonnull = PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_nullability;
-   clearerSel =  type->hasPointerRepresentation() && ! is_nonnull ? setterSel : zeroSel;
+   clearerSel = type->hasPointerRepresentation() && ! is_nonnull ? setterSel : zeroSel;
 
+   propertyid = _HashConstantForString( PD->getIdentifier()->getNameStart());
+   ivarid     = llvm::Constant::getIntegerValue(CGM.Int32Ty, zero);
+   if( PD->getPropertyIvarDecl())
+      ivarid = _HashConstantForString( PD->getPropertyIvarDecl()->getIdentifier()->getNameStart());
+   
 //   struct _mulle_objc_property
 //   {
 //      mulle_objc_propertyid_t    propertyid;
@@ -4123,8 +4131,8 @@ void  CGObjCCommonMulleRuntime::SetPropertyInfoToEmit( const ObjCPropertyDecl *P
 //   };
 
    i = 0;
-   Prop[ i++] = _HashConstantForString( PD->getIdentifier()->getNameStart());
-   Prop[ i++] = _HashConstantForString( PD->getPropertyIvarDecl()->getIdentifier()->getNameStart());
+   Prop[ i++] = propertyid;
+   Prop[ i++] = ivarid;
    
    Prop[ i++] = GetPropertyName( PD->getIdentifier());
    Prop[ i++] = GetPropertyTypeString( PD, Container);
@@ -4133,6 +4141,7 @@ void  CGObjCCommonMulleRuntime::SetPropertyInfoToEmit( const ObjCPropertyDecl *P
    Prop[ i++] = setterSel;
    Prop[ i++] = clearerSel;
 
+   assert( i == 7);
 //   fprintf( stderr, "%s %s has %s clearer\n",  type->hasPointerRepresentation() ? "pointer" : "nonpointer", PD->getIdentifier()->getNameStart(),  Prop[ 5] == zeroSel  ? "no" : "a");
 }
 

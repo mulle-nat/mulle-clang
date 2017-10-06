@@ -927,7 +927,7 @@ namespace {
 
       void  SetPropertyInfoToEmit( const ObjCPropertyDecl *PD,
                                    const Decl *Container,
-                                   llvm::Constant *Prop[ 6]);
+                                   llvm::Constant *Prop[ 7]);
 
       /// EmitPropertyList - Emit the given property list. The return
       /// value has type PropertyListPtrTy.
@@ -4093,27 +4093,45 @@ void  CGObjCCommonMulleRuntime::SetPropertyInfoToEmit( const ObjCPropertyDecl *P
    QualType   type;
    int        is_nonnull;
    int        i;
+   llvm::Constant  *getterSel;
+   llvm::Constant  *setterSel;
+   llvm::Constant  *clearerSel;
+   llvm::Constant  *zeroSel;
    const llvm::APInt zero(32, 0);
-   llvm::Constant  *zeroSel  = llvm::Constant::getIntegerValue(CGM.Int32Ty, zero);
    
+   zeroSel   = llvm::Constant::getIntegerValue(CGM.Int32Ty, zero);
+
+   getterSel = ! getter.isNull() ? _HashConstantForString( getter.getAsString())
+   : zeroSel;
+   setterSel = (! setter.isNull() && ! PD->isReadOnly())
+   ? _HashConstantForString( setter.getAsString())
+   : zeroSel;
+   
+   type       = PD->getType();
+   is_nonnull = PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_nullability;
+   clearerSel =  type->hasPointerRepresentation() && ! is_nonnull ? setterSel : zeroSel;
+
+//   struct _mulle_objc_property
+//   {
+//      mulle_objc_propertyid_t    propertyid;
+//      mulle_objc_ivarid_t        ivarid;      // name prefixed with _
+//      char                       *name;
+//      char                       *signature;  // hmmm...
+//      mulle_objc_methodid_t      getter;
+//      mulle_objc_methodid_t      setter;
+//      mulle_objc_methodid_t      clearer;     // for pointers/objects
+//   };
+
    i = 0;
    Prop[ i++] = _HashConstantForString( PD->getIdentifier()->getNameStart());
    Prop[ i++] = _HashConstantForString( PD->getPropertyIvarDecl()->getIdentifier()->getNameStart());
+   
    Prop[ i++] = GetPropertyName( PD->getIdentifier());
-   Prop[ i++] = GetPropertyTypeString(PD, Container);
-   Prop[ i++] = ! getter.isNull() ? _HashConstantForString( getter.getAsString())
-                                : zeroSel;
-   Prop[ i++] = (! setter.isNull() && ! PD->isReadOnly())
-                ? _HashConstantForString( setter.getAsString())
-                : zeroSel;
-   Prop[ i++] = zeroSel;
+   Prop[ i++] = GetPropertyTypeString( PD, Container);
 
-   // if its a pointer and not nonnull, we can clear it
-   type       = PD->getType();
-   is_nonnull = PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_nullability;
-
-
-   Prop[ 5] =  type->hasPointerRepresentation() && ! is_nonnull ? Prop[ 4] : zeroSel;
+   Prop[ i++] = getterSel;
+   Prop[ i++] = setterSel;
+   Prop[ i++] = clearerSel;
 
 //   fprintf( stderr, "%s %s has %s clearer\n",  type->hasPointerRepresentation() ? "pointer" : "nonpointer", PD->getIdentifier()->getNameStart(),  Prop[ 5] == zeroSel  ? "no" : "a");
 }
@@ -4127,7 +4145,7 @@ llvm::Constant *CGObjCCommonMulleRuntime::EmitPropertyList(Twine Name,
    llvm::SmallPtrSet<const IdentifierInfo*, 16> PropertySet;
    for (const auto *PD : OCD->properties())
    {
-      llvm::Constant *Prop[6];
+      llvm::Constant *Prop[7];
 
       PropertySet.insert(PD->getIdentifier());
 

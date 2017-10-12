@@ -9,10 +9,10 @@
 BY_THE_BOOK="YES"
 
 # our compiler version
-MULLE_CLANG_VERSION="5.0.0.0"
-MULLE_CLANG_RC="5"
+MULLE_CLANG_VERSION="5.0.0.2"
+#MULLE_CLANG_RC="5"
 MULLE_LLDB_VERSION="5.0.0.0"
-MULLE_LLDB_RC="4"
+#MULLE_LLDB_RC="4"
 
 
 # required LLVM version
@@ -731,7 +731,7 @@ setup_build_environment()
             CMAKE_FLAGS="${CMAKE_FLAGS} -Thost=x64"
             if [ ! -z "${MAKE}" ]
             then
-               log_verbose "Falling back to msbuild, as you can't use -Thost=x64 with ${MAKE}... 
+               log_verbose "Falling back to msbuild, as you can't use -Thost=x64 with ${MAKE}...
   But then may run into problems later with visual studio (maybe)."
                MAKE=
             fi
@@ -1025,6 +1025,16 @@ _build_llvm()
          fi
       fi
    fi
+
+   local links
+
+   links="mulle-clang;mulle-clang-cl;mulle-clang-cpp"
+   case "${UNAME}" in
+      MINGW*)
+         links="${links};../msbuild-bin/cl"
+      ;;
+   esac
+
    #
    # Build llvm
    #
@@ -1043,7 +1053,7 @@ _build_llvm()
                -DCMAKE_C_COMPILER="${C_COMPILER}" \
                -DCMAKE_CXX_COMPILER="${CXX_COMPILER}" \
                -DCLANG_VENDOR="${CLANG_VENDOR}" \
-               -DCLANG_LINKS_TO_CREATE="mulle-clang;mulle-clang-cl;mulle-clang-cpp;../msbuild-bin/cl" \
+               -DCLANG_LINKS_TO_CREATE="${links}" \
                -DCMAKE_BUILD_TYPE="${LLVM_BUILD_TYPE}" \
                -DCMAKE_INSTALL_PREFIX="${MULLE_LLVM_INSTALL_PREFIX}" \
                -DLLVM_ENABLE_CXX1Y:BOOL=OFF \
@@ -1055,7 +1065,7 @@ _build_llvm()
    (
       exekutor cd "${LLVM_BUILD_DIR}" &&
    # hmm
-      exekutor ${MAKE} ${MAKE_FLAGS} "$@" 
+      exekutor ${MAKE} ${MAKE_FLAGS} "$@"
    ) || exit 1
 
    case "${UNAME}" in
@@ -1064,7 +1074,7 @@ _build_llvm()
          then
             log_verbose "Creating mulle-lldb link ..."
             # todo need redirect_exekutor here
-            exekutor echo 'perl -S mulle-scan-build %*' > "${MULLE_CLANG_INSTALL_PREFIX}/bin/mulle-scan-build.bat" 
+            exekutor echo 'perl -S mulle-scan-build %*' > "${MULLE_CLANG_INSTALL_PREFIX}/bin/mulle-scan-build.bat"
 
             # this doesn't work and isn't necessary I think
             exekutor chmod 755 "${MULLE_CLANG_INSTALL_PREFIX}/bin/mulle-scan-build.bat"
@@ -1093,7 +1103,7 @@ _build_clang()
    #
    if should_build "${MULLE_CLANG_BUILD_DIR}" || [ "${RUN_CLANG_CMAKE}" = "YES" ]
    then
-      ( 
+      (
          # for msbuild
          C_COMPILER="`command -v "${C_COMPILER}"`"
          CXX_COMPILER="`command -v "${CXX_COMPILER}"`"
@@ -1102,6 +1112,14 @@ _build_clang()
 
          exekutor cd "${MULLE_CLANG_BUILD_DIR}" &&
 
+         local links
+
+         links="mulle-clang;mulle-clang-cl;mulle-clang-cpp"
+         case "${UNAME}" in
+            mingw)
+               links="${links};../msbuild-bin/cl"
+            ;;
+         esac
             # cmake -DCMAKE_BUILD_TYPE=Debug "../${MULLE_CLANG_DIR}"
             # try to build cmake with cmake
          exekutor cmake \
@@ -1110,7 +1128,7 @@ _build_clang()
                -DCMAKE_C_COMPILER="${C_COMPILER}" \
                -DCMAKE_CXX_COMPILER="${CXX_COMPILER}" \
                -DCLANG_VENDOR="${CLANG_VENDOR}" \
-               -DCLANG_LINKS_TO_CREATE="mulle-clang;mulle-clang-cl;mulle-clang-cpp;../msbuild-bin/cl" \
+               -DCLANG_LINKS_TO_CREATE="${links}" \
                -DCMAKE_BUILD_TYPE="${MULLE_CLANG_BUILD_TYPE}" \
                -DCMAKE_INSTALL_PREFIX="${MULLE_CLANG_INSTALL_PREFIX}" \
                ${CMAKE_FLAGS} \
@@ -1120,7 +1138,7 @@ _build_clang()
 
    (
       exekutor cd "${MULLE_CLANG_BUILD_DIR}" &&
-      exekutor ${MAKE} ${MAKE_FLAGS} "$@" 
+      exekutor ${MAKE} ${MAKE_FLAGS} "$@"
    ) || exit 1
 }
 

@@ -3327,33 +3327,22 @@ Parser::ParseObjCMessageExpressionBody(SourceLocation LBracLoc,
 
   unsigned nKeys = KeyIdents.size();
   if (nKeys == 0) {
-     // @mulle-objc@ AAM:  replace alloc/copy/mutableCopy with instantiate & Co
+    // @mulle-objc@ AAM:  replace alloc/copy/mutableCopy with instantiate & Co >
     if( getLangOpts().ObjCAllocsAutoreleasedObjects && selIdent)
     {
        StringRef   s;
        
        s = selIdent->getName();
-       if( s == "alloc")
-       {
-          Diag( Loc, diag::warn_mulle_aam_rename_selector) << s << "instantiate";
+       if( s.equals( "alloc"))
           selIdent = &PP.getIdentifierTable().get( "instantiate");
-       }
-       else if( s == "new")
-       {
-          Diag( Loc, diag::warn_mulle_aam_rename_selector) << s << "instantiatedObject";
+       else if( s.equals( "new"))
           selIdent = &PP.getIdentifierTable().get( "instantiatedObject");
-       }
-       else if( s == "copy")
-       {
-          Diag( Loc, diag::warn_mulle_aam_rename_selector) << s << "immutableInstance";
+       else if( s.equals( "copy"))
           selIdent = &PP.getIdentifierTable().get( "immutableInstance");
-       }
-       else if( s == "mutableCopy")
-       {
-          Diag( Loc, diag::warn_mulle_aam_rename_selector) << s << "mutableInstance";
+       else if( s.equals( "mutableCopy"))
           selIdent = &PP.getIdentifierTable().get( "mutableInstance");
-       }
     }
+    // @mulle-objc@ AAM:  replace alloc/copy/mutableCopy with instantiate & Co <
     KeyIdents.push_back(selIdent);
     KeyLocs.push_back(Loc);
   }

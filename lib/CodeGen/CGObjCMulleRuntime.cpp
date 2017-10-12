@@ -64,7 +64,7 @@
 #include "llvm/Support/Compiler.h"
 
 
-#define COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION  11
+#define COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION  12
 
 
 using namespace clang;
@@ -927,7 +927,7 @@ namespace {
 
       void  SetPropertyInfoToEmit( const ObjCPropertyDecl *PD,
                                    const Decl *Container,
-                                   llvm::Constant *Prop[ 6]);
+                                   llvm::Constant *Prop[ 7]);
 
       /// EmitPropertyList - Emit the given property list. The return
       /// value has type PropertyListPtrTy.
@@ -4075,7 +4075,8 @@ PushProtocolProperties(llvm::SmallPtrSet<const IdentifierInfo*,16> &PropertySet,
       if (!PropertySet.insert(PD->getIdentifier()).second)
          continue;
 
-      llvm::Constant *Prop[6];
+      llvm::Constant *Prop[7];
+      
       SetPropertyInfoToEmit( PD, Container, Prop);
 
       Properties.push_back(llvm::ConstantStruct::get(ObjCTypes.PropertyTy, Prop));
@@ -4085,32 +4086,62 @@ PushProtocolProperties(llvm::SmallPtrSet<const IdentifierInfo*,16> &PropertySet,
 
 void  CGObjCCommonMulleRuntime::SetPropertyInfoToEmit( const ObjCPropertyDecl *PD,
                                                        const Decl *Container,
-                                                       llvm::Constant *Prop[ 6])
+                                                       llvm::Constant *Prop[ 7])
 {
    Selector   getter = PD->getGetterName();
    Selector   setter = PD->getSetterName();
    QualType   type;
    int        is_nonnull;
+   int        i;
+   llvm::Constant  *getterSel;
+   llvm::Constant  *setterSel;
+   llvm::Constant  *clearerSel;
+   llvm::Constant  *zeroSel;
+   llvm::Constant  *propertyid;
+   llvm::Constant  *ivarid;
+   
    const llvm::APInt zero(32, 0);
-   llvm::Constant  *zeroSel  = llvm::Constant::getIntegerValue(CGM.Int32Ty, zero);
+   
+   zeroSel   = llvm::Constant::getIntegerValue(CGM.Int32Ty, zero);
 
-   Prop[ 0] = _HashConstantForString( PD->getIdentifier()->getNameStart());
-   Prop[ 1] = GetPropertyName(PD->getIdentifier());
-   Prop[ 2] = GetPropertyTypeString(PD, Container);
-   Prop[ 3] = ! getter.isNull() ? _HashConstantForString( getter.getAsString())
-                                : zeroSel;
-   Prop[ 4] = (! setter.isNull() && ! PD->isReadOnly())
-                ? _HashConstantForString( setter.getAsString())
-                : zeroSel;
-   Prop[ 5] = zeroSel;
-
-   // if its a pointer and not nonnull, we can clear it
+   getterSel = ! getter.isNull() ? _HashConstantForString( getter.getAsString())
+   : zeroSel;
+   setterSel = (! setter.isNull() && ! PD->isReadOnly())
+   ? _HashConstantForString( setter.getAsString())
+   : zeroSel;
+   
    type       = PD->getType();
    is_nonnull = PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_nullability;
+   clearerSel = type->hasPointerRepresentation() && ! is_nonnull ? setterSel : zeroSel;
 
+   propertyid = _HashConstantForString( PD->getIdentifier()->getNameStart());
+   ivarid     = llvm::Constant::getIntegerValue(CGM.Int32Ty, zero);
+   if( PD->getPropertyIvarDecl())
+      ivarid = _HashConstantForString( PD->getPropertyIvarDecl()->getIdentifier()->getNameStart());
+   
+//   struct _mulle_objc_property
+//   {
+//      mulle_objc_propertyid_t    propertyid;
+//      mulle_objc_ivarid_t        ivarid;      // name prefixed with _
+//      char                       *name;
+//      char                       *signature;  // hmmm...
+//      mulle_objc_methodid_t      getter;
+//      mulle_objc_methodid_t      setter;
+//      mulle_objc_methodid_t      clearer;     // for pointers/objects
+//   };
 
-   Prop[ 5] =  type->hasPointerRepresentation() && ! is_nonnull ? Prop[ 4] : zeroSel;
+   i = 0;
+   Prop[ i++] = propertyid;
+   Prop[ i++] = ivarid;
+   
+   Prop[ i++] = GetPropertyName( PD->getIdentifier());
+   Prop[ i++] = GetPropertyTypeString( PD, Container);
 
+   Prop[ i++] = getterSel;
+   Prop[ i++] = setterSel;
+   Prop[ i++] = clearerSel;
+
+   assert( i == 7);
 //   fprintf( stderr, "%s %s has %s clearer\n",  type->hasPointerRepresentation() ? "pointer" : "nonpointer", PD->getIdentifier()->getNameStart(),  Prop[ 5] == zeroSel  ? "no" : "a");
 }
 
@@ -4123,7 +4154,7 @@ llvm::Constant *CGObjCCommonMulleRuntime::EmitPropertyList(Twine Name,
    llvm::SmallPtrSet<const IdentifierInfo*, 16> PropertySet;
    for (const auto *PD : OCD->properties())
    {
-      llvm::Constant *Prop[6];
+      llvm::Constant *Prop[7];
 
       PropertySet.insert(PD->getIdentifier());
 
@@ -6311,6 +6342,7 @@ ObjCCommonTypesHelper::ObjCCommonTypesHelper(CodeGen::CodeGenModule &cgm)
    //   struct _mulle_objc_property
    //   {
    //      mulle_objc_propertyid_t    propertyid;
+   //      mulle_objc_ivarid_t        ivarid;
    //      char                       *name;
    //      char                       *signature;  // hmmm...
    //      mulle_objc_methodid_t      getter;
@@ -6320,6 +6352,7 @@ ObjCCommonTypesHelper::ObjCCommonTypesHelper(CodeGen::CodeGenModule &cgm)
 
    PropertyTy = llvm::StructType::create("struct._mulle_objc_property",
                                          PropertyIDTy,
+                                         IvarIDTy,
                                          Int8PtrTy,
                                          Int8PtrTy,
                                          SelectorIDTy,

@@ -221,12 +221,10 @@ def warn_mt_message : Warning<"[rewriter] %0">;
 def note_mt_message : Note<"[rewriter] %0">;
 
 
-// @mulle-objc@ AAM:  warn when renaming selectors
-def warn_mulle_aam_rename_selector : Warning<
-"in AAM, method calls to '%0' are actually calls to '%1'">;
+// @mulle-objc@: invalid hash problem >
 def err_mulle_string_hash_invalid : Error<
   "Your input string '%0' hashes to 0 or -1. Please tweet to @mulle_nat and rename">;
-
+// @mulle-objc@: invalid hash problem <
 
 // ARCMigrate
 def warn_arcmt_nsalloc_realloc : Warning<"[rewriter] call returns pointer to GC managed memory; it will become unmanaged in ARC">;

@@ -163,7 +163,7 @@ brew install codeon-gmbh/software/mulle-clang
 > built from source. This takes a long time! On my Macbook Air the build
 > took about 30 minutes, even with the prerequisite llvm downloaded as a bottle.
 
-->
+-->
 
 ### Linux
 

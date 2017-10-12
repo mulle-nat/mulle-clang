@@ -185,25 +185,25 @@ sudo apt-get install mulle-clang
 #### Debian stretch 64 bit
 
 ```
-curl -O -L http://download.codeon.de/dists/zesty/main/binary-amd64/mulle-clang-5.0.0.0-zesty-amd64.deb
-sudo dpkg --install mulle-clang-5.0.0.0-zesty-amd64.deb
+curl -O -L http://download.codeon.de/dists/zesty/main/binary-amd64/mulle-clang-5.0.0.2-zesty-amd64.deb
+sudo dpkg --install mulle-clang-5.0.0.2-zesty-amd64.deb
 ```
 
 Checksum         | Result
 -----------------|------------------
-shasum -b -a 256 | bc51e5111ff863d1aab6444c1e3d26be4f0d6644842eccb4aa2b3d62b4fa1c9e
+shasum -b -a 256 | f8cc19435ad82b5efa35628500e0ee35c9bcf13d84ad7c27523c619b336e24ae
 
 
 #### Debian jessie 64 bit
 
 ```
-curl -O -L http://download.codeon.de/dists/zesty/main/binary-amd64/mulle-clang-5.0.0.0-trusty-amd64.deb
-sudo dpkg --install mulle-clang-5.0.0.0-trusty-amd64.deb
+curl -O -L http://download.codeon.de/dists/zesty/main/binary-amd64/mulle-clang-5.0.0.2-trusty-amd64.deb
+sudo dpkg --install mulle-clang-5.0.0.2-trusty-amd64.deb
 ```
 
 Checksum         | Result
 -----------------|------------------
-shasum -b -a 256 | f4079655b71c7a407972dd0828d5343023f9c6c83c995602bf63d7ad68e15b8b
+shasum -b -a 256 | 75c5f1f4d75bd664ea9b932390113eb31cd80ad2bfbc30e15c7b3a27dd344f81
 
 
 ### FreeBSD, Windows and others

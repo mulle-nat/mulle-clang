@@ -51,7 +51,7 @@ namespace clang {
   public:
     ClangDiagnosticHandler(const CodeGenOptions &CGOpts, BackendConsumer *BCon)
         : CodeGenOpts(CGOpts), BackendCon(BCon) {}
-  
+
     bool handleDiagnostics(const DiagnosticInfo &DI) override;
 
     bool isAnalysisRemarkEnabled(StringRef PassName) const override {
@@ -329,6 +329,13 @@ namespace clang {
       SourceLocation Loc = SourceLocation::getFromRawEncoding(LocCookie);
       ((BackendConsumer*)Context)->InlineAsmDiagHandler2(SM, Loc);
     }
+
+    /// @mulle-objc@ compiler: pass through Parser to ObjCRuntime when finished >
+    void ParserDidFinish( Parser *P) override {
+        if( Gen)
+           Gen->ParserDidFinish( P);
+    }
+    /// @mulle-objc@ compiler: pass through Parser to ObjCRuntime when finished <
 
     /// Get the best possible source location to represent a diagnostic that
     /// may have associated debug info.

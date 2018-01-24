@@ -1193,6 +1193,12 @@ public:
     LFunction,  // Same as Function, but as wide string.
     FuncDName,
     FuncSig,
+    // @mulle-objc@ > add __OBJC_CLASS__ keyword
+    ObjCClass,
+    ObjCCategory,
+    MulleObjCClassid,
+    MulleObjCCategoryid,
+    // @mulle-objc@ < add __OBJC_CLASS__ keyword
     PrettyFunction,
     /// \brief The same as PrettyFunction, except that the
     /// 'virtual' keyword is omitted for virtual member functions.

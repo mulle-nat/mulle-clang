@@ -194,6 +194,13 @@ Decl *Sema::ActOnProperty(Scope *S, SourceLocation AtLoc,
                       // default is readwrite!
                       !(Attributes & ObjCDeclSpec::DQ_PR_readonly));
 
+  // @mulle-objc@ >>>language: property is always nonatomic
+  if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+  {
+     Attributes |= ObjCDeclSpec::DQ_PR_nonatomic;
+  }
+  // @mulle-objc@ <<< language: property is always nonatomic
+
   // Proceed with constructing the ObjCPropertyDecls.
   ObjCContainerDecl *ClassDecl = cast<ObjCContainerDecl>(CurContext);
   ObjCPropertyDecl *Res = nullptr;
@@ -219,6 +226,42 @@ Decl *Sema::ActOnProperty(Scope *S, SourceLocation AtLoc,
                              MethodImplKind);
     if (lexicalDC)
       Res->setLexicalDeclContext(lexicalDC);
+  }
+
+  // @mulle-objc@ language: introduce ivar for property at declaration time
+  if( Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+  {
+     ObjCIvarDecl       *Ivar;
+     ObjCInterfaceDecl  *ClassDeclared;
+
+     //
+     // can only do this for classes not protocols or categories
+     //
+     if (ObjCInterfaceDecl *CDecl = dyn_cast<ObjCInterfaceDecl>(ClassDecl))
+     {
+        Ivar = CDecl->lookupInstanceVariableOfProperty( Context, Res->getIdentifier(), ClassDeclared);
+        if( ! Ivar)
+        {
+           // create an Ivar and add it
+           Ivar = ObjCIvarDecl::Create( Context, CDecl,
+                                       AtLoc ,LParenLoc, Res->getDefaultSynthIvarName(Context),
+                                       Res->getType(), /*Dinfo=*/nullptr,
+                                       ObjCIvarDecl::Protected,
+                                       (Expr *)nullptr, true);
+           if (RequireNonAbstractType(AtLoc,
+                                      Res->getType(),
+                                      diag::err_abstract_type_in_decl,
+                                      AbstractSynthesizedIvarType))
+           {
+              Diag( Res->getLocation(), diag::note_property_declare);
+              Ivar->setInvalidDecl();
+           }
+           CDecl->addDecl(Ivar);
+           CDecl->makeDeclVisibleInContext(Ivar);
+        }
+
+        Res->setPropertyIvarDecl( Ivar);
+     }
   }
 
   // Validate the attributes on the @property.
@@ -1162,14 +1205,31 @@ Decl *Sema::ActOnPropertyImplDecl(Scope *S,
   ObjCIvarDecl *Ivar = nullptr;
   bool CompleteTypeErr = false;
   bool compat = true;
+
   // Check that we have a valid, previously declared ivar for @synthesize
   if (Synthesize) {
     // @synthesize
+
+    ObjCInterfaceDecl *ClassDeclared;
+
+    // @mulle-objc@ language: fix lookup of ivar variable for properties,
+    if( Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+    {
+      if (!PropertyIvar)
+      {
+         Ivar = IDecl->lookupInstanceVariableOfProperty( Context, PropertyId, ClassDeclared);
+         PropertyIvar = Ivar->getIdentifier();
+      }
+      else
+         Ivar = IDecl->lookupInstanceVariable( PropertyIvar, ClassDeclared);
+    }
+    else
+    {
     if (!PropertyIvar)
       PropertyIvar = PropertyId;
     // Check that this is a previously declared 'ivar' in 'IDecl' interface
-    ObjCInterfaceDecl *ClassDeclared;
-    Ivar = IDecl->lookupInstanceVariable(PropertyIvar, ClassDeclared);
+    Ivar = IDecl->lookupInstanceVariable( PropertyIvar, ClassDeclared);
+    }
     QualType PropType = property->getType();
     QualType PropertyIvarType = PropType.getNonReferenceType();
 
@@ -1233,17 +1293,21 @@ Decl *Sema::ActOnPropertyImplDecl(Scope *S,
       }
     }
 
+    // @mulle-objc@ next check is meaningless in MulleObjC
+    if( ! Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
     if (AtLoc.isInvalid()) {
-      // Check when default synthesizing a property that there is 
+      // Check when default synthesizing a property that there is
       // an ivar matching property name and issue warning; since this
       // is the most common case of not using an ivar used for backing
       // property in non-default synthesis case.
       ObjCInterfaceDecl *ClassDeclared=nullptr;
-      ObjCIvarDecl *originalIvar = 
-      IDecl->lookupInstanceVariable(property->getIdentifier(), 
+
+      // @mulle-objc@ language: ivar for properties use lookupInstanceVariableOfProperty instead
+      ObjCIvarDecl *originalIvar =
+      IDecl->lookupInstanceVariableOfProperty( Context, property->getIdentifier(),
                                     ClassDeclared);
       if (originalIvar) {
-        Diag(PropertyDiagLoc, 
+        Diag(PropertyDiagLoc,
              diag::warn_autosynthesis_property_ivar_match)
         << PropertyId << (Ivar == nullptr) << PropertyIvar
         << originalIvar->getIdentifier();
@@ -1303,6 +1367,10 @@ Decl *Sema::ActOnPropertyImplDecl(Scope *S,
       ClassImpDecl->addDecl(Ivar);
       IDecl->makeDeclVisibleInContext(Ivar);
 
+      if (getLangOpts().ObjCRuntime.hasMulleMetaABI())
+        Diag(PropertyDiagLoc, diag::err_mulle_error_missing_property_ivar_decl)
+            << PropertyId;
+      else
       if (getLangOpts().ObjCRuntime.isFragile())
         Diag(PropertyDiagLoc, diag::err_missing_property_ivar_decl)
             << PropertyId;
@@ -1317,13 +1385,23 @@ Decl *Sema::ActOnPropertyImplDecl(Scope *S,
       << Ivar << Ivar->getName();
       // Note! I deliberately want it to fall thru so more errors are caught.
     }
+
+    // @mulle-objc@ language: check that ivar name fits property
+    if( LangOpts.ObjCRuntime.hasMulleMetaABI() && ! Ivar->isInvalidDecl())
+    {
+       IdentifierInfo   *expected;
+
+       expected = property->getDefaultSynthIvarName( Context);
+       if( Ivar->getIdentifier() != expected)
+          Diag(PropertyDiagLoc, diag::err_mulle_objc_property_synthesize_wrong_name);
+    }
     property->setPropertyIvarDecl(Ivar);
 
     QualType IvarType = Context.getCanonicalType(Ivar->getType());
 
     // Check that type of property and its ivar are type compatible.
     if (!Context.hasSameType(PropertyIvarType, IvarType)) {
-      if (isa<ObjCObjectPointerType>(PropertyIvarType) 
+      if (isa<ObjCObjectPointerType>(PropertyIvarType)
           && isa<ObjCObjectPointerType>(IvarType))
         compat =
           Context.canAssignObjCInterfaces(
@@ -1520,16 +1598,18 @@ Decl *Sema::ActOnPropertyImplDecl(Scope *S,
       // but it requires an ivar of different name.
       ObjCInterfaceDecl *ClassDeclared=nullptr;
       ObjCIvarDecl *Ivar = nullptr;
+
+      // @mulle-objc@ language: ivar for properties use lookupInstanceVariableOfProperty instead
       if (!Synthesize)
-        Ivar = IDecl->lookupInstanceVariable(PropertyId, ClassDeclared);
+        Ivar = IDecl->lookupInstanceVariableOfProperty( Context, PropertyId, ClassDeclared);
       else {
-        if (PropertyIvar && PropertyIvar != PropertyId)
-          Ivar = IDecl->lookupInstanceVariable(PropertyId, ClassDeclared);
+        if (PropertyIvar && PropertyIvar != PropertyId)  /* looks like     vvv  a bug */
+          Ivar = IDecl->lookupInstanceVariableOfProperty( Context, PropertyId, ClassDeclared);
       }
       // Issue diagnostics only if Ivar belongs to current class.
-      if (Ivar && Ivar->getSynthesize() && 
+      if (Ivar && Ivar->getSynthesize() &&
           declaresSameEntity(IC->getClassInterface(), ClassDeclared)) {
-        Diag(Ivar->getLocation(), diag::err_undeclared_var_use) 
+        Diag(Ivar->getLocation(), diag::err_undeclared_var_use)
         << PropertyId;
         Ivar->setInvalidDecl();
       }
@@ -1860,6 +1940,9 @@ void Sema::DefaultSynthesizeProperties(Scope *S, ObjCImplDecl *IMPDecl,
     ObjCPropertyDecl *PropInSuperClass =
         SuperPropMap[std::make_pair(Prop->getIdentifier(),
                                     Prop->isClassProperty())];
+
+    // @mulle-objc@ language: experimentally allow auto-synthesis of @protocol properties, I don't see the drawback (yet)
+    if( ! LangOpts.ObjCRuntime.hasMulleMetaABI())
     if (ObjCProtocolDecl *Proto =
           dyn_cast<ObjCProtocolDecl>(Prop->getDeclContext())) {
       // We won't auto-synthesize properties declared in protocols.
@@ -1916,7 +1999,7 @@ void Sema::DefaultSynthesizeProperties(Scope *S, ObjCImplDecl *IMPDecl,
 
 void Sema::DefaultSynthesizeProperties(Scope *S, Decl *D,
                                        SourceLocation AtEnd) {
-  if (!LangOpts.ObjCDefaultSynthProperties || LangOpts.ObjCRuntime.isFragile())
+  if (!LangOpts.ObjCDefaultSynthProperties || (LangOpts.ObjCRuntime.isFragile() && ! LangOpts.ObjCRuntime.hasMulleMetaABI()))
     return;
   ObjCImplementationDecl *IC=dyn_cast_or_null<ObjCImplementationDecl>(D);
   if (!IC)
@@ -2393,14 +2476,26 @@ void Sema::ProcessPropertyDecl(ObjCPropertyDecl *property) {
 
     AddPropertyAttrs(*this, GetterMethod, property);
 
+    //
+    // @mulle-objc@ MetaABI: fix up getter parameter if needed
+    //
+    if( Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+    {
+       if( Context.typeNeedsMetaABIAlloca( resultTy))
+       {
+          SmallVector<ParmVarDecl*, 16> Params;
+          SetMulleObjCParam( GetterMethod, property->getSetterName(), &Params, resultTy, Sema::MetaABIRvalAsStruct, Loc);
+       }
+    }
+
     if (property->hasAttr<NSReturnsNotRetainedAttr>())
       GetterMethod->addAttr(NSReturnsNotRetainedAttr::CreateImplicit(Context,
                                                                      Loc));
-    
+
     if (property->hasAttr<ObjCReturnsInnerPointerAttr>())
       GetterMethod->addAttr(
         ObjCReturnsInnerPointerAttr::CreateImplicit(Context, Loc));
-    
+
     if (const SectionAttr *SA = property->getAttr<SectionAttr>())
       GetterMethod->addAttr(
           SectionAttr::CreateImplicit(Context, SectionAttr::GNU_section,
@@ -2463,6 +2558,24 @@ void Sema::ProcessPropertyDecl(ObjCPropertyDecl *property) {
                                                   SC_None,
                                                   nullptr);
       SetterMethod->setMethodParams(Context, Argument, None);
+
+      //
+      // @mulle-objc@ MetaABI: fix up setter parameter
+      //
+      if( Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+      {
+         if( Context.typeNeedsMetaABIAlloca( property->getType()))
+         {
+            SmallVector<ParmVarDecl*, 16> Params;
+            Params.push_back(Argument);
+
+            SetMulleObjCParam( SetterMethod, property->getSetterName(), &Params, property->getType(), MetaABIParamAsStruct, Loc);
+         }
+         else
+         {
+            SetterMethod->setMetaABIVoidPointerParam( true);
+         }
+      }
 
       AddPropertyAttrs(*this, SetterMethod, property);
 

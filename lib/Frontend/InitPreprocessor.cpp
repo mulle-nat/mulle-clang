@@ -627,6 +627,17 @@ static void InitializePredefinedMacros(const TargetInfo &TI,
     if (LangOpts.ObjCRuntime.isNeXTFamily())
       Builder.defineMacro("__NEXT_RUNTIME__");
 
+    // @mulle-objc@ language: announce that we are running 
+    if (LangOpts.ObjCRuntime.hasMulleMetaABI())
+    {
+       //       Builder.defineMacro("__MULLE_METAABI__");  // superflous
+       Builder.defineMacro("__MULLE_OBJC__");
+       Builder.defineMacro( LangOpts.ObjCAllocsAutoreleasedObjects ? "__MULLE_OBJC_AAM__" : "__MULLE_OBJC_NO_AAM__");
+       Builder.defineMacro( LangOpts.ObjCDisableTaggedPointers ? "__MULLE_OBJC_NO_TPS__" : "__MULLE_OBJC_TPS__");
+       Builder.defineMacro( LangOpts.ObjCHasThreadLocalRuntime ? "__MULLE_OBJC_TRT__" : "__MULLE_OBJC_NO_TRT__");
+       Builder.defineMacro( LangOpts.ObjCDisableFastMethodCalls ? "__MULLE_OBJC_NO_FMC__" : "__MULLE_OBJC_FMC__");
+    }
+
     if (LangOpts.ObjCRuntime.getKind() == ObjCRuntime::ObjFW) {
       VersionTuple tuple = LangOpts.ObjCRuntime.getVersion();
 

@@ -983,7 +983,7 @@ public:
   static std::string getAsString(const Type *ty, Qualifiers qs,
                                  const PrintingPolicy &Policy);
 
-  std::string getAsString() const; 
+  std::string getAsString() const;
   std::string getAsString(const PrintingPolicy &Policy) const;
 
   void print(raw_ostream &OS, const PrintingPolicy &Policy,
@@ -1806,6 +1806,9 @@ public:
 
   bool isBlockCompatibleObjCPointerType(ASTContext &ctx) const;
   bool isObjCSelType() const;                 // Class
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+  bool isObjCProtocolType() const;                 // Class
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
   bool isObjCBuiltinType() const;               // 'id' or 'Class'
   bool isObjCARCBridgableType() const;
   bool isCARCBridgableType() const;
@@ -2175,7 +2178,9 @@ public:
   QualType desugar() const { return QualType(this, 0); }
 
   bool isInteger() const {
-    return getKind() >= Bool && getKind() <= Int128;
+     return((getKind() >= Bool && getKind() <= Int128) ||
+             getKind() == ObjCSel ||
+             getKind() == ObjCProtocol); // @mulle-objc@ uniqueid: ObjCSel is integer
   }
 
   bool isSignedInteger() const {
@@ -2183,7 +2188,9 @@ public:
   }
 
   bool isUnsignedInteger() const {
-    return getKind() >= Bool && getKind() <= UInt128;
+     return((getKind() >= Bool && getKind() <= UInt128) ||
+            getKind() == ObjCSel ||
+            getKind() == ObjCProtocol); // @mulle-objc@ uniqueid: ObjCSel is integer
   }
 
   bool isFloatingPoint() const {
@@ -2819,7 +2826,7 @@ public:
 };
 
 /// Represents an extended address space qualifier where the input address space
-/// value is dependent. Non-dependent address spaces are not represented with a 
+/// value is dependent. Non-dependent address spaces are not represented with a
 /// special Type subclass; they are stored on an ExtQuals node as part of a QualType.
 ///
 /// For example:
@@ -2838,7 +2845,7 @@ class DependentAddressSpaceType : public Type, public llvm::FoldingSetNode {
   SourceLocation loc;
 
   DependentAddressSpaceType(const ASTContext &Context, QualType PointeeType,
-                            QualType can, Expr *AddrSpaceExpr, 
+                            QualType can, Expr *AddrSpaceExpr,
                             SourceLocation loc);
 
 public:
@@ -5169,7 +5176,7 @@ public:
 /// with base C and no protocols.
 ///
 /// 'C<P>' is an unspecialized ObjCObjectType with base C and protocol list [P].
-/// 'C<C*>' is a specialized ObjCObjectType with type arguments 'C*' and no 
+/// 'C<C*>' is a specialized ObjCObjectType with type arguments 'C*' and no
 /// protocol list.
 /// 'C<C*><P>' is a specialized ObjCObjectType with base C, type arguments 'C*',
 /// and protocol list [P].
@@ -5801,7 +5808,7 @@ inline QualType QualType::getUnqualifiedType() const {
 
   return QualType(getSplitUnqualifiedTypeImpl(*this).Ty, 0);
 }
-  
+
 inline SplitQualType QualType::getSplitUnqualifiedType() const {
   if (!getTypePtr()->getCanonicalTypeInternal().hasLocalQualifiers())
     return split();
@@ -6078,13 +6085,30 @@ inline bool Type::isObjCClassType() const {
 }
 
 inline bool Type::isObjCSelType() const {
+   // @mulle-objc@ uniqueid: -> hack type check for SEL
+  if( isSpecificBuiltinType(BuiltinType::ObjCSel))
+     return( true);
+   // @mulle-objc@ uniqueid: <-
   if (const PointerType *OPT = getAs<PointerType>())
     return OPT->getPointeeType()->isSpecificBuiltinType(BuiltinType::ObjCSel);
   return false;
 }
 
+/// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+inline bool Type::isObjCProtocolType() const {
+  // hack type check for PROTOCOL
+  if( isSpecificBuiltinType(BuiltinType::ObjCProtocol))
+     return( true);
+  if (const PointerType *OPT = getAs<PointerType>())
+    return OPT->getPointeeType()->isSpecificBuiltinType(BuiltinType::ObjCProtocol);
+  return false;
+}
+/// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
+
 inline bool Type::isObjCBuiltinType() const {
-  return isObjCIdType() || isObjCClassType() || isObjCSelType();
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+  return isObjCIdType() || isObjCClassType() || isObjCSelType() || isObjCProtocolType();
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
 }
 
 #define IMAGE_TYPE(ImgType, Id, SingletonId, Access, Suffix) \
@@ -6190,8 +6214,11 @@ bool IsEnumDeclScoped(EnumDecl *);
 
 inline bool Type::isIntegerType() const {
   if (const BuiltinType *BT = dyn_cast<BuiltinType>(CanonicalType))
-    return BT->getKind() >= BuiltinType::Bool &&
-           BT->getKind() <= BuiltinType::Int128;
+    return(( BT->getKind() >= BuiltinType::Bool &&
+             BT->getKind() <= BuiltinType::Int128) ||
+             BT->getKind() == BuiltinType::ObjCSel ||
+             BT->getKind() == BuiltinType::ObjCProtocol); // @mulle-objc@ uniqueid: ObjCSel is integral
+
   if (const EnumType *ET = dyn_cast<EnumType>(CanonicalType)) {
     // Incomplete enum types are not treated as integer types.
     // FIXME: In C++, enum types are never integer types.
@@ -6203,8 +6230,10 @@ inline bool Type::isIntegerType() const {
 
 inline bool Type::isScalarType() const {
   if (const BuiltinType *BT = dyn_cast<BuiltinType>(CanonicalType))
-    return BT->getKind() > BuiltinType::Void &&
-           BT->getKind() <= BuiltinType::NullPtr;
+    return ((BT->getKind() > BuiltinType::Void &&
+            BT->getKind() <= BuiltinType::NullPtr) ||
+            BT->getKind() == BuiltinType::ObjCSel ||
+            BT->getKind() == BuiltinType::ObjCProtocol); // @mulle-objc@ uniqueid: ObjCSel is integral
   if (const EnumType *ET = dyn_cast<EnumType>(CanonicalType))
     // Enums are scalar types, but only if they are defined.  Incomplete enums
     // are not treated as scalar types.
@@ -6218,15 +6247,18 @@ inline bool Type::isScalarType() const {
 
 inline bool Type::isIntegralOrEnumerationType() const {
   if (const BuiltinType *BT = dyn_cast<BuiltinType>(CanonicalType))
-    return BT->getKind() >= BuiltinType::Bool &&
-           BT->getKind() <= BuiltinType::Int128;
+    return ((BT->getKind() >= BuiltinType::Bool &&
+            BT->getKind() <= BuiltinType::Int128) ||
+            BT->getKind() == BuiltinType::ObjCSel ||
+            BT->getKind() == BuiltinType::ObjCProtocol); // @mulle-objc@ uniqueid: ObjCSel is integral
+
 
   // Check for a complete enum type; incomplete enum types are not properly an
   // enumeration type in the sense required here.
   if (const EnumType *ET = dyn_cast<EnumType>(CanonicalType))
     return IsEnumDeclComplete(ET->getDecl());
 
-  return false;  
+  return false;
 }
 
 inline bool Type::isBooleanType() const {

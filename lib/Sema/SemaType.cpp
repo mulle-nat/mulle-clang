@@ -2788,7 +2788,7 @@ static QualType GetDeclSpecTypeForDeclarator(TypeProcessingState &state,
     case DeclaratorContext::ObjCParameterContext:
     case DeclaratorContext::ObjCResultContext:
     case DeclaratorContext::PrototypeContext:
-      Error = 0;  
+      Error = 0;
       break;
     case DeclaratorContext::LambdaExprParameterContext:
       // In C++14, generic lambdas allow 'auto' in their parameters.
@@ -2796,7 +2796,7 @@ static QualType GetDeclSpecTypeForDeclarator(TypeProcessingState &state,
           !Auto || Auto->getKeyword() != AutoTypeKeyword::Auto)
         Error = 16;
       else {
-        // If auto is mentioned in a lambda parameter context, convert it to a 
+        // If auto is mentioned in a lambda parameter context, convert it to a
         // template parameter type.
         sema::LambdaScopeInfo *LSI = SemaRef.getCurLambda();
         assert(LSI && "No LambdaScopeInfo on the stack!");
@@ -2814,7 +2814,7 @@ static QualType GetDeclSpecTypeForDeclarator(TypeProcessingState &state,
                 TemplateParameterDepth, AutoParameterPosition,
                 /*Identifier*/nullptr, false, IsParameterPack);
         LSI->AutoTemplateParams.push_back(CorrespondingTemplateParam);
-        // Replace the 'auto' in the function parameter with this invented 
+        // Replace the 'auto' in the function parameter with this invented
         // template type parameter.
         // FIXME: Retain some type sugar to indicate that this was written
         // as 'auto'.
@@ -3670,6 +3670,10 @@ static void
 checkNullabilityConsistency(Sema &S, SimplePointerKind pointerKind,
                             SourceLocation pointerLoc,
                             SourceLocation pointerEndLoc = SourceLocation()) {
+  // @mulle-objc@ compiler: nullability completeness is not objective-c like
+  if( S.Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+     return;
+
   // Determine which file we're performing consistency checking for.
   FileID file = getNullabilityCompletenessCheckFileID(S, pointerLoc);
   if (file.isInvalid())
@@ -3856,7 +3860,9 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
   SourceLocation assumeNonNullLoc = S.PP.getPragmaAssumeNonNullLoc();
   if (assumeNonNullLoc.isValid()) {
     inAssumeNonNullRegion = true;
-    recordNullabilitySeen(S, assumeNonNullLoc);
+    // @mulle-objc@ compiler: nullability completeness is not objective-c like
+    if( ! S.Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+       recordNullabilitySeen(S, assumeNonNullLoc);
   }
 
   // Whether to complain about missing nullability specifiers or not.
@@ -4371,7 +4377,7 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
             S.Diag(D.getIdentifierLoc(), diag::err_opencl_invalid_return)
                 << T << 0 /*pointer hint*/;
             D.setInvalidType(true);
-          } 
+          }
         } else if (!S.getLangOpts().HalfArgsAndReturns) {
           S.Diag(D.getIdentifierLoc(),
             diag::err_parameters_retval_cannot_have_fp16_type) << 1;
@@ -5275,7 +5281,7 @@ namespace {
         TL.copy(OldTL.castAs<TemplateSpecializationTypeLoc>());
         assert(TL.getRAngleLoc() == OldTL.castAs<TemplateSpecializationTypeLoc>().getRAngleLoc());
       }
-        
+
     }
     void VisitTypeOfExprTypeLoc(TypeOfExprTypeLoc TL) {
       assert(DS.getTypeSpecType() == DeclSpec::TST_typeofExpr);
@@ -5533,13 +5539,13 @@ static void fillAtomicQualLoc(AtomicTypeLoc ATL, const DeclaratorChunk &Chunk) {
   ATL.setParensRange(SourceRange());
 }
 
-static void fillDependentAddressSpaceTypeLoc(DependentAddressSpaceTypeLoc DASTL, 
+static void fillDependentAddressSpaceTypeLoc(DependentAddressSpaceTypeLoc DASTL,
                                              const AttributeList *Attrs) {
   while (Attrs && Attrs->getKind() != AttributeList::AT_AddressSpace)
     Attrs = Attrs->getNext();
 
   assert(Attrs && "no address_space attribute found at the expected location!");
-  
+
   DASTL.setAttrNameLoc(Attrs->getLoc());
   DASTL.setAttrExprOperand(Attrs->getArgAsExpr(0));
   DASTL.setAttrOperandParensRange(SourceRange());
@@ -5567,11 +5573,11 @@ Sema::GetTypeSourceInfoForDeclarator(Declarator &D, QualType T,
   }
 
   for (unsigned i = 0, e = D.getNumTypeObjects(); i != e; ++i) {
-    
+
     if (DependentAddressSpaceTypeLoc DASTL =
         CurrTL.getAs<DependentAddressSpaceTypeLoc>()) {
       fillDependentAddressSpaceTypeLoc(DASTL, D.getTypeObject(i).getAttrs());
-      CurrTL = DASTL.getPointeeTypeLoc().getUnqualifiedLoc();  
+      CurrTL = DASTL.getPointeeTypeLoc().getUnqualifiedLoc();
     }
 
     // An AtomicTypeLoc might be produced by an atomic qualifier in this
@@ -5666,13 +5672,13 @@ ParsedType Sema::ActOnObjCInstanceType(SourceLocation Loc) {
 // Type Attribute Processing
 //===----------------------------------------------------------------------===//
 
-/// BuildAddressSpaceAttr - Builds a DependentAddressSpaceType if an expression 
-/// is uninstantiated. If instantiated it will apply the appropriate address space 
+/// BuildAddressSpaceAttr - Builds a DependentAddressSpaceType if an expression
+/// is uninstantiated. If instantiated it will apply the appropriate address space
 /// to the type. This function allows dependent template variables to be used in
-/// conjunction with the address_space attribute  
+/// conjunction with the address_space attribute
 QualType Sema::BuildAddressSpaceAttr(QualType &T, Expr *AddrSpace,
                                      SourceLocation AttrLoc) {
-  if (!AddrSpace->isValueDependent()) { 
+  if (!AddrSpace->isValueDependent()) {
 
     // If this type is already address space qualified, reject it.
     // ISO/IEC TR 18037 S5.3 (amending C99 6.7.3): "No type shall be qualified
@@ -5716,8 +5722,8 @@ QualType Sema::BuildAddressSpaceAttr(QualType &T, Expr *AddrSpace,
   }
 
   // A check with similar intentions as checking if a type already has an
-  // address space except for on a dependent types, basically if the 
-  // current type is already a DependentAddressSpaceType then its already 
+  // address space except for on a dependent types, basically if the
+  // current type is already a DependentAddressSpaceType then its already
   // lined up to have another address space on it and we can't have
   // multiple address spaces on the one pointer indirection
   if (T->getAs<DependentAddressSpaceType>()) {
@@ -6044,7 +6050,7 @@ static bool handleObjCGCTypeAttr(TypeProcessingState &state,
     attr.setInvalid();
     return true;
   }
-  
+
   // Check the attribute arguments.
   if (!attr.isArgIdent(0)) {
     S.Diag(attr.getLoc(), diag::err_attribute_argument_type)
@@ -6256,7 +6262,7 @@ static bool handleMSPointerTypeQualifierAttr(TypeProcessingState &State,
         << "'__sptr'" << "'__uptr'";
       return true;
     }
-    
+
     Desugared = AT->getEquivalentType();
     AT = dyn_cast<AttributedType>(Desugared);
   }
@@ -6291,6 +6297,8 @@ bool Sema::checkNullabilityTypeSpecifier(QualType &type,
                                          SourceLocation nullabilityLoc,
                                          bool isContextSensitive,
                                          bool allowOnArrayType) {
+   // @mulle-objc@ compiler: nullability completeness is not objective-c like
+   if( ! Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
   recordNullabilitySeen(*this, nullabilityLoc);
 
   // Check for existing nullability attributes on the type.
@@ -6305,7 +6313,7 @@ bool Sema::checkNullabilityTypeSpecifier(QualType &type,
           << FixItHint::CreateRemoval(nullabilityLoc);
 
         break;
-      } 
+      }
 
       // Conflicting nullability.
       Diag(nullabilityLoc, diag::err_nullability_conflicting)
@@ -6351,7 +6359,7 @@ bool Sema::checkNullabilityTypeSpecifier(QualType &type,
       << DiagNullabilityKind(nullability, isContextSensitive) << type;
     return true;
   }
-  
+
   // For the context-sensitive keywords/Objective-C property
   // attributes, require that the type be a single-level pointer.
   if (isContextSensitive) {
@@ -6393,7 +6401,7 @@ bool Sema::checkObjCKindOfType(QualType &type, SourceLocation loc) {
 
   // Find out if it's an Objective-C object or object pointer type;
   const ObjCObjectPointerType *ptrType = type->getAs<ObjCObjectPointerType>();
-  const ObjCObjectType *objType = ptrType ? ptrType->getObjectType() 
+  const ObjCObjectType *objType = ptrType ? ptrType->getObjectType()
                                           : type->getAs<ObjCObjectType>();
 
   // If not, we can't apply __kindof.
@@ -6422,7 +6430,7 @@ bool Sema::checkObjCKindOfType(QualType &type, SourceLocation loc) {
   }
 
   // Build the attributed type to record where __kindof occurred.
-  type = Context.getAttributedType(AttributedType::attr_objc_kindof, 
+  type = Context.getAttributedType(AttributedType::attr_objc_kindof,
                                    type,
                                    equivType);
 
@@ -6523,7 +6531,7 @@ static bool distributeNullabilityTypeAttr(TypeProcessingState &state,
       }
 
       return false;
-      
+
     // Don't walk through these.
     case DeclaratorChunk::Reference:
     case DeclaratorChunk::Pipe:
@@ -7864,7 +7872,7 @@ static QualType getDecltypeForExpr(Sema &S, Expr *E) {
   } else if (auto *PE = dyn_cast<PredefinedExpr>(E)) {
     return PE->getType();
   }
-  
+
   // C++11 [expr.lambda.prim]p18:
   //   Every occurrence of decltype((x)) where x is a possibly
   //   parenthesized id-expression that names an entity of automatic

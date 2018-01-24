@@ -1504,6 +1504,9 @@ static InputKind ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
                 .Case("cuda", InputKind::CUDA)
                 .Case("c++", InputKind::CXX)
                 .Case("objective-c", InputKind::ObjC)
+                // @mulle-objc@ AAM:  .aam filename extension support >
+                .Case("objective-c-aam", InputKind::ObjCAAM)
+                // @mulle-objc@ AAM:  .aam filename extension support <
                 .Case("objective-c++", InputKind::ObjCXX)
                 .Case("renderscript", InputKind::RenderScript)
                 .Default(InputKind::Unknown);
@@ -1738,6 +1741,14 @@ void CompilerInvocation::setLangDefaults(LangOptions &Opts, InputKind IK,
     Opts.AsmPreprocessor = 1;
   } else if (IK.isObjectiveC()) {
     Opts.ObjC1 = Opts.ObjC2 = 1;
+
+  }
+
+   // @mulle-objc@ AAM:  .aam filename extension support
+  if( IK.getLanguage() == InputKind::ObjCAAM)
+  {
+     Opts.ObjCAllocsAutoreleasedObjects = 1;
+     Opts.ObjC1 = Opts.ObjC2 = 1;
   }
 
   if (LangStd == LangStandard::lang_unspecified) {
@@ -1761,7 +1772,10 @@ void CompilerInvocation::setLangDefaults(LangOptions &Opts, InputKind IK,
         LangStd = LangStandard::lang_gnu11;
       break;
     case InputKind::ObjC:
-      LangStd = LangStandard::lang_gnu11;
+    // @mulle-objc@ AAM:  .aam filename extension support ->
+    case InputKind::ObjCAAM:
+    // @mulle-objc@ C11 should be standard now
+      LangStd = LangStandard::lang_c11;
       break;
     case InputKind::CXX:
     case InputKind::ObjCXX:
@@ -1870,6 +1884,9 @@ static bool IsInputCompatibleWithStandard(InputKind IK,
 
   case InputKind::C:
   case InputKind::ObjC:
+  // @mulle-objc@ ObjCAAM >
+  case InputKind::ObjCAAM:
+  // @mulle-objc@ ObjCAAM <
   case InputKind::RenderScript:
     return S.getLanguage() == InputKind::C;
 
@@ -1902,6 +1919,10 @@ static const StringRef GetInputKindName(InputKind IK) {
     return "C";
   case InputKind::ObjC:
     return "Objective-C";
+  // @mulle-objc@ ObjCAAM >
+  case InputKind::ObjCAAM:
+    return "Objective-C AAM";
+  // @mulle-objc@ ObjCAAM <
   case InputKind::CXX:
     return "C++";
   case InputKind::ObjCXX:
@@ -2044,7 +2065,17 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
         Diags.Report(diag::err_drv_unknown_objc_runtime) << value;
     }
 
-    if (Args.hasArg(OPT_fobjc_gc_only))
+    // @mulle-objc@: handle AAM and TPS options
+    if( Args.hasArg( OPT_fno_objc_tps))
+      Opts.ObjCDisableTaggedPointers = 1;
+    if( Args.hasArg( OPT_fno_objc_fmc))
+      Opts.ObjCDisableFastMethodCalls = 1;
+    if( Args.hasArg( OPT_fobjc_trt))
+      Opts.ObjCHasThreadLocalRuntime = 1;
+
+    if( Args.hasArg( OPT_fobjc_aam))
+      Opts.ObjCAllocsAutoreleasedObjects = 1;
+    else if (Args.hasArg(OPT_fobjc_gc_only))
       Opts.setGC(LangOptions::GCOnly);
     else if (Args.hasArg(OPT_fobjc_gc))
       Opts.setGC(LangOptions::HybridGC);

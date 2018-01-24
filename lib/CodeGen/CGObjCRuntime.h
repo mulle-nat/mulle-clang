@@ -32,6 +32,7 @@ namespace llvm {
 }
 
 namespace clang {
+  class Parser;
 namespace CodeGen {
   class CodeGenFunction;
 }
@@ -58,6 +59,11 @@ namespace CodeGen {
 
 // FIXME: Several methods should be pure virtual but aren't to avoid the
 // partially-implemented subclass breaking.
+struct CGObjCRuntimeLifetimeMarker
+{
+   llvm::Value  *SizeV;
+   llvm::Value  *Addr;
+};
 
 /// Implements runtime-specific code generation functions.
 class CGObjCRuntime {
@@ -143,13 +149,24 @@ public:
 
   /// Generate a constant string object.
   virtual ConstantAddress GenerateConstantString(const StringLiteral *) = 0;
-  
+
+   // @mulle-objc@: emit constant selectors
+   /// Generate a constant selector for participating runtimes
+  virtual llvm::Constant  *GenerateConstantSelector(Selector);
+  virtual llvm::Constant  *GenerateConstantProtocol(ObjCProtocolDecl *protocol);
+   // @mulle-objc@: emit constant selectors <-
+
   /// Generate a category.  A category contains a list of methods (and
   /// accompanying metadata) and a list of protocols.
   virtual void GenerateCategory(const ObjCCategoryImplDecl *OCD) = 0;
 
   /// Generate a class structure for this class.
   virtual void GenerateClass(const ObjCImplementationDecl *OID) = 0;
+
+  /// @mulle-objc@: forward declarations to runtime
+  /// Generate a  forward class for this class.
+  virtual void GenerateForwardClass(const ObjCInterfaceDecl *OID);
+  /// @mulle-objc@: forward declarations to runtime end
 
   /// Register an class alias.
   virtual void RegisterAlias(const ObjCCompatibleAliasDecl *OAD) = 0;
@@ -168,6 +185,33 @@ public:
                       const ObjCInterfaceDecl *Class = nullptr,
                       const ObjCMethodDecl *Method = nullptr) = 0;
 
+   // @mulle-objc@ MetaABI: Callback to generate LLVM method argument list 
+   virtual CGObjCRuntimeLifetimeMarker   GenerateCallArgs( CodeGenFunction &CGF,
+                                                           CallArgList &Args,
+                                                           const ObjCMethodDecl *method,
+                                                           const ObjCMessageExpr *Expr);
+
+   virtual CGObjCRuntimeLifetimeMarker   ConvertToMetaABIArgsIfNeeded( CodeGenFunction &CGF,
+                                                                       const ObjCMethodDecl *method,
+                                                                       CallArgList &Args);
+   
+  /// @mulle-objc@ MetaABI: callback in special cases to create param decl
+   virtual CodeGen::RValue  EmitFastEnumeratorCall( CodeGen::CodeGenFunction &CGF,
+                                                    ReturnValueSlot ReturnSlot,
+                                                    QualType ResultType,
+                                                    Selector Sel,
+                                                    llvm::Value *Receiver,
+                                                    llvm::Value *StatePtr,
+                                                    QualType StateTy,
+                                                    llvm::Value *ItemsPtr,
+                                                    QualType ItemsTy,
+                                                    llvm::Value *Count,
+                                                    QualType CountTy);
+
+  /// @mulle-objc@ compiler: pass through Parser to ObjCRuntime when finished
+  virtual void      ParserDidFinish( clang::Parser *P) {};
+   
+   
   /// Generate an Objective-C message send operation to the super
   /// class initiated in a method for Class and with the given Self
   /// object.
@@ -304,6 +348,7 @@ public:
 //TODO: This should include some way of selecting which runtime to target.
 CGObjCRuntime *CreateGNUObjCRuntime(CodeGenModule &CGM);
 CGObjCRuntime *CreateMacObjCRuntime(CodeGenModule &CGM);
+CGObjCRuntime *CreateMulleObjCRuntime(CodeGenModule &CGM);
 }
 }
 #endif

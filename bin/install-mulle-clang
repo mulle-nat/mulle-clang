@@ -523,7 +523,8 @@ build_cmake()
          exekutor tar xfz "cmake-${CMAKE_PATCH_VERSION}.tar.gz"
          exekutor cd "cmake-${CMAKE_PATCH_VERSION}"
          exekutor ./configure "--prefix=${PREFIX}"
-         exekutor ${MAKE} install || exit 1
+         # don't use ninja here
+         exekutor make -B -j `get_core_count` install || exit 1
 
          hash -r  # apparently needed...
       exekutor cd "${OWD}"
@@ -628,7 +629,7 @@ get_mulle_clang_version()
       fail "mulle-clang not downloaded yet"
    fi
 
-   if [ ! -f "${src}/install-mulle-clang.sh" ]
+   if [ ! -f "${src}/bin/install-mulle-clang" ]
    then
       fail "No MULLE_CLANG_VERSION version found in \"${src}\""
    fi
@@ -636,12 +637,12 @@ get_mulle_clang_version()
    local version
    local rc
 
-   version="`head -50 "${src}/install-mulle-clang.sh" \
+   version="`head -50 "${src}/bin/install-mulle-clang" \
       | egrep '^MULLE_CLANG_VERSION=' \
       | head -1 \
       | sed 's/.*\"\(.*\)\".*/\1/'`"
 
-   rc="`head -50 "${src}/install-mulle-clang.sh" \
+   rc="`head -50 "${src}/bin/install-mulle-clang" \
       | egrep '^MULLE_CLANG_RC=' \
       | head -1 \
       | sed 's/.*\"\(.*\)\".*/\1/'`"
@@ -1328,7 +1329,7 @@ install_mulle_clang_link()
    then
       log_warning "\"${MULLE_CLANG_INSTALL_PREFIX}/bin/clang${EXE_EXTENSION}\" not built yet"
       fail "download and build mulle-clang with
-   ./install-mulle-clang.sh
+   ./install-mulle-clang
 before you can install"
    fi
 
@@ -1361,7 +1362,7 @@ install_mulle_lldb_link()
    if [ ! -f "${MULLE_CLANG_INSTALL_PREFIX}/bin/lldb${EXE_EXTENSION}" ]
    then
       fail "download and build mulle-lldb with
-   ./install-mulle-clang.sh
+   ./bin/install-mulle-clang
 before you can install"
    fi
 

@@ -2162,7 +2162,7 @@ static bool unionHasUniqueObjectRepresentations(const ASTContext &Context,
     if (FieldSize != UnionSize)
       return false;
   }
-  return true;
+  return !RD->field_empty();
 }
 
 static bool isStructEmpty(QualType Ty) {

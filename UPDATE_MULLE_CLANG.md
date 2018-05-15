@@ -25,7 +25,7 @@ Assume you have 4.0.0 and want to upgrade to 4.1.0. The branch scheme is
 assumed to be :
 
 LLVM         |  Mulle
--------------+-----------
+-------------|-----------
 `release_39` | `mulle_objclang_39`
 `release_40` | `mulle_objclang_40`
 `release_41` | `mulle_objclang_41`
@@ -91,5 +91,4 @@ NEW_MULLE_DEV_BRANCH=mulle_objclang_41
    #
    git branch -d "tmp_${NEW_MULLE_DEV_BRANCH}"
 )
-
-
+```

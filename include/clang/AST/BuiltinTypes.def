@@ -162,7 +162,7 @@ BUILTIN_TYPE(ObjCSel, ObjCBuiltinSelTy)
 
 /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
 //
-// TODO: thinks would be generally better if there was no BUILTIN
+// TODO: I think, it would be generally better if there was no BUILTIN
 // type for ObjCSel and ObjCProtocol, just a typedef to uint32_t
 //
 BUILTIN_TYPE(ObjCProtocol, ObjCBuiltinProtocolTy)

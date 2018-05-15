@@ -11,15 +11,15 @@
 BY_THE_BOOK="YES"
 
 # our compiler version
-MULLE_CLANG_VERSION="5.0.0.2"
+MULLE_CLANG_VERSION="6.0.0.0"
 #MULLE_CLANG_RC="5"
-MULLE_LLDB_VERSION="5.0.0.0"
+MULLE_LLDB_VERSION="6.0.0.0"
 #MULLE_LLDB_RC="4"
 
 
 # required LLVM version
 LLVM_VERSION="6.0.0"
-LLVM_RC="1" # leave empty for releases
+# LLVM_RC="5" # leave empty for releases
 
 CMAKE_VERSION_MAJOR="3"
 CMAKE_VERSION_MINOR="5"

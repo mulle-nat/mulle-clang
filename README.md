@@ -2,9 +2,9 @@
 
 # mulle-clang
 
-This is an Objective-C compiler based on clang 5.0, written for the
+This is an Objective-C compiler based on clang 6.0, written for the
 [mulle-objc](//www.mulle-kybernetik.com/weblog/2015/mulle_objc_a_new_objective_c_.html)
-runtime. It corresponds to mulle-objc-runtime v0.11 or better.
+runtime. It corresponds to mulle-objc-runtime v0.12 or better.
 
 > See [README.txt](README.txt) for more information about clang
 
@@ -165,6 +165,8 @@ brew install codeon-gmbh/software/mulle-clang
 
 -->
 
+<!--
+
 ### Linux
 
 ### Ubuntu Linux
@@ -209,10 +211,12 @@ shasum -b -a 256 | 75c5f1f4d75bd664ea9b932390113eb31cd80ad2bfbc30e15c7b3a27dd344
 ### FreeBSD, Windows and others
 
 
+-->
+
 * [How to Build](BUILD_MULLE_CLANG.md)
 
 Afterwards head on over to [mulle-objc](//github.com/mulle-objc) to get the
-Objective-C libraries.
+runtime libraries.
 
 
 ## Author

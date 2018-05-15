@@ -7,14 +7,17 @@
 
 ### Prerequisites
 
-You need a fairly current Unix, like Linux, OS X or FreeBSD or you can use Windows.
+You need a fairly current Unix, like Linux, OS X or FreeBSD or you can use
+Windows.
 
 Locate a place on your filesystem, where you have at least 8 GB disk space free
 after installing all pre-requisites. You probably need not bother to try, if
 you have less than 6 GB of RAM. Or you risk seeing
-`virtual memory exhausted: Cannot allocate memory`, especially when building debug binaries.
+`virtual memory exhausted: Cannot allocate memory`, especially when building
+debug binaries.
 
-A docker container usually only has 10 GB of space. That may not be enough to build the compiler!
+A docker container usually only has 10 GB of space. That may not be enough to
+build the compiler!
 
 If you are configuring a virtual machine, give it some more cores!
 
@@ -40,7 +43,7 @@ as this project is huge.
 ```
 mkdir mulle-clang
 cd mulle-clang
-curl -L -O "https://raw.githubusercontent.com/Codeon-GmbH/mulle-clang/mulle_objclang_50/install-mulle-clang.sh"
+curl -L -O "https://raw.githubusercontent.com/Codeon-GmbH/mulle-clang/mulle_objclang_60/bin/install-mulle-clang"
 ```
 
 2. Build the compiler. Here is an example, where the compiler is installed into

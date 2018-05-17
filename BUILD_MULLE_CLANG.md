@@ -1,11 +1,12 @@
 # How to build mulle-clang
 
-## What you get
+Executable          | Description
+--------------------|--------------------------------
+`mulle-clang`       | The compiler
+`mulle-scan-build`  | The analyzer frontend
 
-* `mulle-clang` the mulle-clang the binary in `/usr/local/bin`.
 
-
-### Prerequisites
+## Prerequisites
 
 You need a fairly current Unix, like Linux, OS X or FreeBSD or you can use
 Windows.
@@ -22,7 +23,7 @@ build the compiler!
 If you are configuring a virtual machine, give it some more cores!
 
 
-### Installing on Linux or FreeBSD
+## Installing on Linux or FreeBSD
 
 You need the **bash** shell and you may want to get **sudo** happening to
 install packages (or run the script as **root**). bash is already present.
@@ -31,7 +32,7 @@ install packages (or run the script as **root**). bash is already present.
 <a name="common-generic"></a>
 ### Common generic instructions
 
-Build and install using the `install-mulle-clang.sh` script.
+Build and install using the `install-mulle-clang` script.
 
 The script downloads and builds the compiler and the dependencies. If your
 machine is puny and weak, try to get pre-built binary packages from somewhere
@@ -50,17 +51,16 @@ curl -L -O "https://raw.githubusercontent.com/Codeon-GmbH/mulle-clang/mulle_objc
    `opt` and the symlink to the compiler is installed in `/usr/local/bin`:
 
 ```
-chmod 755 install-mulle-clang.sh
-./install-mulle-clang.sh --clang-prefix /opt
-./install-mulle-clang.sh install --symlink-prefix /usr/local
+chmod 755 install-mulle-clang
+./install-mulle-clang --clang-prefix /opt
+./install-mulle-clang install --symlink-prefix /usr/local
 ```
 
 Depending on your platform, the script will ask you to install some more
 prerequisites.
 
 
-
-### Windows: Installing further prerequisites
+## Windows: Installing further prerequisites
 
 >
 > This method uses [MINGW](http://mingw.org/) on Windows. Things will
@@ -77,7 +77,7 @@ characters and underscores.
 * Nat! : bad
 * i am nat : very bad
 
-### Installing on Windows 10 (probably also 7 and 8)
+## Installing on Windows 10 (probably also 7 and 8)
 
 * Install [Visual Studio 2015 Community Edition](//beta.visualstudio.com/downloads/) or better (free). Make sure that you install Windows C++ support. Also add git support.
 * [Git for Windows](//git-scm.com/download/win) is included in VS 2015, make sure it's there

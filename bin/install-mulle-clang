@@ -12,7 +12,7 @@ BY_THE_BOOK="YES"
 
 # our compiler version
 MULLE_CLANG_VERSION="6.0.0.0"
-#MULLE_CLANG_RC="5"
+#MULLE_CLANG_RC="1"
 MULLE_LLDB_VERSION="6.0.0.0"
 #MULLE_LLDB_RC="4"
 
@@ -1439,6 +1439,45 @@ uninstall_links()
 }
 
 
+usage()
+{
+   cat <<EOF >&2
+
+Usage:
+   install-mulle-clang [options]
+
+   Build llvm and mulle-clang/mulle-lld. The version of llvm and mulle-clang
+   being built is hardcoded into this script (see top).
+
+Options:
+EOF
+   (
+      cat <<EOF
+   --all-in-one         : place mulle-clang inside src/llvm/tools (default)
+   --no-clang           : do not build clang
+   --no-lldb            : do not build mulle-lldb
+   --no-ninja           : use make instead of ninja
+   --separate           : place mulle-clang outside of src/llvm (implied -no-lldb)
+   -n                   : dry run
+   -v                   : be verbose
+EOF
+      if [ "${VERBOSE}" = "YES" ]
+      then
+      cat <<EOF
+   --clang-prefix <dir> : install prefix for clang
+   --lldb-prefix <dir>  : install prefix for lldb
+   --llvm-prefix <dir>  : install prefix for llvm
+   --no-libcxx          : do not build libcxx
+   --no-patch-llvm      : do not patch llvm for better inlining code
+   --prefix <dir>       : default install prefix
+   --vs32bit            : compile for Visual Studo 32 bit
+EOF
+      fi
+   ) | sort >&2
+
+   exit 1
+}
+
 
 main()
 {
@@ -1457,6 +1496,10 @@ main()
    while [ $# -ne 0 ]
    do
       case "$1" in
+         -h|--help|help)
+            usage
+         ;;
+
          -t|--trace)
             set -x
          ;;
@@ -1497,7 +1540,7 @@ main()
             BUILD_CLANG="YES"
          ;;
 
-         # can be usefule when migrating to new llvm version
+         # can be usefue when migrating to new llvm version
          --no-clang)
             BUILD_CLANG="NO"
          ;;
@@ -1564,7 +1607,6 @@ main()
             shift
             SYMLINK_PREFIX="$1"
          ;;
-
 
          --no-ninja)
             OPTION_NINJA="NO"

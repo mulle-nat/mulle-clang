@@ -1301,7 +1301,7 @@ namespace {
                                                       const ObjCMethodDecl *method,
                                                       const ObjCMessageExpr *expr) override;
       QualType   CreateVoid5PtrTy( void);
-      LValue     GenerateAllocaedUnion( CodeGenFunction &CGF,
+      LValue     GenerateAlloca( CodeGenFunction &CGF,
                                         RecordDecl *UD);
 
       RecordDecl   *CreateMetaABIUnionDecl( CodeGenFunction &CGF,
@@ -2530,7 +2530,7 @@ CGObjCMulleRuntime::EmitFastEnumeratorCall( CodeGen::CodeGenFunction &CGF,
 
    RecordDecl  *RD    = CreateMetaABIRecordDecl( FastEnumSel, ArrayRef<QualType>( Types, 3));
    RecordDecl  *UD    = CreateMetaABIUnionDecl( CGF, RD, nullptr);
-   LValue       Union = GenerateAllocaedUnion( CGF, UD);
+   LValue       Union = GenerateAlloca( CGF, UD);
 
    uint64_t     size = get_size_of_type( &CGM, Union.getType());
    llvm::Type   *UnionLLVMType = CGF.ConvertTypeForMem( Union.getType());
@@ -3463,25 +3463,25 @@ RecordDecl   *CGObjCMulleRuntime::CreateMetaABIUnionDecl( CodeGenFunction &CGF,
 }
 
 
-LValue  CGObjCMulleRuntime::GenerateAllocaedUnion( CodeGenFunction &CGF,
-                                                   RecordDecl *UD)
+LValue  CGObjCMulleRuntime::GenerateAlloca( CodeGenFunction &CGF,
+                                            RecordDecl *UD)
 {
-   QualType     unionTy = CGM.getContext().getTagDeclType( UD);
+   QualType Ty = CGM.getContext().getTagDeclType( UD);
 
    // now alloca the union
-   Address  allocaed = CGF.CreateMemTemp( unionTy, "_args");  // leak ?
-   LValue   Union  = CGF.MakeNaturalAlignAddrLValue( allocaed.getPointer(), unionTy);
+   Address  allocaed = CGF.CreateMemTemp( Ty, "_args");  // leak ?
+   LValue   Alloca  = CGF.MakeNaturalAlignAddrLValue( allocaed.getPointer(), Ty);
 
-   return( Union);
+   return( Alloca);
 }
 
 
 bool CGObjCMulleRuntime::OptimizeReuseParam( CodeGenFunction &CGF,
-                                            CallArgList &Args,
-                                            const ObjCMessageExpr *Expr,
-                                            RecordDecl   *RD,
-                                            Address  RecordAddress,
-                                            CGObjCRuntimeLifetimeMarker &Marker)
+                                             CallArgList &Args,
+                                             const ObjCMessageExpr *Expr,
+                                             RecordDecl   *RD,
+                                             Address  RecordAddress,
+                                             CGObjCRuntimeLifetimeMarker &Marker)
 {
    const ObjCMethodDecl *parent;
 
@@ -3531,7 +3531,7 @@ bool CGObjCMulleRuntime::OptimizeReuseParam( CodeGenFunction &CGF,
    //
 
    if( ! param_unused_after_expr( const_cast< ObjCMethodDecl *>( parent),
-                                  const_cast<ObjCMessageExpr *>( Expr)))
+                                  const_cast< ObjCMessageExpr *>( Expr)))
    {
       // fprintf( stderr, "reuse denied\n");
       return( false);
@@ -3539,26 +3539,29 @@ bool CGObjCMulleRuntime::OptimizeReuseParam( CodeGenFunction &CGF,
    // fprintf( stderr, "can reuse\n");
 
    //
-   // nice we can substitute _param, so what we do is
-   // memcpy over the contents of alloca into it
-   // the optimizer can optimize the alloca away then
+   // nice we can substitute _param
+   //
+   // So we memcpy the contents of the already allocated alloca into it.
+   // Then tell the compiler that the previously allocated alloca is dead
+   // it will optimize the alloca away
    //
    ImplicitParamDecl  *D = parent->getParamDecl();
 
    DeclarationNameInfo NameInfo( D->getDeclName(), SourceLocation());
-
+   QualType ptrTy = CGM.getContext().getPointerType( parent_info.recTy);
    DeclRefExpr *E = DeclRefExpr::Create( CGM.getContext(),
-                                        NestedNameSpecifierLoc(),
-                                        SourceLocation(),
-                                        D,
-                                        false,
-                                        NameInfo,
-                                        parent_info.recTy,
-                                        VK_LValue);
+                                         NestedNameSpecifierLoc(),
+                                         SourceLocation(),
+                                         D,
+                                         false,
+                                         NameInfo,
+                                         ptrTy,
+                                         VK_LValue);
 
    LValue ParentRecord = CGF.EmitLValue( E);
    // this next emit is needed, weird llvmism i dont understand
-   RValue loaded       = CGF.EmitLoadOfLValue(ParentRecord, SourceLocation());
+//   LValue field        = CGF.EmitLValueForField( ParentRecord, *PRD->field_begin());
+   RValue loaded       = CGF.EmitLoadOfLValue( ParentRecord, SourceLocation());
 
    // only memcpy, if there are actual parameters
    CGF.EmitAggregateCopy( Address( loaded.getScalarVal(), CGM.getPointerAlign()),
@@ -3566,7 +3569,7 @@ bool CGObjCMulleRuntime::OptimizeReuseParam( CodeGenFunction &CGF,
                           record_info.recTy,
                           false);
 
-   // dont need the alloca anymore
+   // dont need the original alloca anymore
    if( Marker.SizeV)
    {
       CGF.EmitLifetimeEnd( Marker.SizeV, Marker.Addr);
@@ -3586,7 +3589,7 @@ LValue  CGObjCMulleRuntime::GenerateMetaABIRecordAlloca( CodeGenFunction &CGF,
    RecordDecl *UD = CreateMetaABIUnionDecl( CGF,
                                            RD,
                                            RV);
-   LValue Union = GenerateAllocaedUnion( CGF, UD);
+   LValue Union = GenerateAlloca( CGF, UD);
 
    //
    // specify beginning of life for this alloca
@@ -3788,7 +3791,6 @@ CGObjCRuntimeLifetimeMarker  CGObjCMulleRuntime::GenerateCallArgs( CodeGenFuncti
    }
 
    LValue   Record = GenerateMetaABIRecordAlloca( CGF, RD, RV, Marker);
-
    PushArgumentsIntoRecord( CGF, RD, Record, Expr);
 
    //
@@ -3801,6 +3803,7 @@ CGObjCRuntimeLifetimeMarker  CGObjCMulleRuntime::GenerateCallArgs( CodeGenFuncti
       if( OptimizeReuseParam( CGF, Args, Expr, RD, Record.getAddress(), Marker))
          return( Marker);
    }
+   
    // we are always pushing a void through mulle_objc_calls
    Args.add( RValue::get( Record.getPointer()), CGM.getContext().VoidPtrTy);
    return( Marker);

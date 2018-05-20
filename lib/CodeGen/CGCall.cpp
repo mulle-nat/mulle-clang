@@ -464,7 +464,7 @@ CodeGenTypes::arrangeObjCMessageSendSignature(const ObjCMethodDecl *MD,
   argTys.push_back(Context.getCanonicalParamType(receiverType));
   argTys.push_back(Context.getCanonicalParamType(Context.getObjCSelType()));
 
-   // @mulle-objc@ MetaABI: Hack ObjCMessageSendSignature
+   // @mulle-objc@ MetaABI: Hack ObjCMessageSendSignature >
    if( Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
    {
       RecordDecl *RD = MD->getParamRecord();
@@ -474,21 +474,29 @@ CodeGenTypes::arrangeObjCMessageSendSignature(const ObjCMethodDecl *MD,
          QualType PtrTy = Context.getPointerType( RecTy);
 
          argTys.push_back( Context.getCanonicalParamType( PtrTy));
+
+         // push an empty one
+         extParamInfos.push_back( FunctionProtoType::ExtParameterInfo());
       }
       else
          if( MD->isMetaABIVoidPointerParam())
+         {
             argTys.push_back( Context.getCanonicalParamType( Context.VoidPtrTy));
+            // push an empty one
+            extParamInfos.push_back( FunctionProtoType::ExtParameterInfo());
+         }
 
       // fix up calling convention for MD, to be like mulle_objc_object_inline_call
       // it would be nice to not just use the default, but use the actual one
       // with which mulle_objc_object_inline_call was declared
       callConv = Context.getDefaultCallingConvention( false, false);
 
-      // @mulle-objc@ MetaABI: fix returnType to void * (Part I)
+      // @mulle-objc@ MetaABI: fix returnType to void * (Part I) >
       if( MD->getReturnType()->isVoidType())
          returnType = Context.VoidTy;
       else
          returnType = Context.VoidPtrTy;
+      // @mulle-objc@ MetaABI: fix returnType to void * (Part I) <
    }
    else
    {
@@ -505,8 +513,11 @@ CodeGenTypes::arrangeObjCMessageSendSignature(const ObjCMethodDecl *MD,
       bool IsWindows = getContext().getTargetInfo().getTriple().isOSWindows();
       callConv = getCallingConventionForDecl( MD, IsWindows);
 
+      // @mulle-objc@ MetaABI: fix returnType to void * (Part II) >
       returnType = GetReturnType(MD->getReturnType());
+      // @mulle-objc@ MetaABI: fix returnType to void * (Part II) <
    }
+   // @mulle-objc@ MetaABI: Hack ObjCMessageSendSignature <
 
   FunctionType::ExtInfo einfo;
 
@@ -520,10 +531,11 @@ CodeGenTypes::arrangeObjCMessageSendSignature(const ObjCMethodDecl *MD,
   RequiredArgs required =
     (MD->isVariadic() ? RequiredArgs(argTys.size()) : RequiredArgs::All);
 
-  // @mulle-objc@ MetaABI: fix returnType to void * (Part II)
+  // @mulle-objc@ MetaABI: fix returnType to void * (Part III) >
   return arrangeLLVMFunctionInfo(
-      GetReturnType(MD->getReturnType()), /*instanceMethod=*/false,
+      returnType, /*instanceMethod=*/false,
       /*chainCall=*/false, argTys, einfo, extParamInfos, required);
+  // @mulle-objc@ MetaABI: fix returnType to void * (Part III) <
 }
 
 const CGFunctionInfo &

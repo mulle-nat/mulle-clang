@@ -4573,9 +4573,13 @@ unsigned int   Sema::metaABIDescription( SmallVector<ParmVarDecl*, 16> &Params,
 {
    unsigned int   desc;
    
-   desc = resultType->isVoidType() ? 0 : MetaABIVoidPtrRval;
-   if( Context.typeNeedsMetaABIAlloca( resultType))
-      desc = MetaABIRvalAsStruct;
+   desc = 0;
+   if( ! resultType->isVoidType())
+   {
+      desc = MetaABIVoidPtrRval;
+      if( Context.typeNeedsMetaABIAlloca( resultType))
+         desc = MetaABIRvalAsStruct;  // must be as struct then
+   }
    
    switch( Params.size())
    {

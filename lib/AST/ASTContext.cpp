@@ -6224,6 +6224,13 @@ void ASTContext::getObjCEncodingForType(QualType T, std::string& S,
 // 3. if sizeof(x) >sizeof( void *), it's in _param
 bool   ASTContext::typeNeedsMetaABIAlloca( QualType type)
 {
+   if( type->isIncompleteType())
+   {
+      if( type->isVoidType())
+         return( false);
+      return( true);
+   }
+   
    if( getTypeSize( type) > getTypeSize( VoidPtrTy))
       return( true);
    // should log this, as this is unusual

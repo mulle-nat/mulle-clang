@@ -19,12 +19,12 @@ get_mulle_clang_version()
       fail "mulle-clang not downloaded yet"
    fi
 
-   if [ ! -f "${src}/install-mulle-clang.sh" ]
+   if [ ! -f "${src}/bin/install-mulle-clang" ]
    then
       fail "No MULLE_CLANG_VERSION version found in \"${src}\""
    fi
 
-   grep MULLE_CLANG_VERSION "${src}/install-mulle-clang.sh" | head -1 | sed 's/.*\"\(.*\)\"/\1/'
+   grep MULLE_CLANG_VERSION "${src}/bin/install-mulle-clang" | head -1 | sed 's/.*\"\(.*\)\"/\1/'
 }
 
 
@@ -52,13 +52,13 @@ get_clang_vendor()
    local compiler_version
    local runtime_load_version
 
-   compiler_version="`get_mulle_clang_version "${src}"`"
+   compiler_version="`get_mulle_clang_version "${src}"`" || exit 1
    if [ -z "${compiler_version}" ]
    then
       fail "Could not determine mulle-clang version"
    fi
 
-   runtime_load_version="`get_runtime_load_version "${src}"`"
+   runtime_load_version="`get_runtime_load_version "${src}"`" || exit 1
    if [ -z "${runtime_load_version}" ]
    then
       fail "Could not determine runtime load version"

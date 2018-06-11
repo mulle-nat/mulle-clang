@@ -3099,10 +3099,9 @@ static size_t  rounded_type_length( ASTContext *context, QualType type1, QualTyp
 
 struct struct_info
 {
-   QualType    recTy;
-   QualType    ptrTy;
-   llvm::Type  *llvmType;
-   size_t      size;
+   QualType   recTy;
+   QualType   ptrTy;
+   size_t     size;
 };
 
 static uint64_t  get_size_of_type( CodeGenModule *CGM, QualType type)
@@ -3116,9 +3115,8 @@ static uint64_t  get_size_of_type( CodeGenModule *CGM, QualType type)
 
 static void  fill_struct_info_from_recTy( struct struct_info *info, CodeGenModule *CGM)
 {
-   info->ptrTy    = CGM->getContext().getPointerType( info->recTy);
-   info->llvmType = CGM->getTypes().ConvertTypeForMem( info->recTy);
-   info->size     = CGM->getDataLayout().getTypeAllocSize( info->llvmType);
+   info->ptrTy = CGM->getContext().getPointerType( info->recTy);
+   info->size  = get_size_of_type( CGM, info->recTy);
 }
 
 

@@ -1,0 +1,29 @@
+{
+   // See https://go.microsoft.com/fwlink/?LinkId=733558
+   // for the documentation about the tasks.json format
+   "version": "2.0.0",
+   "tasks": [
+      {
+         "label": "mulle-clang",
+         "type": "shell",
+         "command": "cd ../.. ; ./src/mulle-clang/bin/install-mulle-clang --clang-debug --no-warn --no-lldb --separate",
+         "problemMatcher": [
+            "$gcc"
+         ],
+         "group": {
+            "kind": "build",
+            "isDefault": true
+         }
+      }, 
+      {
+         "label": "clean",
+         "type": "shell",
+         "command": "rm -rf ../../build/mulle-clang.d",
+         "problemMatcher": [
+         ],
+         "group": {
+            "kind": "build",
+         }
+      }   
+   ]
+}

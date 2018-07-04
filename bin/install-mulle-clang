@@ -11,7 +11,7 @@
 BY_THE_BOOK="YES"
 
 # our compiler version
-MULLE_CLANG_VERSION="6.0.0.1"
+MULLE_CLANG_VERSION="6.0.0.2"
 #MULLE_CLANG_RC="1"
 MULLE_LLDB_VERSION="6.0.0.0"
 #MULLE_LLDB_RC="4"
@@ -713,6 +713,17 @@ setup_build_environment()
       MAKE="ninja"
       MAKEFILE="build.ninja"
       MAKE_INSTALL_COMMAND="install"
+
+      local cores
+      local loadavg
+
+      cores="`get_core_count`"
+      loadavg="`expr $cores / 4`"
+      loadavg="`expr $cores - ${loadavg}`"
+      if [ "${loadavg}" -gt 0 ]
+      then
+         MAKE_FLAGS="-l ${loadavg}"
+      fi
       MAKE_BUILD_COMMAND=""
    fi
 

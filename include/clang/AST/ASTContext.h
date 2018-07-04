@@ -1889,7 +1889,7 @@ public:
    /// @mulle-objc@ compiler: change type of getObjCPROTOCOLDecl
     if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
       return getTypeDeclType( (TypedefDecl *) getObjCPROTOCOLDecl());
-    return getObjCInterfaceType( (ObjCInterfaceDecl *) getObjCPROTOCOLDecl());
+    return getObjCInterfaceType(getObjCProtocolDecl());
   }
 
   /// \brief Retrieve the C type declaration corresponding to the predefined

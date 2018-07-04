@@ -6946,8 +6946,8 @@ TypedefDecl *ASTContext::getObjCClassDecl() const {
   return ObjCClassDecl;
 }
 
-/// @mulle-objc@ uniqueid: change type of PROTOCOL >
-/// INCOMPATIBLE! biw
+/// @mulle-objc@ uniqueid: change type of PROTOCOL to pointer >
+/// INCOMPATIBLE! 
 TypedefDecl *ASTContext::getObjCPROTOCOLDecl() const {
   if (!ObjCPROTOCOLDecl) {
      QualType T = getLangOpts().ObjCRuntime.hasConstantProtocol()
@@ -6958,8 +6958,23 @@ TypedefDecl *ASTContext::getObjCPROTOCOLDecl() const {
 
   return ObjCPROTOCOLDecl;
 }
-/// @mulle-objc@ uniqueid: change type of PROTOCOL <
+/// @mulle-objc@ uniqueid: change type of PROTOCOL to pointer <
+/// the method below is not used for mulle-objc
 
+ ObjCInterfaceDecl *ASTContext::getObjCProtocolDecl() const {
+   if (!ObjCProtocolClassDecl) {
+     ObjCProtocolClassDecl 
+       = ObjCInterfaceDecl::Create(*this, getTranslationUnitDecl(), 
+                                   SourceLocation(),
+                                   &Idents.get("Protocol"),
+                                   /*typeParamList=*/nullptr,
+                                   /*PrevDecl=*/nullptr,
+                                   SourceLocation(), true);    
+   }
+   
+   return ObjCProtocolClassDecl;
+ }
+ 
 //===----------------------------------------------------------------------===//
 // __builtin_va_list Construction Functions
 //===----------------------------------------------------------------------===//

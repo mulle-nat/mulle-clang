@@ -271,14 +271,6 @@ emit_llvm_loop_utils_patch()
    cat <<EOF
    --- lib/Transforms/Utils/LoopUtils.cpp 2017-09-13 15:16:32.000000000 +0200
 +++ /tmp/LoopUtils.cpp  2017-09-13 15:14:27.000000000 +0200
-@@ -23,7 +23,6 @@
- #include "llvm/Analysis/ScalarEvolutionExpander.h"
- #include "llvm/Analysis/ScalarEvolutionExpressions.h"
- #include "llvm/Analysis/TargetTransformInfo.h"
--#include "llvm/Analysis/ValueTracking.h" // (nat) added this
- #include "llvm/IR/Dominators.h"
- #include "llvm/IR/Instructions.h"
- #include "llvm/IR/Module.h"
 @@ -1118,8 +1117,6 @@
 
  /// Returns true if the instruction in a loop is guaranteed to execute at least

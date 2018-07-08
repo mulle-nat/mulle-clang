@@ -6223,7 +6223,7 @@ def err_mulle_error_missing_property_ivar_decl : Error<
 def err_mulle_objc_preprocessor_not_integer_value : Error<
   "special preprocessor directives for the mulle-objc runtime must be integers only">;
 def err_mulle_objc_preprocessor_missing_include : Error<
-  "missing #include <mulle_objc_runtime/mulle_objc_runtime> in compilation. Can not emit runtime information">;
+  "missing #include <mulle-objc-runtime/mulle-objc-runtime> in compilation. Can not emit runtime information">;
 def err_mulle_objc_runtime_version_mismatch: Error<
    "the runtime load version %0 is not compatible with this compiler %1">;
 def err_mulle_objc_hash_invalid: Error<

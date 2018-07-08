@@ -1203,7 +1203,8 @@ void ASTContext::InitBuiltinTypes(const TargetInfo &Target,
   InitBuiltinType(ObjCBuiltinClassTy, BuiltinType::ObjCClass);
   InitBuiltinType(ObjCBuiltinSelTy, BuiltinType::ObjCSel);
   /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
-  InitBuiltinType(ObjCBuiltinProtocolTy, BuiltinType::ObjCProtocol);
+  ///if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+    InitBuiltinType(ObjCBuiltinProtocolTy, BuiltinType::ObjCProtocol);
   /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
 
   if (LangOpts.OpenCL) {

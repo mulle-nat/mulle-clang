@@ -598,28 +598,32 @@ llvm::DIType *CGDebugInfo::CreateType(const BuiltinType *BT) {
                                            "objc_class", TheCU,
                                            getOrCreateMainFile(), 0);
 
-     // @mulle-objc@ :: hack out isa ->
-#if 0
+     // @mulle-objc@ :: hack out isa from debug info ->
+    if( CGM.getContext().getLangOpts().ObjCRuntime.hasMulleMetaABI())
+    {
+       ObjTy = DBuilder.createStructType(
+           TheCU, "objc_object", getOrCreateMainFile(), 0, 0, 0,
+           llvm::DINode::FlagZero, nullptr, llvm::DINodeArray());
+
+      return ObjTy;
+    }
+    // @mulle-objc@ :: hack out isa from debug info <-
     unsigned Size = CGM.getContext().getTypeSize(CGM.getContext().VoidPtrTy);
-   
+
     auto *ISATy = DBuilder.createPointerType(ClassTy, Size);
-#endif
+
     ObjTy = DBuilder.createStructType(
         TheCU, "objc_object", getOrCreateMainFile(), 0, 0, 0,
         llvm::DINode::FlagZero, nullptr, llvm::DINodeArray());
 
-     // @mulle-objc@ :: hack out isa part 2
-#if 0
     DBuilder.replaceArrays(
         ObjTy, DBuilder.getOrCreateArray(&*DBuilder.createMemberType(
                    ObjTy, "isa", getOrCreateMainFile(), 0, Size, 0, 0,
                    llvm::DINode::FlagZero, ISATy)));
-#endif
-     // @mulle-objc@ :: hack out isa both parts <-
     return ObjTy;
   }
 
-  // @mulle-objc@ :: we keep it fake like this for the lldb debugger
+  // @mulle-objc@ :: we keep SEL fake like this for the lldb debugger
   case BuiltinType::ObjCSel: {
     if (!SelTy)
       SelTy = DBuilder.createForwardDecl(llvm::dwarf::DW_TAG_structure_type,
@@ -628,13 +632,13 @@ llvm::DIType *CGDebugInfo::CreateType(const BuiltinType *BT) {
     return SelTy;
   }
 
-  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+  // @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
   case BuiltinType::ObjCProtocol: {
      uint64_t Size = CGM.getContext().getTypeSize(BT);
      BTName = "unsigned int";
      return DBuilder.createBasicType( BTName, Size, llvm::dwarf::DW_ATE_unsigned);
   }
-  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
+  // @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
 
 #define IMAGE_TYPE(ImgType, Id, SingletonId, Access, Suffix) \
   case BuiltinType::Id: \

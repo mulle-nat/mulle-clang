@@ -507,9 +507,6 @@ CodeGenTypes::arrangeObjCMessageSendSignature(const ObjCMethodDecl *MD,
             I->hasAttr<NoEscapeAttr>());
         extParamInfos.push_back(extParamInfo);
       }
-      for (const auto *I : MD->parameters()) {
-         argTys.push_back(Context.getCanonicalParamType(I->getType()));
-      }
       bool IsWindows = getContext().getTargetInfo().getTriple().isOSWindows();
       callConv = getCallingConventionForDecl( MD, IsWindows);
 

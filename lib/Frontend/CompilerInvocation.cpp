@@ -1772,10 +1772,12 @@ void CompilerInvocation::setLangDefaults(LangOptions &Opts, InputKind IK,
         LangStd = LangStandard::lang_gnu11;
       break;
     case InputKind::ObjC:
-    // @mulle-objc@ AAM:  .aam filename extension support ->
+    // @mulle-objc@ AAM: .aam filename extension support ->
     case InputKind::ObjCAAM:
-    // @mulle-objc@ C11 should be standard now
+    // @mulle-objc@ AAM: .aam filename extension support -<
+    // @mulle-objc@ C11 should be standard now -<
       LangStd = LangStandard::lang_c11;
+    // @mulle-objc@ C11 should be standard now -<
       break;
     case InputKind::CXX:
     case InputKind::ObjCXX:

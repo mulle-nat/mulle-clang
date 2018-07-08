@@ -6080,17 +6080,17 @@ llvm::ConstantInt *CGObjCMulleRuntime::EmitClassID(CodeGenFunction &CGF, const O
 }
 
 
-IdentifierInfo  *CGObjCMulleRuntime::GetOverriddenIdentifier( CodeGenFunction &CGF,
-                                                              const ObjCInterfaceDecl *Class,
-                                                              Selector &Sel)
-{
-   std::string     superName;
-   IdentifierInfo  *superInfo;
-
-   superName = Class->getNameAsString() + " " + Sel.getAsString();
-   superInfo = &CGF.getContext().Idents.get( superName);
-   return( superInfo);
-}
+// IdentifierInfo  *CGObjCMulleRuntime::GetOverriddenIdentifier( CodeGenFunction &CGF,
+//                                                               const ObjCInterfaceDecl *Class,
+//                                                               Selector &Sel)
+// {
+//    std::string     superName;
+//    IdentifierInfo  *superInfo;
+//
+//    superName = Class->getNameAsString() + " " + Sel.getAsString();
+//    superInfo = &CGF.getContext().Idents.get( superName);
+//    return( superInfo);
+// }
 
 
 IdentifierInfo  *CGObjCMulleRuntime::GetSuperIdentifier( CodeGenFunction &CGF,
@@ -6180,16 +6180,16 @@ llvm::Constant *CGObjCCommonMulleRuntime::GetMethodVarName(IdentifierInfo *ID) {
    return GetMethodVarName(CGM.getContext().Selectors.getNullarySelector(ID));
 }
 
-llvm::Constant *CGObjCCommonMulleRuntime::GetMethodVarType(const FieldDecl *Field) {
-   std::string TypeStr;
-   CGM.getContext().getObjCEncodingForType(Field->getType(), TypeStr, Field);
-
-   llvm::GlobalVariable *&Entry = MethodVarTypes[TypeStr];
-
-   if (!Entry)
-      Entry = CreateCStringLiteral(TypeStr, ObjCLabelType::MethodVarType);
-   return getConstantGEP(VMContext, Entry, 0, 0);
-}
+// llvm::Constant *CGObjCCommonMulleRuntime::GetMethodVarType(const FieldDecl *Field) {
+//    std::string TypeStr;
+//    CGM.getContext().getObjCEncodingForType(Field->getType(), TypeStr, Field);
+//
+//    llvm::GlobalVariable *&Entry = MethodVarTypes[TypeStr];
+//
+//    if (!Entry)
+//       Entry = CreateCStringLiteral(TypeStr, ObjCLabelType::MethodVarType);
+//    return getConstantGEP(VMContext, Entry, 0, 0);
+// }
 
 
 llvm::Constant *CGObjCCommonMulleRuntime::GetMethodVarType(const ObjCMethodDecl *D,

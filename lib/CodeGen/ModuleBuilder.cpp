@@ -34,7 +34,11 @@ namespace {
     DiagnosticsEngine &Diags;
     ASTContext *Ctx;
     const HeaderSearchOptions &HeaderSearchOpts; // Only used for debug info.
+// @mulle-objc@ need PreprocessorOptions public >
+  public:
     const PreprocessorOptions &PreprocessorOpts; // Only used for debug info.
+// @mulle-objc@ need PreprocessorOptions public <
+  private:
     const CodeGenOptions CodeGenOpts;  // Intentionally copied in.
 
     unsigned HandlingTopLevelDecls;

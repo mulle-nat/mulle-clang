@@ -297,7 +297,7 @@ class ASTContext : public RefCountedBase<ASTContext> {
 
   /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
   /// \brief The typedef for the predefined \c PROTOCOL in Objective-C.
-  mutable TypedefDecl *ObjCPROTOCOLDecl;
+  mutable TypedefDecl *ObjCPROTOCOLDecl = nullptr;
   /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
 
   /// \brief The typedef for the predefined 'BOOL' type.

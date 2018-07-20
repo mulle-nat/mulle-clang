@@ -786,9 +786,6 @@ ASTContext::ASTContext(LangOptions &LOpts, SourceManager &SM,
     : FunctionProtoTypes(this_()), TemplateSpecializationTypes(this_()),
       DependentTemplateSpecializationTypes(this_()),
       SubstTemplateTemplateParmPacks(this_()), SourceMgr(SM), LangOpts(LOpts),
-      /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
-      ObjCPROTOCOLDecl(nullptr), // is this nulling still needed ?
-      /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
       SanitizerBL(new SanitizerBlacklist(LangOpts.SanitizerBlacklistFiles, SM)),
       XRayFilter(new XRayFunctionFilter(LangOpts.XRayAlwaysInstrumentFiles,
                                         LangOpts.XRayNeverInstrumentFiles, SM)),
@@ -6231,7 +6228,7 @@ bool   ASTContext::typeNeedsMetaABIAlloca( QualType type)
          return( false);
       return( true);
    }
-   
+
    if( getTypeSize( type) > getTypeSize( VoidPtrTy))
       return( true);
    // should log this, as this is unusual
@@ -6948,7 +6945,7 @@ TypedefDecl *ASTContext::getObjCClassDecl() const {
 }
 
 /// @mulle-objc@ uniqueid: change type of PROTOCOL to pointer >
-/// INCOMPATIBLE! 
+/// INCOMPATIBLE!
 TypedefDecl *ASTContext::getObjCPROTOCOLDecl() const {
   if (!ObjCPROTOCOLDecl) {
      QualType T = getLangOpts().ObjCRuntime.hasConstantProtocol()
@@ -6964,18 +6961,18 @@ TypedefDecl *ASTContext::getObjCPROTOCOLDecl() const {
 
  ObjCInterfaceDecl *ASTContext::getObjCProtocolDecl() const {
    if (!ObjCProtocolClassDecl) {
-     ObjCProtocolClassDecl 
-       = ObjCInterfaceDecl::Create(*this, getTranslationUnitDecl(), 
+     ObjCProtocolClassDecl
+       = ObjCInterfaceDecl::Create(*this, getTranslationUnitDecl(),
                                    SourceLocation(),
                                    &Idents.get("Protocol"),
                                    /*typeParamList=*/nullptr,
                                    /*PrevDecl=*/nullptr,
-                                   SourceLocation(), true);    
+                                   SourceLocation(), true);
    }
-   
+
    return ObjCProtocolClassDecl;
  }
- 
+
 //===----------------------------------------------------------------------===//
 // __builtin_va_list Construction Functions
 //===----------------------------------------------------------------------===//

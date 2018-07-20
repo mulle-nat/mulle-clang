@@ -3294,9 +3294,8 @@ static void RemoveSelectorFromWarningCache(Sema &S, Expr* Arg) {
 
 bool Sema::CheckMulleObjCFunctionDefined( Scope *S, SourceLocation Loc, StringRef Name)
 {
-   DeclarationName           DN;
-   DeclContextLookupResult   R;
-   IdentifierInfo            *II;
+   DeclarationName   DN;
+   IdentifierInfo    *II;
 
    // hacked together without a clue
    II  = &Context.Idents.get( Name);

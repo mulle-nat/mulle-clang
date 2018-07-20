@@ -11,7 +11,7 @@
 BY_THE_BOOK="YES"
 
 # our compiler version
-MULLE_CLANG_VERSION="6.0.0.3"
+MULLE_CLANG_VERSION="6.0.0.4"
 #MULLE_CLANG_RC="1"
 MULLE_LLDB_VERSION="6.0.0.0"
 #MULLE_LLDB_RC="4"
@@ -271,15 +271,6 @@ emit_llvm_loop_utils_patch()
    cat <<EOF
    --- lib/Transforms/Utils/LoopUtils.cpp 2017-09-13 15:16:32.000000000 +0200
 +++ /tmp/LoopUtils.cpp  2017-09-13 15:14:27.000000000 +0200
-@@ -1118,8 +1117,6 @@
-
- /// Returns true if the instruction in a loop is guaranteed to execute at least
- /// once.
--/// Returns true if the instruction in a loop is guaranteed to execute at least
--/// once.
- bool llvm::isGuaranteedToExecute(const Instruction &Inst,
-                                  const DominatorTree *DT, const Loop *CurLoop,
-                                  const LoopSafetyInfo *SafetyInfo) {
 @@ -1131,27 +1128,14 @@
    // common), it is always guaranteed to dominate the exit blocks.  Since this
    // is a common case, and can save some work, check it now.
@@ -1052,6 +1043,8 @@ _build_llvm()
          CXX_COMPILER="`command -v "${CXX_COMPILER}"`"
 
          exekutor mkdir -p "${LLVM_BUILD_DIR}" 2> /dev/null
+         [ -d "${LLVM_BUILD_DIR}" ] || fail "Not enough permissions to create \"${LLVM_BUILD_DIR}\""
+
          exekutor cd "${LLVM_BUILD_DIR}" &&
          exekutor cmake \
                -Wno-dev \
@@ -1060,6 +1053,7 @@ _build_llvm()
                -DCMAKE_CXX_COMPILER="${CXX_COMPILER}" \
                -DCLANG_VENDOR="${CLANG_VENDOR}" \
                -DCLANG_LINKS_TO_CREATE="${links}" \
+               -DLLVM_USE_LINKER="${OPTION_LINKER}" \
                -DCMAKE_BUILD_TYPE="${LLVM_BUILD_TYPE}" \
                -DCMAKE_INSTALL_PREFIX="${MULLE_LLVM_INSTALL_PREFIX}" \
                -DLLVM_ENABLE_CXX1Y:BOOL=OFF \
@@ -1135,6 +1129,7 @@ _build_clang()
                -DCMAKE_CXX_COMPILER="${CXX_COMPILER}" \
                -DCLANG_VENDOR="${CLANG_VENDOR}" \
                -DCLANG_LINKS_TO_CREATE="${links}" \
+               -DLLVM_USE_LINKER="${OPTION_LINKER}" \
                -DCMAKE_BUILD_TYPE="${MULLE_CLANG_BUILD_TYPE}" \
                -DCMAKE_INSTALL_PREFIX="${MULLE_CLANG_INSTALL_PREFIX}" \
                ${CMAKE_FLAGS} \
@@ -1495,6 +1490,7 @@ main()
    local OPTION_PATCH_LLVM="YES"
    local OPTION_WARN="YES"
    local OPTION_VS32BIT="NO"
+   local OPTION_LINKER="${LD:-DEFAULT}"
 
    while [ $# -ne 0 ]
    do
@@ -1541,6 +1537,13 @@ main()
 
          --with-clang|--build-clang)
             BUILD_CLANG="YES"
+         ;;
+
+         --linker)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+
+            OPTION_LINKER="$1"
          ;;
 
          # can be usefue when migrating to new llvm version
@@ -1663,6 +1666,33 @@ main()
       CXX_COMPILER="g++"
    fi
 
+   if [ "${OPTION_LINKER}" = "DEFAULT" ]
+   then
+      local linker
+      local linkerpreferences
+
+      case "${UNAME}" in
+         MINGW*)
+            # todo: untested
+            linkerpreferences="lld ld.lld ld link.exe"
+         ;;
+
+         *)
+            linkerpreferences="lld ld.lld gold ld.gold ld"
+         ;;
+      esac
+
+      for linker in ${linkerpreferences}
+      do
+         if [ ! -z "`command -v "${linker}"`" ]
+         then
+            OPTION_LINKER="${linker}"
+            log_verbose "Use linker=${linker}"
+            break
+         fi
+      done
+   fi
+
    #
    # it makes little sense to change these
    #
@@ -1765,6 +1795,9 @@ main()
       uninstall)
          uninstall_links
       ;;
+
+      *)
+         fail "Unknown command \"$COMMAND\""
    esac
 }
 

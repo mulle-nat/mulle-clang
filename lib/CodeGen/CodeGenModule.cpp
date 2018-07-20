@@ -190,10 +190,11 @@ void CodeGenModule::createObjCRuntime() {
     ObjCRuntime.reset(CreateMacObjCRuntime(*this));
     return;
    
-  // @mulle-objc@ compiler: add ObjCRuntime::Mulle to runtimes
+  // @mulle-objc@ compiler: add ObjCRuntime::Mulle to runtimes >
   case ObjCRuntime::Mulle:
     ObjCRuntime.reset( CreateMulleObjCRuntime(*this));
     return;
+  // @mulle-objc@ compiler: add ObjCRuntime::Mulle to runtimes <
   }
   llvm_unreachable("bad runtime kind");
 }

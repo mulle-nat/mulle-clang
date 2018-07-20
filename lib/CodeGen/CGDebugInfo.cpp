@@ -534,7 +534,13 @@ void CGDebugInfo::CreateCompileUnit() {
   // Figure out which version of the ObjC runtime we have.
   unsigned RuntimeVers = 0;
   if (LO.ObjC1)
+  /// @mulle-objc@ change debug RuntimeVers to Mulle (1848) >
+  {
     RuntimeVers = LO.ObjCRuntime.isNonFragile() ? 2 : 1;
+    if( LO.ObjCRuntime.hasMulleMetaABI())
+      RuntimeVers = 1848;
+  }
+  /// @mulle-objc@ change debug RuntimeVers to Mulle (1848) <
 
   llvm::DICompileUnit::DebugEmissionKind EmissionKind;
   switch (DebugKind) {

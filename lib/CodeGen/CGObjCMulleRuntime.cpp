@@ -82,6 +82,13 @@ extern "C"
 
 namespace {
 
+   struct clang_mulle_objc_compiler_info
+   {
+      uint32_t   load_version;
+      uint32_t   runtime_version;
+   };
+
+
    // FIXME: We should find a nicer way to make the labels for metadata, string
    // concatenation is lame.
 
@@ -773,20 +780,18 @@ namespace {
 
    protected:
       llvm::LLVMContext &VMContext;
-      struct clang_mulle_objc_compiler_info
-      {
-         int64_t   foundation_version;
-         int64_t   load_version;
-         int64_t   runtime_version;
-         int64_t   thread_local_runtime;
-         int64_t   no_tagged_pointers;
-         int64_t   no_fast_method_calls;
-         int64_t   user_version;
-         // @mulle-objc@ uniqueid: make it 32 bit here
-         uint32_t  fastclassids[ 32];
-      } runtime_info;
+      struct clang_mulle_objc_compiler_info   runtime_info;
 
-      bool      fastclassids_defined;
+      uint32_t   foundation_version;
+      uint32_t   user_version;
+      int32_t    thread_local_runtime;
+      int32_t    no_tagged_pointers;
+      int32_t    no_fast_method_calls;
+
+#define MULLE_OBJC_S_FASTCLASSES   64
+
+      uint32_t  fastclassids[ MULLE_OBJC_S_FASTCLASSES];
+      uint32_t  fastclassids_defined;
       bool      struct_read;
       bool      _trace_fastids;
 
@@ -1165,6 +1170,12 @@ namespace {
                                                     StringRef name,
                                                     uint64_t *value);
 
+      RecordDecl  *CreateCompilerInfoRecordDecl( void);
+      VarDecl     *CreateCompilerInfoVarDecl( void);
+
+      void  fillRuntimeInfoWithGlobal( llvm::GlobalValue *global);
+      struct clang_mulle_objc_compiler_info  *getMulleObjCRuntimeInfo( void);
+
 #pragma mark - Method Call Declarations
       const CGFunctionInfo   &GenerateFunctionInfo( QualType arg0Ty,
                                                     QualType rvalTy);
@@ -1498,17 +1509,18 @@ CGObjCMulleRuntime::CGObjCMulleRuntime(CodeGen::CodeGenModule &cgm) : CGObjCComm
 ObjCTypes(cgm) {
    struct_read = false;
 
-   runtime_info.load_version         = 0;
-   runtime_info.foundation_version   = 0;
-   runtime_info.runtime_version      = 0;      // MUST be set by header, if we emit loadinfo
-   runtime_info.user_version         = 0;
-   runtime_info.thread_local_runtime = CGM.getLangOpts().ObjCHasThreadLocalRuntime;
-   runtime_info.no_tagged_pointers   = CGM.getLangOpts().ObjCDisableTaggedPointers;
-   runtime_info.no_fast_method_calls = CGM.getLangOpts().ObjCDisableFastMethodCalls;
+   runtime_info.load_version    = 0; // MUST be set to emit loadinfo
+   runtime_info.runtime_version = 0; // MUST be set to emit loadinfo
 
-   memset( runtime_info.fastclassids, 0, sizeof( runtime_info.fastclassids));
+   foundation_version   = 0;
+   user_version         = 0;
+   thread_local_runtime = CGM.getLangOpts().ObjCHasThreadLocalRuntime;
+   no_tagged_pointers   = CGM.getLangOpts().ObjCDisableTaggedPointers;
+   no_fast_method_calls = CGM.getLangOpts().ObjCDisableFastMethodCalls;
 
-   fastclassids_defined = false;
+   memset( fastclassids, 0, sizeof( fastclassids));
+
+   fastclassids_defined = 0;
    _trace_fastids = getenv( "MULLE_CLANG_TRACE_FASTCLASS") ? 1 : 0;  // need compiler flag
 
    NSConstantStringType = nullptr;
@@ -1517,41 +1529,189 @@ ObjCTypes(cgm) {
 }
 
 
-//
-// call this as late as possible
-//
-void  CGObjCMulleRuntime::getMulleObjCRuntimeInfo( llvm::GlobalValue *global)
+void  CGObjCMulleRuntime::fillRuntimeInfoWithGlobal( llvm::GlobalValue *global)
 {
+   llvm::Type   *valueType;
+
+   valueType = global->getValueType();
+   if( ! valueType->isAggregateType())
+      CGM.getDiags().Report( diag::err_mulle_objc_compiler_info_malformed);
+
+   llvm::ConstantInt   *runtime_version;
+   llvm::ConstantInt   *load_version;
+
+   load_version = dyn_cast<llvm::ConstantInt>( global->getAggregateElement( 0U));
+   if( load_version)
+      this->runtime_info.load_version = (int32_t) load_version->getLimitedValue();
+
+   runtime_version = dyn_cast<llvm::ConstantInt>( global->getAggregateElement( 1U));
+   if( runtime_version)
+      this->runtime_info.runtime_version = (int32_t) runtime_version->getLimitedValue();
 
 }
 
 
-struct clang_mulle_objc_compiler_info  *CGObjCMulleRuntime::getMulleObjCRuntimeInfo()
+//
+// call this as late as possible
+//
+/* variadic alloca, could have size of struct block in
+ * front, for interpreters / storage (?)
+ */
+RecordDecl  *CGObjCMulleRuntime::CreateCompilerInfoRecordDecl( void)
+{
+   ASTContext      *Context;
+   IdentifierInfo  *RecordID;
+   RecordDecl      *RD;
+
+   Context  = &CGM.getContext();
+   RecordID = &Context->Idents.get( "clang_mulle_objc_compiler_info");
+   RD       = RecordDecl::Create( *Context,
+                                  TTK_Struct,
+                                  Context->getTranslationUnitDecl(),
+                                  SourceLocation(),
+                                  SourceLocation(),
+                                  RecordID);
+
+
+   /* copy over parameters from Record decl first */
+   FieldDecl       *FD;
+   IdentifierInfo  *FieldID;
+
+   FieldID = &Context->Idents.get( "load_version");
+   FD      = FieldDecl::Create( *Context,
+                                RD,
+                                SourceLocation(), SourceLocation(),
+                                FieldID,
+                                Context->UnsignedIntTy,
+                                Context->CreateTypeSourceInfo( Context->UnsignedIntTy, 0),
+                                NULL,
+                                false,  // Mutable... only for C++
+                                ICIS_NoInit);
+   RD->addDecl( FD);
+
+   FieldID = &Context->Idents.get( "runtime_version");
+   FD      = FieldDecl::Create( *Context,
+                                RD,
+                                SourceLocation(), SourceLocation(),
+                                FieldID,
+                                Context->UnsignedIntTy,
+                                Context->CreateTypeSourceInfo( Context->UnsignedIntTy, 0),
+                                NULL,
+                                false,  // Mutable... only for C++
+                                ICIS_NoInit);
+   RD->addDecl( FD);
+
+   RD->completeDefinition();
+
+   return( RD);
+}
+
+
+VarDecl  *CGObjCMulleRuntime::CreateCompilerInfoVarDecl( void)
+{
+   RecordDecl      *RD;
+   VarDecl         *VD;
+   IdentifierInfo  *VariableID;
+
+   RD            = CreateCompilerInfoRecordDecl();
+   QualType type = CGM.getContext().getTagDeclType( RD);
+
+   VariableID = &CGM.getContext().Idents.get( "__mulle_objc_compiler_info");
+   VD         = VarDecl::Create( CGM.getContext(),
+                                 CGM.getContext().getTranslationUnitDecl(),
+                                 SourceLocation(),
+                                 SourceLocation(),
+                                 VariableID,
+                                 type,
+                                 CGM.getContext().CreateTypeSourceInfo( type, 0),
+                                 SC_None);
+   return( VD);
+}
+
+
+struct clang_mulle_objc_compiler_info  *CGObjCMulleRuntime::getMulleObjCRuntimeInfo( void)
 {
    if( this->runtime_info.runtime_version)
       return( &this->runtime_info);
 
-   if( ! this->struct_read) 
+   //
+   // The define method is preferred, because it gives the user a chance
+   // to define fastclassids. But for JIT like mulle-lldb does it is often
+   // preferable to allow the emission of code w/o the mulle-objc-runtime.h
+   //
+   // Your code needs to specify a global variable like this:
+   // static const struct clang_mulle_objc_compiler_info
+   // {
+   //    unsigned int   load_version;
+   //    unsigned int   runtime_version;
+   // } __mulle_objc_compiler_info =
+   // {
+   //    12, // load version
+   //    ((0 << 20) | (13 << 8) | 0) // runtime version
+   // };
+   
+   if( ! this->struct_read)
    {
-      llvm::GlobalValue  *global;
-
-      global = &CGM.GetGlobalValue("__mulle_objc_compiler_info");
-      if( ! global)
+      TranslationUnitDecl   *TUDecl;
+      DeclContext           *DC;
+      VarDecl               *VD;
+      IdentifierInfo        *InfoID;
+      
+      TUDecl = CGM.getContext().getTranslationUnitDecl();
+      DC     = TranslationUnitDecl::castToDeclContext(TUDecl);
+      InfoID = &CGM.getContext().Idents.get( "__mulle_objc_compiler_info");
+      VD     = nullptr;
+      
+      DeclContext::lookup_result R = DC->lookup( InfoID);
+      for (DeclContext::lookup_result::iterator I = R.begin(), E = R.end();
+           I != E; ++I)
       {
-         CGM.getDiags().Report( diag::err_mulle_objc_preprocessor_missing_include);
-         return( nullptr);
+         VD = dyn_cast< VarDecl>( *I);
+         if( VD)
+            break;
       }
+      if( ! VD)
+         return( nullptr);
 
-      fillRuntimeInfoWithGlobal( global);
+      InitListExpr  *initializers;
+      Expr          *initializer;
+      unsigned      i, n;
+      
+      initializers = dyn_cast< InitListExpr>( VD->getInit());
+      if( ! initializers) // could output something here
+         return( nullptr);
+      
+      n = initializers->getNumInits();
+      for( i = 0; i < n; i++)
+      {
+         llvm::APSInt Value;
+
+         initializer = initializers->getInit( i);
+         // find out if both sizes are known at compile time
+         if( ! initializer->EvaluateAsInt( Value, CGM.getContext()))
+            return( nullptr);
+
+         switch( i)
+         {
+         case 0 :
+            this->runtime_info.load_version = (uint32_t) Value.getZExtValue();
+            break;
+
+         case 1 :
+            this->runtime_info.runtime_version = (uint32_t) Value.getZExtValue();
+            break;
+         }
+      }
+      
       this->struct_read = true;
    }
 
    if( ! this->runtime_info.runtime_version)
-   {
       return( nullptr);
-   }
+
    return( &this->runtime_info);
 }
+
 
 bool  CGObjCMulleRuntime::GetMacroDefinitionUnsignedIntegerValue( clang::Preprocessor *PP,
                                                                   StringRef name,
@@ -1610,82 +1770,81 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
 
    // it's cool if versions aren't defined, when just compiling C stuff
    PP = &P->getPreprocessor();
-   if( ! runtime_info.runtime_version)
+   if( ! this->runtime_info.runtime_version)
    {
       if( GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_RUNTIME_VERSION_MAJOR", &major) &&
           GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_RUNTIME_VERSION_MINOR", &minor) &&
           GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_RUNTIME_VERSION_PATCH", &patch))
       {
-         runtime_info.runtime_version = (major << 20) | (minor << 8) | patch;
+         this->runtime_info.runtime_version = (uint32_t) ((major << 20) | (minor << 8) | patch);
          // fprintf( stderr, "%d.%d.%d -> 0x%x\n", (int) major, (int)  minor, (int) patch, (int)  runtime_version);
       }
-   }
 
-   if( ! runtime_info.load_version)
-   {
-      if( GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_RUNTIME_LOAD_VERSION", &value))
+      if( ! this->runtime_info.load_version)
       {
-         runtime_info.load_version = value;
-         // fprintf( stderr, "load_version -> 0x%x\n", (int)  load_version);
+         if( GetMacroDefinitionUnsignedIntegerValue( PP, "MULLE_OBJC_RUNTIME_LOAD_VERSION", &value))
+         {
+            this->runtime_info.load_version = (uint32_t) value;
+            // fprintf( stderr, "load_version -> 0x%x\n", (int)  load_version);
+         }
+      }
+
+      // possibly make this a #pragma sometime
+      if( GetMacroDefinitionUnsignedIntegerValue( PP, "__MULLE_OBJC_TPS__", &value))
+      {
+         no_tagged_pointers = ! value;
+      }
+
+      if( GetMacroDefinitionUnsignedIntegerValue( PP, "__MULLE_OBJC_NO_TPS__", &value))
+      {
+         no_tagged_pointers = value;
+      }
+
+      // possibly make this a #pragma sometime
+      if( GetMacroDefinitionUnsignedIntegerValue( PP, "__MULLE_OBJC_FMC__", &value))
+      {
+         no_fast_method_calls = ! value;
+      }
+
+      if( GetMacroDefinitionUnsignedIntegerValue( PP, "__MULLE_OBJC_NO_FMC__", &value))
+      {
+         no_fast_method_calls = value;
+      }
+
+      // possibly make this a #pragma sometime
+      if( GetMacroDefinitionUnsignedIntegerValue( PP, "__MULLE_OBJC_TRT__", &value))
+      {
+         thread_local_runtime = value;
+      }
+
+      if( GetMacroDefinitionUnsignedIntegerValue( PP, "__MULLE_OBJC_NO_TRT__", &value))
+      {
+         thread_local_runtime = ! value;
       }
    }
 
-
    // optional anyway
-   if( ! runtime_info.foundation_version)
+   if( ! foundation_version)
    {
       if( GetMacroDefinitionUnsignedIntegerValue( PP, "FOUNDATION_VERSION_MAJOR", &major) &&
           GetMacroDefinitionUnsignedIntegerValue( PP, "FOUNDATION_VERSION_MINOR", &minor) &&
           GetMacroDefinitionUnsignedIntegerValue( PP, "FOUNDATION_VERSION_PATCH", &patch))
       {
-         runtime_info.foundation_version = (major << 20) | (minor << 8) | patch;
+         foundation_version = (uint32_t) ((major << 20) | (minor << 8) | patch);
       }
    }
 
    // optional anyway
-   if( ! runtime_info.user_version)
+   if( ! user_version)
    {
       if( GetMacroDefinitionUnsignedIntegerValue( PP, "USER_VERSION_MAJOR", &major) &&
           GetMacroDefinitionUnsignedIntegerValue( PP, "USER_VERSION_MINOR", &minor) &&
           GetMacroDefinitionUnsignedIntegerValue( PP, "USER_VERSION_PATCH", &patch))
       {
-         runtime_info.user_version = (major << 20) | (minor << 8) | patch;
+         user_version = (uint32_t) ((major << 20) | (minor << 8) | patch);
       }
    }
 
-
-   // possibly make this a #pragma sometime
-   if( GetMacroDefinitionUnsignedIntegerValue( PP, "__MULLE_OBJC_TPS__", &value))
-   {
-      runtime_info.no_tagged_pointers = ! value;
-   }
-
-   if( GetMacroDefinitionUnsignedIntegerValue( PP, "__MULLE_OBJC_NO_TPS__", &value))
-   {
-      runtime_info.no_tagged_pointers = value;
-   }
-
-   // possibly make this a #pragma sometime
-   if( GetMacroDefinitionUnsignedIntegerValue( PP, "__MULLE_OBJC_FMC__", &value))
-   {
-      runtime_info.no_fast_method_calls = ! value;
-   }
-
-   if( GetMacroDefinitionUnsignedIntegerValue( PP, "__MULLE_OBJC_NO_FMC__", &value))
-   {
-      runtime_info.no_fast_method_calls = value;
-   }
-
-   // possibly make this a #pragma sometime
-   if( GetMacroDefinitionUnsignedIntegerValue( PP, "__MULLE_OBJC_TRT__", &value))
-   {
-      runtime_info.thread_local_runtime = value;
-   }
-
-   if( GetMacroDefinitionUnsignedIntegerValue( PP, "__MULLE_OBJC_NO_TRT__", &value))
-   {
-      runtime_info.thread_local_runtime = ! value;
-   }
 
    /* this runs for every top level declaration.(layme)
       Fastclass must always be compiled regardless of optimization level
@@ -1694,17 +1853,16 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
    {
       char   buf[ 64];
 
-      for( int i = 0; i < 32; i++)
+      for( int i = 0; i < MULLE_OBJC_S_FASTCLASSES; i++)
       {
-         // these are always 64 bit regardless if compiling to 32 bit
          sprintf( buf, "MULLE_OBJC_FASTCLASSHASH_%d", i);
          if( GetMacroDefinitionUnsignedIntegerValue( PP, buf, &value))
          {
-            runtime_info.fastclassids[ i]     = value; // >> 32;
-            fastclassids_defined = true;
+            fastclassids[ i]     = (uint32_t) value; // >> 32;
+            fastclassids_defined = i + 1;
 
             if( _trace_fastids)
-               fprintf( stderr, "fastclassid #%d = 0x%llx\n", i, (long long) runtime_info.fastclassids[ i]);
+               fprintf( stderr, "fastclassid #%d = 0x%llx\n", i, (long long) fastclassids[ i]);
          }
       }
    }
@@ -2119,14 +2277,10 @@ ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
    StringRef str = SL->getString();
    unsigned StringLength = str.size();
 
-   struct clang_mulle_objc_compiler_info  *runtime_info;
-
-   runtime_info = getMulleObjCRuntimeInfo();
-
    //
    // create a tagged pointer for strings, if the constant matches
    //
-   if( (! runtime_info || ! runtime_info->no_tagged_pointers) && SL->getKind() == StringLiteral::Ascii)
+   if( this->no_tagged_pointers && SL->getKind() == StringLiteral::Ascii)
    {
       unsigned WordSizeInBits = CGM.getTarget().getPointerWidth(0);
 
@@ -2292,7 +2446,7 @@ CodeGen::RValue CGObjCMulleRuntime::CommonMessageSend(CodeGen::CodeGenFunction &
       int optLevel = CGM.getLangOpts().OptimizeSize ? -1 : CGM.getCodeGenOpts().OptimizationLevel;
 
       // tagged pointers bloat the code too much IMO (make decision later)
-      // if( optLevel > 1 && ! runtime_info.no_tagged_pointers)
+      // if( optLevel > 1 && ! no_tagged_pointers)
       //   optLevel = 1;
 
       if( ! CallArgs.size())
@@ -4478,12 +4632,11 @@ void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
    if( fastclassids_defined)
    {
       int        j;
-      // @mulle-objc@ uniqueid: make it 32 bit here
+      // @mulle-objc@ uniqueid is now 32 bit since fnv hash
       uint32_t   uniqueid;
 
-      // the ClassID is possibly 32 bit though, so we have to rehash here
-      uniqueid = UniqueIdHashForString(ID->getObjCRuntimeNameAsString());
-      for( j = 31; j >= 0; j--)
+      uniqueid = UniqueIdHashForString( ID->getObjCRuntimeNameAsString());
+      for( j = fastclassids_defined - 1; j >= 0; j--)
       {
          if( fastclassids[ j] == uniqueid)
             break;
@@ -4869,15 +5022,13 @@ llvm::Constant *CGObjCMulleRuntime::EmitLoadInfoList(Twine Name,
 {
    llvm::Constant   *Values[10];
 
-   struct clang_mulle_objc_compiler_info  *runtime_info;
-
    //
    // should get these values from the header
    //
-   Values[0] = llvm::ConstantInt::get(ObjCTypes.IntTy, runtime_info.load_version);        // just a number
-   Values[1] = llvm::ConstantInt::get(ObjCTypes.IntTy, runtime_info.runtime_version);     // major, minor, patch version
-   Values[2] = llvm::ConstantInt::get(ObjCTypes.IntTy, runtime_info.foundation_version);  // foundation
-   Values[3] = llvm::ConstantInt::get(ObjCTypes.IntTy, runtime_info.user_version);        // user
+   Values[0] = llvm::ConstantInt::get(ObjCTypes.IntTy, this->runtime_info.load_version);        // just a number
+   Values[1] = llvm::ConstantInt::get(ObjCTypes.IntTy, this->runtime_info.runtime_version);     // major, minor, patch version
+   Values[2] = llvm::ConstantInt::get(ObjCTypes.IntTy, this->foundation_version);  // foundation
+   Values[3] = llvm::ConstantInt::get(ObjCTypes.IntTy, this->user_version);        // user
 
    unsigned int   optLevel;
 
@@ -4887,9 +5038,9 @@ llvm::Constant *CGObjCMulleRuntime::EmitLoadInfoList(Twine Name,
    unsigned int   bits;
 
    bits  = optLevel << 8;
-   bits |= runtime_info.no_tagged_pointers ? 0x4 : 0x0;
-   bits |= runtime_info.thread_local_runtime  ? 0x8 : 0x0;
-   bits |= runtime_info.no_fast_method_calls  ? 0x10 : 0x0;
+   bits |= this->no_tagged_pointers ? 0x4 : 0x0;
+   bits |= this->thread_local_runtime  ? 0x8 : 0x0;
+   bits |= this->no_fast_method_calls  ? 0x10 : 0x0;
    bits |= CGM.getLangOpts().ObjCAllocsAutoreleasedObjects ? 0x2 : 0;
    bits |= 0;         // we are sorted, so unsorted == 0
 
@@ -4977,39 +5128,44 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
                             uniqueid_comparator);
    }
 
+
+   // if we are called from CreateLLVMCodeGen and friends, the ParserDidFinish
+   // will not have been called. Yikes! Then we need the
+   // clang_mulle_objc_compiler_info global, which we may read now
+   //
+   struct clang_mulle_objc_compiler_info  *runtime_info;
+
+   runtime_info = getMulleObjCRuntimeInfo();
+
+   //
    // always emit to check for code compatability
    // supers w/o classes or categories are uninteresting
-
+   //
    if( ! LoadClasses.size() && ! LoadCategories.size() && \
        ! LoadStrings.size() && ! EmitHashes.size())
    {
       // if nothing is emitted, and no runtime versions has been set emit
       // nothing, it's plain C code
-      if( ! runtime_info.runtime_version)
+      if( ! runtime_info)
          return( nullptr);
    }
 
-   // if we are called from CreateLLVMCodeGen and friends, the ParserDidFinish
-   // will not have been called. Yikes!
-
-
-   // if we emit something, then check that our produced loadinfo is compatible
-   if( ! runtime_info.runtime_version)
+   if( ! runtime_info)
    {
       CGM.getDiags().Report( diag::err_mulle_objc_preprocessor_missing_include);
       return( nullptr);
    }
-
    // since the loadinfo and stuff is hardcoded, the check is also hardcoded
    // not elegant...
 
-   if( runtime_info.load_version != COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION)
+   if( runtime_info->load_version != COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION)
    {
       char   buf1[ 32];
       char   buf2[ 32];
+
       // fprintf( stderr, "version found: 0x%x\n", (int) runtime_version);
-      sprintf( buf1, "%u", (unsigned) runtime_info.load_version);
-      sprintf( buf2, "%u", (unsigned) COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION);
+      sprintf( buf1, "%lu", (unsigned long) runtime_info->load_version);
+      sprintf( buf2, "%lu", (unsigned long) COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION);
 
       CGM.getDiags().Report( diag::err_mulle_objc_runtime_version_mismatch) <<
                             buf1 << buf2;
@@ -5938,7 +6094,7 @@ void CGObjCCommonMulleRuntime::EmitImageInfo() {
    // Add the ObjC ABI version to the module flags.
    Mod.addModuleFlag(llvm::Module::Error, "Objective-C Version", 1848);
    Mod.addModuleFlag(llvm::Module::Error, "Objective-C Image Info Version",
-                     COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION);
+                     this->runtime_info.load_version);
    Mod.addModuleFlag(llvm::Module::Error, "Objective-C Image Info Section",
                      llvm::MDString::get(VMContext,Section));
 

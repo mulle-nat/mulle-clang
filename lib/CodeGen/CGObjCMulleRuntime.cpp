@@ -305,10 +305,12 @@ namespace {
          StringRef    name;
          switch( optLevel)
          {
-         default : name = "mulle_objc_inline_unfailingfastlookup_infraclass"; break;
+         default : name = "mulle_objc_inline_unfailingfastlookup_infraclass";
+                   break;
          case 1  :
          case -1 :
-         case 0  : name = "mulle_objc_unfailingfastlookup_infraclass"; break;
+         case 0  : name = "mulle_objc_unfailingfastlookup_infraclass";
+                   break;
          }
 
          llvm::AttributeList   attributes = llvm::AttributeList::get(CGM.getLLVMContext(),
@@ -1631,7 +1633,7 @@ VarDecl  *CGObjCMulleRuntime::CreateCompilerInfoVarDecl( void)
 
 struct clang_mulle_objc_compiler_info  *CGObjCMulleRuntime::getMulleObjCRuntimeInfo( void)
 {
-   if( this->runtime_info.runtime_version)
+   if( this->runtime_info.load_version)
       return( &this->runtime_info);
 
    //
@@ -1649,19 +1651,19 @@ struct clang_mulle_objc_compiler_info  *CGObjCMulleRuntime::getMulleObjCRuntimeI
    //    12, // load version
    //    ((0 << 20) | (13 << 8) | 0) // runtime version
    // };
-   
+
    if( ! this->struct_read)
    {
       TranslationUnitDecl   *TUDecl;
       DeclContext           *DC;
       VarDecl               *VD;
       IdentifierInfo        *InfoID;
-      
+
       TUDecl = CGM.getContext().getTranslationUnitDecl();
       DC     = TranslationUnitDecl::castToDeclContext(TUDecl);
       InfoID = &CGM.getContext().Idents.get( "__mulle_objc_compiler_info");
       VD     = nullptr;
-      
+
       DeclContext::lookup_result R = DC->lookup( InfoID);
       for (DeclContext::lookup_result::iterator I = R.begin(), E = R.end();
            I != E; ++I)
@@ -1671,16 +1673,19 @@ struct clang_mulle_objc_compiler_info  *CGObjCMulleRuntime::getMulleObjCRuntimeI
             break;
       }
       if( ! VD)
+      {
+         // fprintf( stderr,"__mulle_objc_compiler_info not found\n");
          return( nullptr);
+      }
 
       InitListExpr  *initializers;
       Expr          *initializer;
       unsigned      i, n;
-      
+
       initializers = dyn_cast< InitListExpr>( VD->getInit());
       if( ! initializers) // could output something here
          return( nullptr);
-      
+
       n = initializers->getNumInits();
       for( i = 0; i < n; i++)
       {
@@ -1689,8 +1694,10 @@ struct clang_mulle_objc_compiler_info  *CGObjCMulleRuntime::getMulleObjCRuntimeI
          initializer = initializers->getInit( i);
          // find out if both sizes are known at compile time
          if( ! initializer->EvaluateAsInt( Value, CGM.getContext()))
+         {
+            // fprintf( stderr,"__mulle_objc_compiler_info non integer data\n");
             return( nullptr);
-
+         }
          switch( i)
          {
          case 0 :
@@ -1702,11 +1709,11 @@ struct clang_mulle_objc_compiler_info  *CGObjCMulleRuntime::getMulleObjCRuntimeI
             break;
          }
       }
-      
+
       this->struct_read = true;
    }
 
-   if( ! this->runtime_info.runtime_version)
+   if( ! this->runtime_info.load_version)
       return( nullptr);
 
    return( &this->runtime_info);
@@ -5155,6 +5162,7 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
       CGM.getDiags().Report( diag::err_mulle_objc_preprocessor_missing_include);
       return( nullptr);
    }
+
    // since the loadinfo and stuff is hardcoded, the check is also hardcoded
    // not elegant...
 
@@ -5169,6 +5177,12 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
 
       CGM.getDiags().Report( diag::err_mulle_objc_runtime_version_mismatch) <<
                             buf1 << buf2;
+   }
+
+   if( ! runtime_info->runtime_version)
+   {
+      // do not emit anything for sake of lldb debugger
+      return( nullptr);
    }
 
   llvm::Constant *ClassList = EmitClassList( "OBJC_CLASS_LOADS", "__DATA,_objc_load_info", LoadClasses);

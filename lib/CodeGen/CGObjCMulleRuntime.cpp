@@ -978,11 +978,15 @@ namespace {
       /// define the type of the variable.
       /// \param Section - The section the variable should go into, or empty.
       /// \param Align - The alignment for the variable, or 0.
+      /// \param AddToSymbolTable - Whether the variable should be in the symbol table
       /// \param AddToUsed - Whether the variable should be added to
       /// "llvm.used".
-      llvm::GlobalVariable *CreateMetadataVar(Twine Name, llvm::Constant *Init,
-                                              StringRef Section, unsigned Align,
-                                              bool AddToUsed);
+      llvm::GlobalVariable *CreateMetadataVar(Twine Name,
+                                              llvm::Constant *Init,
+                                              StringRef Section,
+                                              unsigned Align,
+                                              bool AddToSymbolTable = false,
+                                              bool AddToUsed = true);
 
       llvm::GlobalVariable *CreateCStringLiteral( StringRef Name,
                                                   ObjCLabelType LabelType,
@@ -2362,9 +2366,12 @@ ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
    llvm::GlobalVariable   *GV;
    llvm::ConstantStruct   *NSStringHeader = CreateNSConstantStringStruct( Entry.first(), StringLength);
 
-   GV = new llvm::GlobalVariable( CGM.getModule(), NSStringHeader->getType(), false,
-                                 llvm::GlobalVariable::PrivateLinkage, NSStringHeader,
-                                 "_unnamed_nsstring_header");
+   GV = new llvm::GlobalVariable( CGM.getModule(),
+                                  NSStringHeader->getType(),
+                                  false,
+                                  llvm::GlobalVariable::PrivateLinkage,
+                                  NSStringHeader,
+                                  "_unnamed_nsstring_header");
    // FIXME. Fix section.
    GV->setSection( "__DATA,__objc_stringobj,regular,no_dead_strip");
    GV->setConstant( false);
@@ -2481,16 +2488,16 @@ CodeGen::RValue CGObjCMulleRuntime::CommonMessageSend(CodeGen::CodeGenFunction &
    MessageSendInfo MSI = getMessageSendInfo( Method, ResultType, ActualArgs);
 
    return( CommonFunctionCall( CGF,
-                              Fn,
-                              Return,
-                              ResultType,
-                              CGF.getContext().VoidPtrTy,
-                              MSI.CallInfo,
-                              Receiver,
-                              CallArgs,
-                              ActualArgs,
-                              Arg0,
-                              Method));
+                               Fn,
+                               Return,
+                               ResultType,
+                               CGF.getContext().VoidPtrTy,
+                               MSI.CallInfo,
+                               Receiver,
+                               CallArgs,
+                               ActualArgs,
+                               Arg0,
+                               Method));
 }
 
 
@@ -4139,8 +4146,10 @@ llvm::Constant *
 
    llvm::Constant *Init = llvm::ConstantStruct::getAnon(Values);
 
-   llvm::GlobalVariable *GV = CreateMetadataVar(Name, Init, "__DATA,__supers,regular,no_dead_strip",
-                     4, true);
+   llvm::GlobalVariable *GV = CreateMetadataVar( Name,
+                                                 Init,
+                                                 "__DATA,__supers,regular,no_dead_strip",
+                                                 4);
    return llvm::ConstantExpr::getBitCast(GV, ObjCTypes.SuperListPtrTy);
 }
 
@@ -4209,8 +4218,10 @@ CGObjCMulleRuntime::EmitProtocolList(Twine Name,
 
    llvm::Constant *Init = llvm::ConstantStruct::getAnon(Values);
 
-   llvm::GlobalVariable *GV = CreateMetadataVar(Name, Init, "__DATA,__protocols,regular,no_dead_strip",
-                     4, true);
+   llvm::GlobalVariable *GV = CreateMetadataVar( Name,
+                                                 Init,
+                                                 "__DATA,__protocols,regular,no_dead_strip",
+                                                 4);
    return llvm::ConstantExpr::getBitCast(GV, ObjCTypes.ProtocolListPtrTy);
 }
 
@@ -4258,8 +4269,10 @@ CGObjCMulleRuntime::EmitProtocolClassIDList(Twine Name,
 
    llvm::Constant       *Init = llvm::ConstantStruct::getAnon(Values);
    llvm::GlobalVariable *GV =
-   CreateMetadataVar(Name, Init, "__DATA,__protoclassids,regular,no_dead_strip",
-                     4, true);
+   CreateMetadataVar( Name,
+                      Init,
+                      "__DATA,__protoclassids,regular,no_dead_strip",
+                      4);
    return llvm::ConstantExpr::getBitCast( GV, ObjCTypes.ClassIDPtrTy);
 }
 
@@ -4387,11 +4400,10 @@ llvm::Constant *CGObjCCommonMulleRuntime::EmitPropertyList(Twine Name,
    Values[1] = llvm::ConstantArray::get(AT, Properties);
    llvm::Constant *Init = llvm::ConstantStruct::getAnon(Values);
 
-   llvm::GlobalVariable *GV =
-   CreateMetadataVar(Name, Init,
-                     "__DATA,__property,regular,no_dead_strip",
-                     4,
-                     true);
+   llvm::GlobalVariable *GV = CreateMetadataVar( Name,
+                                                 Init,
+                                                 "__DATA,__property,regular,no_dead_strip",
+                                                 4);
    return llvm::ConstantExpr::getBitCast(GV, ObjCTypes.PropertyListPtrTy);
 }
 
@@ -4502,8 +4514,10 @@ void CGObjCMulleRuntime::GenerateCategory(const ObjCCategoryImplDecl *OCD) {
                                                     Values);
 
    llvm::GlobalVariable *GV =
-   CreateMetadataVar("OBJC_CATEGORY_" + ExtName.str(), Init,
-                     "__DATA,__category,regular,no_dead_strip", 4, true);
+   CreateMetadataVar( "OBJC_CATEGORY_" + ExtName.str(),
+                      Init,
+                      "__DATA,__category,regular,no_dead_strip",
+                      4);
    DefinedCategories.push_back(GV);
    // method definition entries must be clear for next implementation.
    MethodDefinitions.clear();
@@ -4693,7 +4707,7 @@ void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
       GV->setAlignment(4);
       CGM.addCompilerUsedGlobal(GV);
    } else
-      GV = CreateMetadataVar(Name, Init, Section, 4, true);
+      GV = CreateMetadataVar(Name, Init, Section, 4);
 
    DeclaredClassNames.insert( ID->getIdentifier());
    DefinedClasses.push_back(GV);
@@ -4767,9 +4781,10 @@ llvm::Constant *CGObjCMulleRuntime::EmitIvarList(const ObjCImplementationDecl *I
 
    llvm::GlobalVariable *GV;
 
-   GV = CreateMetadataVar("OBJC_INSTANCE_VARIABLES_" + ID->getName(), Init,
-                             "__DATA,__instance_vars,regular,no_dead_strip", 4,
-                             true);
+   GV = CreateMetadataVar( "OBJC_INSTANCE_VARIABLES_" + ID->getName(),
+                           Init,
+                           "__DATA,__instance_vars,regular,no_dead_strip",
+                           4);
    return llvm::ConstantExpr::getBitCast(GV, ObjCTypes.IvarListPtrTy);
 }
 
@@ -4854,7 +4869,7 @@ llvm::Constant *CGObjCMulleRuntime::EmitMethodList(Twine Name,
 
    llvm::Constant *Init = llvm::ConstantStruct::getAnon(Values);
 
-   llvm::GlobalVariable *GV = CreateMetadataVar(Name, Init, Section, 4, true);
+   llvm::GlobalVariable *GV = CreateMetadataVar(Name, Init, Section, 4);
    return llvm::ConstantExpr::getBitCast(GV, ObjCTypes.MethodListPtrTy);
 }
 
@@ -4876,15 +4891,22 @@ llvm::Function *CGObjCCommonMulleRuntime::GenerateMethod(const ObjCMethodDecl *O
    return Method;
 }
 
+
 llvm::GlobalVariable *CGObjCCommonMulleRuntime::CreateMetadataVar(Twine Name,
                                                          llvm::Constant *Init,
                                                          StringRef Section,
                                                          unsigned Align,
+                                                         bool AddToSymbolTable,
                                                          bool AddToUsed) {
    llvm::Type *Ty = Init->getType();
    llvm::GlobalVariable *GV =
-   new llvm::GlobalVariable(CGM.getModule(), Ty, false,
-                            llvm::GlobalValue::PrivateLinkage, Init, Name);
+   new llvm::GlobalVariable( CGM.getModule(),
+                             Ty,
+                             false, // isConstant
+                             AddToSymbolTable ? llvm::GlobalValue::InternalLinkage  // not observed though
+                                              : llvm::GlobalValue::PrivateLinkage,
+                             Init,
+                             Name);
    if (!Section.empty())
       GV->setSection(Section);
    if (Align)
@@ -4953,7 +4975,7 @@ llvm::Constant *CGObjCMulleRuntime::EmitClassList(Twine Name,
    Values[1] = llvm::ConstantArray::get(AT, Classes);
    llvm::Constant *Init = llvm::ConstantStruct::getAnon(Values);
 
-   llvm::GlobalVariable *GV = CreateMetadataVar( Name, Init, Section, 4, true);
+   llvm::GlobalVariable *GV = CreateMetadataVar( Name, Init, Section, 4, true, true);
    return llvm::ConstantExpr::getBitCast(GV, llvm::PointerType::getUnqual( ObjCTypes.ClassListTy));
 }
 
@@ -4973,7 +4995,7 @@ llvm::Constant *CGObjCMulleRuntime::EmitCategoryList(Twine Name,
    Values[1] = llvm::ConstantArray::get(AT, Categories);
    llvm::Constant *Init = llvm::ConstantStruct::getAnon(Values);
 
-   llvm::GlobalVariable *GV = CreateMetadataVar( Name, Init, Section, 4, true);
+   llvm::GlobalVariable *GV = CreateMetadataVar( Name, Init, Section, 4, true, true);
    return llvm::ConstantExpr::getBitCast(GV, llvm::PointerType::getUnqual( ObjCTypes.CategoryListTy));
 }
 
@@ -4993,7 +5015,7 @@ llvm::Constant *CGObjCMulleRuntime::EmitStaticStringList(Twine Name,
    Values[1] = llvm::ConstantArray::get(AT, StaticStrings);
    llvm::Constant *Init = llvm::ConstantStruct::getAnon(Values);
 
-   llvm::GlobalVariable *GV = CreateMetadataVar( Name, Init, Section, 4, true);
+   llvm::GlobalVariable *GV = CreateMetadataVar( Name, Init, Section, 4);
    return llvm::ConstantExpr::getBitCast(GV, llvm::PointerType::getUnqual( ObjCTypes.StaticStringListTy));
 }
 
@@ -5013,7 +5035,7 @@ llvm::Constant *CGObjCMulleRuntime::EmitHashNameList(Twine Name,
    Values[1] = llvm::ConstantArray::get(AT, HashNames);
    llvm::Constant *Init = llvm::ConstantStruct::getAnon(Values);
 
-   llvm::GlobalVariable *GV = CreateMetadataVar( Name, Init, Section, 4, true);
+   llvm::GlobalVariable *GV = CreateMetadataVar( Name, Init, Section, 4);
    return llvm::ConstantExpr::getBitCast(GV, llvm::PointerType::getUnqual( ObjCTypes.HashNameListTy));
 }
 
@@ -5064,7 +5086,7 @@ llvm::Constant *CGObjCMulleRuntime::EmitLoadInfoList(Twine Name,
 
    llvm::Constant *Init = llvm::ConstantStruct::getAnon(Values);
 
-   llvm::GlobalVariable *GV = CreateMetadataVar( Name, Init, Section, 4, true);
+   llvm::GlobalVariable *GV = CreateMetadataVar( Name, Init, Section, 4);
    return llvm::ConstantExpr::getBitCast(GV, llvm::PointerType::getUnqual( ObjCTypes.LoadInfoTy));
 }
 
@@ -5123,7 +5145,8 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
 
          String  = CreateMetadataVar( "OBJC_HASHNAME_" + I->getKey(),
                                       llvm::ConstantDataArray::getString( VMContext, I->getKey()),
-                                      "__DATA,__module_info,regular,no_dead_strip", 4, false);
+                                      "__DATA,__module_info,regular,no_dead_strip",
+                                      4);
          Values[0] = llvm::ConstantExpr::getBitCast( I->getValue(), ObjCTypes.ClassIDTy);
          Values[1] = llvm::ConstantExpr::getBitCast( String, CGM.VoidPtrTy);
 
@@ -5185,12 +5208,12 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
       return( nullptr);
    }
 
-  llvm::Constant *ClassList = EmitClassList( "OBJC_CLASS_LOADS", "__DATA,_objc_load_info", LoadClasses);
+  llvm::Constant *ClassList    = EmitClassList( "OBJC_CLASS_LOADS", "__DATA,_objc_load_info", LoadClasses);
   llvm::Constant *CategoryList = EmitCategoryList( "OBJC_CATEGORY_LOADS", "__DATA,_objc_load_info", LoadCategories);
-  llvm::Constant *SuperList = EmitSuperList( "OBJC_SUPER_LOADS", "__DATA,_objc_load_info", LoadSupers);
-  llvm::Constant *StringList = EmitStaticStringList( "OBJC_STATICSTRING_LOADS", "__DATA,_objc_load_info", LoadStrings);
+  llvm::Constant *SuperList    = EmitSuperList( "OBJC_SUPER_LOADS", "__DATA,_objc_load_info", LoadSupers);
+  llvm::Constant *StringList   = EmitStaticStringList( "OBJC_STATICSTRING_LOADS", "__DATA,_objc_load_info", LoadStrings);
   llvm::Constant *HashNameList = EmitHashNameList( "OBJC_HASHNAME_LOADS", "__DATA,_objc_load_info", EmitHashes);
-  llvm::Constant *LoadInfo = EmitLoadInfoList( "OBJC_LOAD_INFO", "__DATA,_objc_load_info", ClassList, CategoryList, SuperList, StringList, HashNameList);
+  llvm::Constant *LoadInfo     = EmitLoadInfoList( "OBJC_LOAD_INFO", "__DATA,_objc_load_info", ClassList, CategoryList, SuperList, StringList, HashNameList);
 
    // take collected initializers and create a __attribute__(constructor)
    // static void   __load_mulle_objc() function
@@ -5199,7 +5222,7 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
 
   llvm::Function * LoadFunction = llvm::Function::Create(
       llvm::FunctionType::get(llvm::Type::getVoidTy(VMContext), false),
-      llvm::GlobalValue::InternalLinkage, "__load_mulle_objc",
+      llvm::GlobalValue::PrivateLinkage, "__load_mulle_objc",
       &CGM.getModule());
 
   // (nat) i have no idea, what this is for
@@ -6168,7 +6191,7 @@ void CGObjCMulleRuntime::EmitModuleInfo() {
    };
    CreateMetadataVar("OBJC_MODULES",
                      llvm::ConstantStruct::get(ObjCTypes.ModuleTy, Values),
-                     "__DATA,__module_info,regular,no_dead_strip", 4, true);
+                     "__DATA,__module_info,regular,no_dead_strip", 4);
 }
 
 llvm::Constant *CGObjCMulleRuntime::EmitModuleSymbols() {
@@ -6211,8 +6234,10 @@ llvm::Constant *CGObjCMulleRuntime::EmitModuleSymbols() {
 
    llvm::Constant *Init = llvm::ConstantStruct::getAnon(Values);
 
-   llvm::GlobalVariable *GV = CreateMetadataVar(
-                                                "OBJC_SYMBOLS", Init, "__DATA,__symbols,regular,no_dead_strip", 4, true);
+   llvm::GlobalVariable *GV = CreateMetadataVar( "OBJC_SYMBOLS",
+                                                 Init,
+                                                 "__DATA,__symbols,regular,no_dead_strip",
+                                                 4);
    return llvm::ConstantExpr::getBitCast(GV, ObjCTypes.SymtabPtrTy);
 }
 

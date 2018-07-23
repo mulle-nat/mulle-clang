@@ -65,6 +65,54 @@ CMAKE_VERSION="${CMAKE_VERSION_MAJOR}.${CMAKE_VERSION_MINOR}"
 CMAKE_PATCH_VERSION="${CMAKE_VERSION}.${CMAKE_VERSION_PATCH}"
 
 
+usage()
+{
+   cat <<EOF >&2
+Usage:
+   install-mulle-clang [options] [command]
+
+   Build llvm and mulle-clang/mulle-lld. The version of llvm and mulle-clang
+   being built is hardcoded into this script (see top).
+
+Options:
+EOF
+   (
+      cat <<EOF
+   --all-in-one         : place mulle-clang inside src/llvm/tools (default)
+   --no-clang           : do not build clang
+   --no-lldb            : do not build mulle-lldb
+   --no-ninja           : use make instead of ninja
+   --separate           : place mulle-clang outside of src/llvm (implied -no-lldb)
+   -n                   : dry run
+   -v                   : be verbose
+EOF
+      if [ "${VERBOSE}" = "YES" ]
+      then
+      cat <<EOF
+   --clang-prefix <dir> : install prefix for clang
+   --lldb-prefix <dir>  : install prefix for lldb
+   --llvm-prefix <dir>  : install prefix for llvm
+   --no-libcxx          : do not build libcxx
+   --no-patch-llvm      : do not patch llvm for better inlining code
+   --prefix <dir>       : default install prefix
+   --vs32bit            : compile for Visual Studo 32 bit
+EOF
+      fi
+   ) | sort >&2
+
+
+   cat <<EOF >&2
+Commands:
+   install              : install links
+   default              : download and build
+   download             : download only
+   build                : build only
+   uninstall            : remove links
+EOF
+   exit 1
+}
+
+
 environment_initialize()
 {
    UNAME="`uname -s`"
@@ -1434,46 +1482,6 @@ uninstall_links()
 {
    uninstall_mulle_clang_link
    uninstall_mulle_lldb_link
-}
-
-
-usage()
-{
-   cat <<EOF >&2
-
-Usage:
-   install-mulle-clang [options]
-
-   Build llvm and mulle-clang/mulle-lld. The version of llvm and mulle-clang
-   being built is hardcoded into this script (see top).
-
-Options:
-EOF
-   (
-      cat <<EOF
-   --all-in-one         : place mulle-clang inside src/llvm/tools (default)
-   --no-clang           : do not build clang
-   --no-lldb            : do not build mulle-lldb
-   --no-ninja           : use make instead of ninja
-   --separate           : place mulle-clang outside of src/llvm (implied -no-lldb)
-   -n                   : dry run
-   -v                   : be verbose
-EOF
-      if [ "${VERBOSE}" = "YES" ]
-      then
-      cat <<EOF
-   --clang-prefix <dir> : install prefix for clang
-   --lldb-prefix <dir>  : install prefix for lldb
-   --llvm-prefix <dir>  : install prefix for llvm
-   --no-libcxx          : do not build libcxx
-   --no-patch-llvm      : do not patch llvm for better inlining code
-   --prefix <dir>       : default install prefix
-   --vs32bit            : compile for Visual Studo 32 bit
-EOF
-      fi
-   ) | sort >&2
-
-   exit 1
 }
 
 

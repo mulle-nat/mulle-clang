@@ -3582,9 +3582,10 @@ void CGDebugInfo::EmitDeclare(const VarDecl *VD, llvm::Value *Storage,
           continue;
 
         // Use VarDecl's Tag, Scope and Line number.
+        // Do not preserve variable, when optimizing
         auto FieldAlign = getDeclAlignIfRequired(Field, CGM.getContext());
         auto *D = DBuilder.createAutoVariable(
-            Scope, FieldName, Unit, Line, FieldTy, CGM.getLangOpts().Optimize,
+            Scope, FieldName, Unit, Line, FieldTy, true, // CGM.getLangOpts().Optimize ? false : true,
             Flags | llvm::DINode::FlagArtificial, FieldAlign);
 
         // Insert an llvm.dbg.declare into the current block.
@@ -3610,6 +3611,7 @@ void CGDebugInfo::EmitDeclare(const VarDecl *VD, llvm::Value *Storage,
                          llvm::DebugLoc::get(Line, Column, Scope, CurInlinedAt),
                          Builder.GetInsertBlock());
 }
+
 
 void CGDebugInfo::EmitDeclareOfAutoVariable(const VarDecl *VD,
                                             llvm::Value *Storage,
@@ -3703,6 +3705,41 @@ void CGDebugInfo::EmitDeclareOfArgVariable(const VarDecl *VD, llvm::Value *AI,
   assert(DebugKind >= codegenoptions::LimitedDebugInfo);
   EmitDeclare(VD, AI, ArgNo, Builder);
 }
+
+// @mulle-clang@ emit
+void CGDebugInfo::EmitDeclareOfMetaABIArgVariable(const FieldDecl *Field,
+                                                  unsigned idx,
+                                                  llvm::Value *Storage,
+                                                  CGBuilderTy &Builder) {
+  assert(DebugKind >= codegenoptions::LimitedDebugInfo);
+  llvm::DIFile *Unit = getOrCreateFile(Field->getLocation());
+  llvm::DIType *FieldTy = getOrCreateType(Field->getType(), Unit);
+  StringRef FieldName = Field->getName();
+
+  SmallVector<int64_t, 4> Expr;
+
+  unsigned AddressSpace = CGM.getContext().getTargetAddressSpace(Field->getType());
+  AppendAddressSpaceXDeref(AddressSpace, Expr);
+
+  llvm::DINode::DIFlags Flags = llvm::DINode::FlagZero | llvm::DINode::FlagArtificial;
+
+  // Use VarDecl's Tag, Scope and Line number.
+  auto *Scope = cast<llvm::DIScope>(LexicalBlockStack.back());
+  unsigned Line = getLineNumber(Field->getLocation());
+  unsigned Column = getColumnNumber(Field->getLocation());
+  // auto FieldAlign = getDeclAlignIfRequired(Field, CGM.getContext());
+  // +3 for self, _cmd, _param, +1 because it starts with 1
+  auto *D = DBuilder.createParameterVariable(
+                      Scope, FieldName, idx + 3 + 1, Unit, Line, FieldTy,
+                      CGM.getLangOpts().Optimize ? false : true, Flags);
+
+  // Insert an llvm.dbg.declare into the current block.
+  DBuilder.insertDeclare(
+      Storage, D, DBuilder.createExpression(Expr),
+      llvm::DebugLoc::get(Line, Column, Scope, CurInlinedAt),
+      Builder.GetInsertBlock());
+}
+///@mulle-clang@ emit debugger info for MetaAB
 
 namespace {
 struct BlockLayoutChunk {

@@ -17,6 +17,7 @@
 #include "CGBlocks.h"
 #include "CGCXXABI.h"
 #include "CGCleanup.h"
+#include "CGRecordLayout.h"
 #include "CodeGenFunction.h"
 #include "CodeGenModule.h"
 #include "TargetInfo.h"
@@ -575,7 +576,7 @@ CodeGenTypes::arrangeUnprototypedObjCMessageSend(QualType returnType,
            break;
         }
      default:
-        llvm_unreachable( "called a non-metabi compatible method w/o a prototype");
+        llvm_unreachable( "called a non-metaABI compatible method w/o a prototype");
      }
 
 
@@ -2421,14 +2422,15 @@ void CodeGenFunction::EmitFunctionProlog(const CGFunctionInfo &FI,
         llvm::Value *V = FnArgs[FirstIRArg];
         auto AI = cast<llvm::Argument>(V);
 
-         // @mulle-objc@ language: make implicit nonnullable in llvm if so desired
-         if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
-         {
-            if (const ImplicitParamDecl *IPD = dyn_cast<ImplicitParamDecl>(Arg)) {
-               if (IPD->getAttr<NonNullAttr>())
-                  AI->addAttr( llvm::Attribute::NonNull);
-            }
-         }
+        // @mulle-objc@ language: make implicit nonnullable in llvm if so desired >
+        if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+        {
+          if (const ImplicitParamDecl *IPD = dyn_cast<ImplicitParamDecl>(Arg)) {
+            if (IPD->getAttr<NonNullAttr>())
+              AI->addAttr( llvm::Attribute::NonNull);
+          }
+        }
+        // @mulle-objc@ language: make implicit nonnullable in llvm if so desired >
 
         if (const ParmVarDecl *PVD = dyn_cast<ParmVarDecl>(Arg)) {
           if (getNonNullAttr(CurCodeDecl, PVD, PVD->getType(),
@@ -2512,30 +2514,99 @@ void CodeGenFunction::EmitFunctionProlog(const CGFunctionInfo &FI,
         // possible for the type of an argument to not match the corresponding
         // type in the function type. Since we are codegening the callee
         // in here, add a cast to the argument type.
+
         llvm::Type *LTy = ConvertType(Arg->getType());
         if (V->getType() != LTy)
         {
-            // @mulle-objc@ MetaABI: function argument _param, cast from void pointer to uintptr_t (methods only)
-            if( CGM.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+          // @mulle-objc@ MetaABI: function argument _param, cast from void pointer to uintptr_t (methods only)
+          if( CGM.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+          {
+            if( dyn_cast_or_null<ObjCMethodDecl>(CurCodeDecl))
             {
-               if( dyn_cast_or_null<ObjCMethodDecl>(CurCodeDecl))
-               {
-                  if( AI->getArgNo() == 2) // after _cmd
-                  {
-                     // got to be but check anyway, cast it to long
-                     if( V->getType()->isPointerTy() && Arg->getType()->isIntegerType())
-                     {
-                        V = Builder.CreatePtrToInt( V, ConvertType( getContext().getUIntPtrType()));
-                        V = Builder.CreateIntCast( V, LTy, true);
-                     }
-                  }
-               }
+              if( AI->getArgNo() == 2) // after _cmd
+              {
+                // got to be but check anyway, cast it to long
+                if( V->getType()->isPointerTy() && Arg->getType()->isIntegerType())
+                {
+                   V = Builder.CreatePtrToInt( V, ConvertType( getContext().getUIntPtrType()));
+                   V = Builder.CreateIntCast( V, LTy, true);
+                }
+              }
             }
+          }
+          // @mulle-objc@ MetaABI: function argument _param, cast from void pointer to uintptr_t (methods only)
 
-            // @mulle-objc@ MetaABI: lost this bitcast last time in the merge
-            V = Builder.CreateBitCast(V, LTy);
+          // @mulle-objc@ MetaABI: lost this bitcast last time in the merge
+          V = Builder.CreateBitCast(V, LTy);
         }
         ArgVals.push_back(ParamValue::forDirect(V));
+
+        // @mulle-objc@ MetaABI: make _param input fields available to debugger >
+        {
+          const ObjCMethodDecl *methodDecl;
+
+          methodDecl = dyn_cast_or_null<ObjCMethodDecl>(CurCodeDecl);
+          if( methodDecl && AI->getArgNo() == 2 && methodDecl->getParamRecord())
+          {
+            RecordDecl   *RD;
+            FieldDecl    *FD;
+
+            RD = methodDecl->getParamRecord();
+
+            const ASTRecordLayout &ASTLayout = CGM.getContext().getASTRecordLayout(RD);
+            const CGRecordLayout &CGLayout = CGM.getTypes().getCGRecordLayout(RD);
+//                  const llvm::StructLayout *llvmStructLayout = CGM.getDataLayout().getStructLayout(
+//                                           CGM.getContext().getTagDeclType( RD));
+
+            Address _paramAddr = Address( FnArgs[ 2], getPointerAlign());
+            assert( _paramAddr.isValid());
+
+            for( RecordDecl::field_iterator CurField = RD->field_begin(),
+                                            SentinelField = RD->field_end();
+                 CurField != SentinelField;
+                 CurField++)
+            {
+              FD=*CurField;
+              // create a GEP to access the field like this then add a declare
+              // for that we need an individual alloca
+              //   %4 = getelementptr inbounds %struct.metaabi, %struct.metaabi* %3, i32 0, i32 0, !dbg !19
+              // call void @llvm.dbg.declare(metadata i32* %4, metadata !43, metadata !DIExpression()), !dbg !17
+
+//                    Address Alloca = CreateMemTemp( FD->getType(),
+//                                                    getContext().getDeclAlign(FD),
+//                                                    FD->getName());
+//
+              unsigned idx = CGLayout.getLLVMFieldNo(FD);
+              CharUnits offset;
+
+              // Adjust the alignment down to the given offset.
+              // As a special case, if the LLVM field index is 0, we know that this
+              // is zero.
+              assert((idx != 0 || ASTLayout.getFieldOffset(FD->getFieldIndex()) == 0) &&
+                     "LLVM field at index zero had non-zero offset?");
+              if (idx != 0) {
+                auto offsetInBits = ASTLayout.getFieldOffset(FD->getFieldIndex());
+                offset = getContext().toCharUnitsFromBits(offsetInBits);
+              }
+
+              Address varAddress = Builder.CreateStructGEP( _paramAddr, idx, offset);
+              assert( varAddress.isValid());
+
+              // Emit debug info for param declaration.
+              if (CGDebugInfo *DI = getDebugInfo()) {
+                if (CGM.getCodeGenOpts().getDebugInfo() >=
+                    codegenoptions::LimitedDebugInfo) {
+                  DI->EmitDeclareOfMetaABIArgVariable(FD, idx, varAddress.getPointer(), Builder);
+                  // fprintf( stderr, "***Emitting MetaABI variable \"%s\": ", FD->getName().data());
+                  // varAddress.getPointer()->printAsOperand( llvm::dbgs());
+                  // fprintf( stderr, "\n");
+                }
+              }
+            }
+          }
+        }
+        // @mulle-objc@ MetaABI: make _param input fields available to debugger <
+
         break;
       }
 
@@ -4034,20 +4105,20 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
           V = Builder.CreateLoad(RV.getAggregateAddress());
 
         // @mulle-objc@ MetaABI: function call argument, cast into void *, if dst is objc method (or NULL)
-	if( ArgNo == 2 && CGM.getLangOpts().ObjCRuntime.hasMulleMetaABI())
-	{
-            const ObjCMethodDecl *MD = dyn_cast_or_null<ObjCMethodDecl>( Callee.getAbstractInfo().getCalleeDecl());
+      	if( ArgNo == 2 && CGM.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+      	{
+          const ObjCMethodDecl *MD = dyn_cast_or_null<ObjCMethodDecl>( Callee.getAbstractInfo().getCalleeDecl());
 
-            if( ! Callee.getAbstractInfo().getCalleeDecl() || (MD && ! MD->getParamDecl()))
-	    {
-               // promote all non pointers to uintptr_t and make them pointers
-	       if( ! V->getType()->isPointerTy())
-	       {
-                  V = Builder.CreateSExt( V, ConvertType( getContext().getUIntPtrType()));
-	          V = Builder.CreateIntToPtr( V, ArgInfo.getCoerceToType());
-	       }
-	    }
-	}
+          if( ! Callee.getAbstractInfo().getCalleeDecl() || (MD && ! MD->getParamDecl()))
+    	    {
+                   // promote all non pointers to uintptr_t and make them pointers
+            if( ! V->getType()->isPointerTy())
+            {
+                    V = Builder.CreateSExt( V, ConvertType( getContext().getUIntPtrType()));
+              V = Builder.CreateIntToPtr( V, ArgInfo.getCoerceToType());
+            }
+    	    }
+      	}
         // @mulle-objc@ MetaABI: <-
 
         // Implement swifterror by copying into a new swifterror argument.

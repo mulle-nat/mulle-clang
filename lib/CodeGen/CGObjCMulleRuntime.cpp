@@ -82,7 +82,7 @@ extern "C"
 
 namespace {
 
-   struct clang_mulle_objc_compiler_info
+   struct mulle_clang_objccompilerinfo
    {
       uint32_t   load_version;
       uint32_t   runtime_version;
@@ -782,7 +782,7 @@ namespace {
 
    protected:
       llvm::LLVMContext &VMContext;
-      struct clang_mulle_objc_compiler_info   runtime_info;
+      struct mulle_clang_objccompilerinfo   runtime_info;
 
       uint32_t   foundation_version;
       uint32_t   user_version;
@@ -1180,7 +1180,7 @@ namespace {
       VarDecl     *CreateCompilerInfoVarDecl( void);
 
       void  fillRuntimeInfoWithGlobal( llvm::GlobalValue *global);
-      struct clang_mulle_objc_compiler_info  *getMulleObjCRuntimeInfo( void);
+      struct mulle_clang_objccompilerinfo  *getMulleObjCRuntimeInfo( void);
 
 #pragma mark - Method Call Declarations
       const CGFunctionInfo   &GenerateFunctionInfo( QualType arg0Ty,
@@ -1570,7 +1570,7 @@ RecordDecl  *CGObjCMulleRuntime::CreateCompilerInfoRecordDecl( void)
    RecordDecl      *RD;
 
    Context  = &CGM.getContext();
-   RecordID = &Context->Idents.get( "clang_mulle_objc_compiler_info");
+   RecordID = &Context->Idents.get( "mulle_clang_objccompilerinfo");
    RD       = RecordDecl::Create( *Context,
                                   TTK_Struct,
                                   Context->getTranslationUnitDecl(),
@@ -1622,7 +1622,7 @@ VarDecl  *CGObjCMulleRuntime::CreateCompilerInfoVarDecl( void)
    RD            = CreateCompilerInfoRecordDecl();
    QualType type = CGM.getContext().getTagDeclType( RD);
 
-   VariableID = &CGM.getContext().Idents.get( "__mulle_objc_compiler_info");
+   VariableID = &CGM.getContext().Idents.get( "__mulle_objc_objccompilerinfo");
    VD         = VarDecl::Create( CGM.getContext(),
                                  CGM.getContext().getTranslationUnitDecl(),
                                  SourceLocation(),
@@ -1635,7 +1635,7 @@ VarDecl  *CGObjCMulleRuntime::CreateCompilerInfoVarDecl( void)
 }
 
 
-struct clang_mulle_objc_compiler_info  *CGObjCMulleRuntime::getMulleObjCRuntimeInfo( void)
+struct mulle_clang_objccompilerinfo  *CGObjCMulleRuntime::getMulleObjCRuntimeInfo( void)
 {
    if( this->runtime_info.load_version)
       return( &this->runtime_info);
@@ -1646,7 +1646,7 @@ struct clang_mulle_objc_compiler_info  *CGObjCMulleRuntime::getMulleObjCRuntimeI
    // preferable to allow the emission of code w/o the mulle-objc-runtime.h
    //
    // Your code needs to specify a global variable like this:
-   // static const struct clang_mulle_objc_compiler_info
+   // static const struct mulle_clang_objccompilerinfo
    // {
    //    unsigned int   load_version;
    //    unsigned int   runtime_version;
@@ -1665,7 +1665,7 @@ struct clang_mulle_objc_compiler_info  *CGObjCMulleRuntime::getMulleObjCRuntimeI
 
       TUDecl = CGM.getContext().getTranslationUnitDecl();
       DC     = TranslationUnitDecl::castToDeclContext(TUDecl);
-      InfoID = &CGM.getContext().Idents.get( "__mulle_objc_compiler_info");
+      InfoID = &CGM.getContext().Idents.get( "__mulle_objc_objccompilerinfo");
       VD     = nullptr;
 
       DeclContext::lookup_result R = DC->lookup( InfoID);
@@ -1962,9 +1962,15 @@ llvm::Constant *CGObjCMulleRuntime::GetEHType(QualType T) {
 llvm::StructType *CGObjCCommonMulleRuntime::CreateNSConstantStringType( void)
 {
    ASTContext   &Context = CGM.getContext();
+   SourceLocation Loc;
+   RecordDecl *D;
 
-   // Construct the type for a constant NSString.
-   RecordDecl *D = Context.buildImplicitRecord("__builtin_NSString");
+   D = RecordDecl::Create(Context, TTK_Struct, Context.getTranslationUnitDecl(), Loc, Loc,
+                                 &Context.Idents.get("__builtin_NSString"));
+   D->setImplicit();
+   D->addAttr(TypeVisibilityAttr::CreateImplicit(
+        Context, TypeVisibilityAttr::Default));
+
    D->startDefinition();
 
    QualType FieldTypes[4];
@@ -2291,7 +2297,7 @@ ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
    //
    // create a tagged pointer for strings, if the constant matches
    //
-   if( this->no_tagged_pointers && SL->getKind() == StringLiteral::Ascii)
+   if( ! this->no_tagged_pointers && SL->getKind() == StringLiteral::Ascii)
    {
       unsigned WordSizeInBits = CGM.getTarget().getPointerWidth(0);
 
@@ -3343,11 +3349,17 @@ static RecordDecl   *create_union_type( ASTContext *context,
                                         QualType rvalType,
                                         bool hasRvalType)
 {
-   QualType       FieldTypes[3];
-   const char     *FieldNames[3];
-   unsigned int   i, n;
+   QualType         FieldTypes[3];
+   const char       *FieldNames[3];
+   unsigned int     i, n;
+   SourceLocation   Loc;
+   RecordDecl       *UD;
 
-   RecordDecl  *UD = context->buildImplicitRecord( "_u_args");
+   UD = RecordDecl::Create( *context, TTK_Union, context->getTranslationUnitDecl(), Loc, Loc,
+                              &context->Idents.get("_u_args"));
+   UD->setImplicit();
+   UD->addAttr(TypeVisibilityAttr::CreateImplicit(
+        *context, TypeVisibilityAttr::Default));
 
    UD->setTagKind( TTK_Union);
    UD->startDefinition();
@@ -5161,9 +5173,9 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
 
    // if we are called from CreateLLVMCodeGen and friends, the ParserDidFinish
    // will not have been called. Yikes! Then we need the
-   // clang_mulle_objc_compiler_info global, which we may read now
+   // mulle_clang_objccompilerinfo global, which we may read now
    //
-   struct clang_mulle_objc_compiler_info  *runtime_info;
+   struct mulle_clang_objccompilerinfo  *runtime_info;
 
    runtime_info = getMulleObjCRuntimeInfo();
 

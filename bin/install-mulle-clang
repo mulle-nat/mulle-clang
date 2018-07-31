@@ -82,6 +82,7 @@ EOF
    --no-clang           : do not build clang
    --no-lldb            : do not build mulle-lldb
    --no-ninja           : use make instead of ninja
+   --debug              : build everyting DEBUG (not recommended)
    --separate           : place mulle-clang outside of src/llvm (implied -no-lldb)
    -n                   : dry run
    -v                   : be verbose
@@ -89,6 +90,7 @@ EOF
       if [ "${VERBOSE}" = "YES" ]
       then
       cat <<EOF
+   --clang-debug        : build clang as debug only
    --clang-prefix <dir> : install prefix for clang
    --lldb-prefix <dir>  : install prefix for lldb
    --llvm-prefix <dir>  : install prefix for llvm

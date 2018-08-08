@@ -2377,7 +2377,8 @@ ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
                                   false,
                                   llvm::GlobalVariable::PrivateLinkage,
                                   NSStringHeader,
-                                  "_unnamed_nsstring_header");
+                                  "__unnamed_nsstring"); // add underscore for header
+                                                         // easier for the debugger
    // FIXME. Fix section.
    GV->setSection( "__DATA,__objc_stringobj,regular,no_dead_strip");
    GV->setConstant( false);
@@ -2388,7 +2389,7 @@ ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
    llvm::Constant     *C = getConstantGEP( VMContext, GV, 0, 2);
    llvm::GlobalAlias  *GA = llvm::GlobalAlias::create( CType,
                                                        0,
-                                                       llvm::GlobalVariable::InternalLinkage,
+                                                       llvm::GlobalVariable::PrivateLinkage,
                                                        Twine( "_unnamed_nsstring"),
                                                        C,
                                                        &CGM.getModule());

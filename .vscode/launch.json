@@ -44,7 +44,12 @@
                    "-x", "c",
                    "/Volumes/Source/srcO/MulleFoundation/MulleObjCOSFoundation/crash.c"
                   ],
-         "cwd": "${workspaceFolder}"
+         "cwd": "${workspaceFolder}",
+         "stopAtEntry": false,
+         "linux": {
+            "MIMode": "lldb",
+            "miDebuggerPath": "/usr/bin/mulle-lldb"
+         },         
       }
    ]
 }

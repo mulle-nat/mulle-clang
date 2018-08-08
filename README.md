@@ -4,7 +4,7 @@
 
 This is an Objective-C compiler based on clang 6.0, written for the
 [mulle-objc](//www.mulle-kybernetik.com/weblog/2015/mulle_objc_a_new_objective_c_.html)
-runtime. It corresponds to mulle-objc-runtime v0.12 or better.
+runtime. It corresponds to mulle-objc-runtime v0.13 or better.
 
 > See [README.txt](README.txt) for more information about clang
 
@@ -149,11 +149,9 @@ defined in the runtime.
 ## Install
 
 
-<!--
-
 ### OS X
 
-You can use [homebrew](//brew.sh) to install the library:
+You can use [homebrew](//brew.sh) to install the compiler (only):
 
 ```
 brew install codeon-gmbh/software/mulle-clang
@@ -163,15 +161,9 @@ brew install codeon-gmbh/software/mulle-clang
 > built from source. This takes a long time! On my Macbook Air the build
 > took about 30 minutes, even with the prerequisite llvm downloaded as a bottle.
 
--->
+### Ubuntu
 
-<!--
-
-### Linux
-
-### Ubuntu Linux
-
-You can install mulle-clang via **apt-get**:
+You can install mulle-clang with mulle-lldb via **apt-get** on Ubuntu bionic and trusty:
 
 ```
 sudo apt-get update &&
@@ -184,34 +176,22 @@ sudo apt-get update &&
 sudo apt-get install mulle-clang
 ```
 
-#### Debian stretch 64 bit
+#### Debian 
+
+You can install on Debian (and Ubuntu) with:
 
 ```
-curl -O -L http://download.codeon.de/dists/zesty/main/binary-amd64/mulle-clang-5.0.0.2-zesty-amd64.deb
-sudo dpkg --install mulle-clang-5.0.0.2-zesty-amd64.deb
+OS="`lsb_release -s -c`" \
+curl -O -L http://download.codeon.de/dists/${OS}/main/binary-amd64/mulle-clang-6.0.0.4-${OS}-amd64.deb && \
+sudo dpkg --install mulle-clang-6.0.0.4-${OS}-amd64.deb
 ```
 
-Checksum         | Result
------------------|------------------
-shasum -b -a 256 | f8cc19435ad82b5efa35628500e0ee35c9bcf13d84ad7c27523c619b336e24ae
-
-
-#### Debian jessie 64 bit
-
-```
-curl -O -L http://download.codeon.de/dists/zesty/main/binary-amd64/mulle-clang-5.0.0.2-trusty-amd64.deb
-sudo dpkg --install mulle-clang-5.0.0.2-trusty-amd64.deb
-```
-
-Checksum         | Result
------------------|------------------
-shasum -b -a 256 | 75c5f1f4d75bd664ea9b932390113eb31cd80ad2bfbc30e15c7b3a27dd344f81
-
+Checksum         | OS     | Result
+-----------------|--------|-------------
+shasum -b -a 256 | trusty | 98b5364d6cb23d662813680431183b45e523a15fbca5f92909c3e79df0a3603b
+shasum -b -a 256 | bionic | 373daf1e82229270b11855cf867bc21b98d129fa96cf6a03a42d7844881a9567
 
 ### FreeBSD, Windows and others
-
-
--->
 
 * [How to Build](BUILD_MULLE_CLANG.md)
 

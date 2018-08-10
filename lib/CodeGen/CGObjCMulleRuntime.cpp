@@ -2387,9 +2387,15 @@ ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
    llvm::Type         *CType = CGM.getTypes().ConvertTypeForMem( CharType);
 
    llvm::Constant     *C = getConstantGEP( VMContext, GV, 0, 2);
+
+   //
+   // if this is not InternalLinkage I get
+   // fatal error: error in backend: unsupported relocation of variable 'L__unnamed_nsstring.41'
+   // on darwin
+   //
    llvm::GlobalAlias  *GA = llvm::GlobalAlias::create( CType,
                                                        0,
-                                                       llvm::GlobalVariable::PrivateLinkage,
+                                                       llvm::GlobalVariable::InternalLinkage,
                                                        Twine( "_unnamed_nsstring"),
                                                        C,
                                                        &CGM.getModule());

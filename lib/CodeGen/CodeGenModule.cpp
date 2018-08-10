@@ -177,6 +177,7 @@ void CodeGenModule::createObjCRuntime() {
   // This is just isGNUFamily(), but we want to force implementors of
   // new ABIs to decide how best to do this.
   switch (LangOpts.ObjCRuntime.getKind()) {
+  // @mulle-objc@ compiler: disable all other objc runtimes >
   case ObjCRuntime::GNUstep:
   case ObjCRuntime::GCC:
   case ObjCRuntime::ObjFW:
@@ -189,6 +190,7 @@ void CodeGenModule::createObjCRuntime() {
   case ObjCRuntime::WatchOS:
     ObjCRuntime.reset(CreateMacObjCRuntime(*this));
     return;
+  // @mulle-objc@ compiler: disable all other runtimes <
    
   // @mulle-objc@ compiler: add ObjCRuntime::Mulle to runtimes >
   case ObjCRuntime::Mulle:

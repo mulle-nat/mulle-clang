@@ -182,14 +182,14 @@ You can install on Debian (and Ubuntu) with:
 
 ```
 OS="`lsb_release -s -c`" \
-curl -O -L http://download.codeon.de/dists/${OS}/main/binary-amd64/mulle-clang-6.0.0.4-${OS}-amd64.deb && \
-sudo dpkg --install mulle-clang-6.0.0.4-${OS}-amd64.deb
+curl -O -L http://download.codeon.de/dists/${OS}/main/binary-amd64/mulle-clang-6.0.0.6-${OS}-amd64.deb && \
+sudo dpkg --install mulle-clang-6.0.0.6-${OS}-amd64.deb
 ```
 
 Checksum         | OS     | Result
 -----------------|--------|-------------
-shasum -b -a 256 | trusty | 98b5364d6cb23d662813680431183b45e523a15fbca5f92909c3e79df0a3603b
-shasum -b -a 256 | bionic | 373daf1e82229270b11855cf867bc21b98d129fa96cf6a03a42d7844881a9567
+shasum -b -a 256 | bionic | d0846a036f3160679be8e4d4adb10d9e9d44f728754b6a2d062d915598a558cc
+shasum -b -a 256 | trusty | d61b6e80dad80cfc965afc271e5750fd97cf6a87e0be625077fa06d7065e30cd
 
 ### FreeBSD, Windows and others
 

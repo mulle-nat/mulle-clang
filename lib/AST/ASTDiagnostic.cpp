@@ -125,6 +125,9 @@ static QualType Desugar(ASTContext &Context, QualType QT, bool &ShouldAKA) {
     }
 
     // Don't desugar magic Objective-C types.
+    // @mulle-objc@ But only ask if running ObjC for now >
+    if (Context.getLangOpts().ObjC1 || Context.getLangOpts().ObjC2)
+    // @mulle-objc@ But only ask if running ObjC for now <
     if (QualType(Ty,0) == Context.getObjCIdType() ||
         QualType(Ty,0) == Context.getObjCClassType() ||
         QualType(Ty,0) == Context.getObjCSelType() ||

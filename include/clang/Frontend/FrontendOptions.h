@@ -160,6 +160,9 @@ public:
     C,
     CXX,
     ObjC,
+//@mulle-objc@ >
+    ObjCAAM,
+//@mulle-objc@ <
     ObjCXX,
     OpenCL,
     CUDA,

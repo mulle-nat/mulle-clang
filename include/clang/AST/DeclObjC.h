@@ -200,6 +200,12 @@ private:
   void *ParamsAndSelLocs = nullptr;
   unsigned NumParams = 0;
 
+  // @mulle-objc@ MetaABI: ivars ParamRecord
+  RecordDecl    *ParamRecord;
+
+  // return value record (if needed)
+  RecordDecl    *RvalRecord;
+
   /// List of attributes for this method declaration.
   SourceLocation DeclEndLoc; // the location of the ';' or '{'.
 
@@ -213,6 +219,13 @@ private:
   /// CmdDecl - Decl for the implicit _cmd parameter. This is lazily
   /// constructed by createImplicitParams.
   ImplicitParamDecl *CmdDecl = nullptr;
+
+   /// @mulle-objc@ MetaABI: ParamDecl storage of declaration >>>
+   /// Para,Decl - Decl for the implicit _param parameter. This is lazily
+   /// constructed by ActOnMethodDeclaration.
+  ImplicitParamDecl *ParamDecl;
+  bool              _isMetaABIVoidPointerParam;
+   /// @mulle-objc@ MetaABI: ParamDecl storage of declaration <<<
 
   ObjCMethodDecl(SourceLocation beginLoc, SourceLocation endLoc,
                  Selector SelInfo, QualType T, TypeSourceInfo *ReturnTInfo,
@@ -229,7 +242,13 @@ private:
         objcDeclQualifier(OBJC_TQ_None),
         RelatedResultType(HasRelatedResultType),
         SelLocsKind(SelLoc_StandardNoSpace), IsOverriding(0), HasSkippedBody(0),
-        MethodDeclType(T), ReturnTInfo(ReturnTInfo), DeclEndLoc(endLoc) {
+        MethodDeclType(T), ReturnTInfo(ReturnTInfo), DeclEndLoc(endLoc),
+    /// @mulle-objc@ MetaABI: initialize storage of parameter ivars >>>
+        ParamDecl( nullptr) {
+    ParamRecord = nullptr;
+    RvalRecord = nullptr;
+    _isMetaABIVoidPointerParam = false;
+    /// @mulle-objc@ MetaABI: initialize storage of parameter ivars <<<
     setImplicit(isImplicitlyDeclared);
   }
 
@@ -431,6 +450,26 @@ public:
   param_type_iterator param_type_end() const {
     return llvm::map_iterator(param_end(), GetTypeFn());
   }
+
+  // @mulle-objc@ MetaABI: paramRecord, paramDecl accessors
+  // struct {}
+  RecordDecl   *getParamRecord() const { return ParamRecord; }
+  void setParamRecord( RecordDecl  *RD) { ParamRecord = RD; }
+
+  // struct {}  *param
+  ImplicitParamDecl * getParamDecl() const { return ParamDecl; }
+  void setParamDecl(ImplicitParamDecl *PD) { ParamDecl = PD; }
+
+  bool isMetaABIVoidPointerParam() const { return _isMetaABIVoidPointerParam; }
+  void setMetaABIVoidPointerParam(bool Flag) { _isMetaABIVoidPointerParam = Flag; }
+
+  // struct {} rval;
+  RecordDecl   *getRvalRecord() const { return RvalRecord; }
+  void setRvalRecord( RecordDecl  *RD) { RvalRecord = RD; }
+
+
+  // @mulle-objc@ MetaABI:  method FindParamRecordField for parameters
+  FieldDecl  *FindParamRecordField( IdentifierInfo *II);
 
   /// createImplicitParams - Used to lazily create the self and cmd
   /// implict parameters. This must be called prior to using getSelfDecl()
@@ -1525,6 +1564,9 @@ public:
   /// objc_runtime_name attribute or class name.
   StringRef getObjCRuntimeNameAsString() const;
 
+// @mulle-objc@ codegen: make an ivar hash string for fragility fix
+  std::string  getIvarHashString( ASTContext &C) const;
+
   /// Returns the designated initializers for the interface.
   ///
   /// If this declaration does not have methods marked as designated
@@ -1854,6 +1896,15 @@ public:
     ObjCInterfaceDecl *ClassDeclared;
     return lookupInstanceVariable(IVarName, ClassDeclared);
   }
+
+// @mulle-objc@ language: compatible lookup of instance variable for property
+  ObjCIvarDecl *lookupInstanceVariableOfProperty( ASTContext &C, IdentifierInfo *PropertyName,
+                                       ObjCInterfaceDecl *&ClassDeclared);
+  ObjCIvarDecl *lookupInstanceVariableOfProperty( ASTContext &C, IdentifierInfo *PropertyName) {
+    ObjCInterfaceDecl *ClassDeclared;
+    return lookupInstanceVariableOfProperty( C, PropertyName, ClassDeclared);
+  }
+
 
   ObjCProtocolDecl *lookupNestedProtocol(IdentifierInfo *Name);
 
@@ -2702,6 +2753,9 @@ public:
   std::string getNameAsString() const {
     return getName();
   }
+
+  // @mulle-objc@ codegen: make an ivar hash string for fragility fix
+  std::string getIvarHashString() const;
 
   /// Produce a name to be used for class's metadata. It comes either via
   /// class's objc_runtime_name attribute or class name.

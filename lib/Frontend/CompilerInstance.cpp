@@ -1022,7 +1022,7 @@ static InputKind::Language getLanguageFromOptions(const LangOptions &LangOpts) {
   if (LangOpts.CUDA)
     return InputKind::CUDA;
   if (LangOpts.ObjC1)
-    return LangOpts.CPlusPlus ? InputKind::ObjCXX : InputKind::ObjC;
+    return LangOpts.CPlusPlus ? InputKind::ObjCXX :  (LangOpts.ObjCAllocsAutoreleasedObjects ? InputKind::ObjCAAM : InputKind::ObjC);
   return LangOpts.CPlusPlus ? InputKind::CXX : InputKind::C;
 }
 

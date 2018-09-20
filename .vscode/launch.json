@@ -1,0 +1,55 @@
+{
+   // Use IntelliSense to learn about possible attributes.
+   // Hover to view descriptions of existing attributes.
+   // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+   "version": "0.2.0",
+   "configurations": [
+      {
+         "type": "lldb",
+         "request": "launch",
+         "name": "Debug",
+         "program": "${workspaceFolder}/../../build/mulle-clang.d/bin/clang",
+         "args": [ "-cc1", 
+                   "-triple", "x86_64-unknown-linux-gnu", 
+                   "-emit-obj",  
+                   "-mrelax-all",  
+                   "-disable-free",  
+                   "-disable-llvm-verifier",  
+                   "-discard-value-names", 
+                   "-main-file-name", "crash-0fd447.c", 
+                   "-mrelocation-model", "static",
+                   "-mthread-model", "posix",
+                   "-mdisable-fp-elim",
+                   "-fmath-errno",
+                   "-masm-verbose",
+                   "-mconstructor-aliases",
+                   "-munwind-tables",
+                   "-fuse-init-array",
+                   "-target-cpu", "x86-64",
+                   "-dwarf-column-info",
+                   "-debugger-tuning=gdb",
+                   "-coverage-notes-file", "/home/nat/srcO/MulleFoundation/MulleObjCOSFoundation/crash-0fd447.gcno",
+                   "-resource-dir", "/opt/mulle-clang/6.0.0.1/lib/clang/6.0.0",
+                   "-internal-isystem", "/usr/local/include",
+                   "-internal-isystem", "/opt/mulle-clang/6.0.0.1/lib/clang/6.0.0/include",
+                   "-internal-externc-isystem", "/usr/include/x86_64-linux-gnu",
+                   "-internal-externc-isystem", "/include",
+                   "-internal-externc-isystem", "/usr/include", 
+                   "-fdebug-compilation-dir", "/home/nat/srcO/MulleFoundation/MulleObjCOSFoundation",
+                   "-ferror-limit", "19",
+                   "-fmessage-length", "162",
+                   "-fobjc-runtime=mulle",
+                   "-fdiagnostics-show-option",
+                   "-o", "/tmp/crash-0fd447.o",
+                   "-x", "c",
+                   "/Volumes/Source/srcO/MulleFoundation/MulleObjCOSFoundation/crash.c"
+                  ],
+         "cwd": "${workspaceFolder}",
+         "stopAtEntry": false,
+         "linux": {
+            "MIMode": "lldb",
+            "miDebuggerPath": "/usr/bin/mulle-lldb"
+         },         
+      }
+   ]
+}

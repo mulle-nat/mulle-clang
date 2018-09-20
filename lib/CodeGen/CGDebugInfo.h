@@ -67,6 +67,9 @@ class CGDebugInfo {
   llvm::DIType *ClassTy = nullptr;
   llvm::DICompositeType *ObjTy = nullptr;
   llvm::DIType *SelTy = nullptr;
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+  llvm::DIType *ProtocolTy = nullptr;
+  /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
 #define IMAGE_TYPE(ImgType, Id, SingletonId, Access, Suffix)                   \
   llvm::DIType *SingletonId = nullptr;
 #include "clang/Basic/OpenCLImageTypes.def"
@@ -410,6 +413,12 @@ public:
   void EmitDeclareOfArgVariable(const VarDecl *Decl, llvm::Value *AI,
                                 unsigned ArgNo, CGBuilderTy &Builder);
 
+  /// Emit call to \c llvm.dbg.declare for a MetaABI argument variable
+  /// declaration.
+  void EmitDeclareOfMetaABIArgVariable(const FieldDecl *Field,
+                                       unsigned idx,
+                                       llvm::Value *Storage,
+                                       CGBuilderTy &Builder);
   /// Emit call to \c llvm.dbg.declare for the block-literal argument
   /// to a block invocation function.
   void EmitDeclareOfBlockLiteralArgVariable(const CGBlockInfo &block,

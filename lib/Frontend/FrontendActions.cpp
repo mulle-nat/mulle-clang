@@ -769,6 +769,9 @@ void PrintPreambleAction::ExecuteAction() {
   case InputKind::C:
   case InputKind::CXX:
   case InputKind::ObjC:
+  // @mulle-objc@ AAM:  .aam filename extension support >
+  case InputKind::ObjCAAM:
+  // @mulle-objc@ AAM:  .aam filename extension support <
   case InputKind::ObjCXX:
   case InputKind::OpenCL:
   case InputKind::CUDA:

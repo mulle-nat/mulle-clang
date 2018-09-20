@@ -639,6 +639,28 @@ ObjCIvarDecl *ObjCInterfaceDecl::lookupInstanceVariable(IdentifierInfo *ID,
   return nullptr;
 }
 
+// @mulle-objc@ language: compatible lookup of instance variable for property
+ObjCIvarDecl *ObjCInterfaceDecl::lookupInstanceVariableOfProperty( ASTContext &C,
+                                                                   IdentifierInfo *PropertyName,
+                                                                   ObjCInterfaceDecl *&ClassDeclared)
+{
+   IdentifierInfo   *IvarIdentifier = PropertyName;
+   
+   //
+   // this should be somewhere alongside getDefaultSynthIvarName
+   // actually it's kind of curious, that this isn't the proper code
+   // in most cases
+   if( C.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+   {
+      std::string   underscored;
+   
+      underscored = "_" + std::string( IvarIdentifier->getNameStart());
+      IvarIdentifier = &C.Idents.get( underscored);
+   }
+
+   return( lookupInstanceVariable( IvarIdentifier, ClassDeclared));
+}
+
 /// lookupInheritedClass - This method returns ObjCInterfaceDecl * of the super
 /// class whose name is passed as argument. If it is not one of the super classes
 /// the it returns NULL.
@@ -1029,6 +1051,25 @@ ObjCMethodFamily ObjCMethodDecl::getMethodFamily() const {
   return family;
 }
 
+// @mulle-objc@ MetaABI: Lookup a _param FieldDecl by Identifier
+FieldDecl  *ObjCMethodDecl::FindParamRecordField( IdentifierInfo *II)
+{
+   IdentifierInfo   *FII;
+   
+   if( ! ParamRecord)
+      return( nullptr);
+   
+   for (RecordDecl::field_iterator Field = ParamRecord->field_begin(),
+        FieldEnd = ParamRecord->field_end(); Field != FieldEnd; ++Field)
+   {
+      FII = Field->getIdentifier();
+      if( FII == II)
+         return( Field->getCanonicalDecl());
+   }
+   return( nullptr);
+}
+
+
 QualType ObjCMethodDecl::getSelfType(ASTContext &Context,
                                      const ObjCInterfaceDecl *OID,
                                      bool &selfIsPseudoStrong,
@@ -1083,7 +1124,11 @@ void ObjCMethodDecl::createImplicitParams(ASTContext &Context,
                                          &Context.Idents.get("self"), selfTy,
                                          ImplicitParamDecl::ObjCSelf);
   setSelfDecl(Self);
-
+  // @mulle-objc@ declare self as non-null >
+  if( Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+      Self->addAttr( NonNullAttr::CreateImplicit( Context, 0, 0));
+  // @mulle-objc@ declare self as non-null <
+  
   if (selfIsConsumed)
     Self->addAttr(NSConsumedAttr::CreateImplicit(Context));
 
@@ -1500,6 +1545,7 @@ ObjCImplementationDecl::getObjCRuntimeNameAsString() const {
   return getName();
 }
 
+
 ObjCImplementationDecl *ObjCInterfaceDecl::getImplementation() const {
   if (const ObjCInterfaceDecl *Def = getDefinition()) {
     if (data().ExternallyCompleted)
@@ -1609,6 +1655,39 @@ ObjCIvarDecl *ObjCInterfaceDecl::all_declared_ivar_begin() {
   }
   return data().IvarList;
 }
+
+
+//
+// @mulle-objc@ codegen: make an ivar hash string for fragility fix
+// could cache this value
+std::string
+ObjCInterfaceDecl::getIvarHashString( ASTContext &C) const
+{
+  std::string   concat;
+  
+  for (const ObjCIvarDecl *Ivar = all_declared_ivar_begin(); Ivar;
+       Ivar = Ivar->getNextIvar())
+  {
+      std::string TypeStr;
+      QualType PType = Ivar->getType();
+   
+      C.getObjCEncodingForTypeImpl( PType, TypeStr, true, true, nullptr,
+                              true     /*OutermostType*/,
+                              false    /*EncodingProperty*/,
+                              false    /*StructField*/,
+                              false    /*EncodeBlockParameters*/,
+                              false    /*EncodeClassNames*/);
+      /* superflous, but make look nicey */
+      if( concat.size())
+         concat = concat + ',';
+      concat = concat + Ivar->getNameAsString();
+      concat = concat + ":";
+      concat = concat + TypeStr;
+  }
+  
+  return concat;
+}
+
 
 /// FindCategoryDeclaration - Finds category declaration in the list of
 /// categories for this class and returns it. Name of the category is passed

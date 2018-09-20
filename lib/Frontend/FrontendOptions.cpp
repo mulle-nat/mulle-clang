@@ -21,6 +21,9 @@ InputKind FrontendOptions::getInputKindForExtension(StringRef Extension) {
     .Case("ii", InputKind(InputKind::CXX).getPreprocessed())
     .Case("cui", InputKind(InputKind::CUDA).getPreprocessed())
     .Case("m", InputKind::ObjC)
+     // @mulle-objc@ AAM:  .aam filename extension support >
+    .Case("aam", InputKind::ObjCAAM)
+     // @mulle-objc@ AAM:  .aam filename extension support <
     .Case("mi", InputKind(InputKind::ObjC).getPreprocessed())
     .Cases("mm", "M", InputKind::ObjCXX)
     .Case("mii", InputKind(InputKind::ObjCXX).getPreprocessed())

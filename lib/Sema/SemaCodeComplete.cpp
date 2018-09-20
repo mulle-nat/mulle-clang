@@ -622,6 +622,9 @@ SimplifiedTypeClass clang::getSimplifiedTypeClass(CanQualType T) {
       case BuiltinType::ObjCId:
       case BuiltinType::ObjCClass:
       case BuiltinType::ObjCSel:
+      /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+      case BuiltinType::ObjCProtocol:
+      /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
         return STC_ObjectiveC;
 
       default:
@@ -1221,6 +1224,9 @@ static bool isObjCReceiverType(ASTContext &C, QualType T) {
     case BuiltinType::ObjCId:
     case BuiltinType::ObjCClass:
     case BuiltinType::ObjCSel:
+    /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+    case BuiltinType::ObjCProtocol:
+    /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
       return true;
 
     default:
@@ -5295,7 +5301,7 @@ static void AddObjCVisibilityResults(const LangOptions &LangOpts,
   Results.AddResult(Result(OBJC_AT_KEYWORD_NAME(NeedAt,"private")));
   Results.AddResult(Result(OBJC_AT_KEYWORD_NAME(NeedAt,"protected")));
   Results.AddResult(Result(OBJC_AT_KEYWORD_NAME(NeedAt,"public")));
-  if (LangOpts.ObjC2)
+  if (LangOpts.ObjC2 && ! LangOpts.ObjCRuntime.hasMulleMetaABI())
     Results.AddResult(Result(OBJC_AT_KEYWORD_NAME(NeedAt,"package")));
 }
 

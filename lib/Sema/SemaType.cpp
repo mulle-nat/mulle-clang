@@ -3743,6 +3743,10 @@ static void
 checkNullabilityConsistency(Sema &S, SimplePointerKind pointerKind,
                             SourceLocation pointerLoc,
                             SourceLocation pointerEndLoc = SourceLocation()) {
+  // @mulle-objc@ compiler: nullability completeness is not objective-c like
+  if( S.Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+     return;
+
   // Determine which file we're performing consistency checking for.
   FileID file = getNullabilityCompletenessCheckFileID(S, pointerLoc);
   if (file.isInvalid())
@@ -3929,7 +3933,9 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
   SourceLocation assumeNonNullLoc = S.PP.getPragmaAssumeNonNullLoc();
   if (assumeNonNullLoc.isValid()) {
     inAssumeNonNullRegion = true;
-    recordNullabilitySeen(S, assumeNonNullLoc);
+    // @mulle-objc@ compiler: nullability completeness is not objective-c like
+    if( ! S.Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+       recordNullabilitySeen(S, assumeNonNullLoc);
   }
 
   // Whether to complain about missing nullability specifiers or not.
@@ -6372,6 +6378,8 @@ bool Sema::checkNullabilityTypeSpecifier(QualType &type,
                                          SourceLocation nullabilityLoc,
                                          bool isContextSensitive,
                                          bool allowOnArrayType) {
+   // @mulle-objc@ compiler: nullability completeness is not objective-c like
+   if( ! Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
   recordNullabilitySeen(*this, nullabilityLoc);
 
   // Check for existing nullability attributes on the type.

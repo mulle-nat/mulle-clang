@@ -1439,6 +1439,23 @@ def fno_verbose_asm : Flag<["-"], "fno-verbose-asm">, Group<f_Group>;
 def fno_working_directory : Flag<["-"], "fno-working-directory">, Group<f_Group>;
 def fno_wrapv : Flag<["-"], "fno-wrapv">, Group<f_Group>;
 def fno_zero_initialized_in_bss : Flag<["-"], "fno-zero-initialized-in-bss">, Group<f_Group>;
+// mulle-objc@ options >
+def fobjc_tps : Flag<["-"], "fobjc-tps">, Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"use Objective-C tagged pointers for literals">;
+def fno_objc_tps : Flag<["-"], "fno-objc-tps">, Group<f_Group>, Flags<[CC1Option]>,
+   HelpText<"don't use Objective-C tagged pointers for literals">;
+def fobjc_fmc : Flag<["-"], "fobjc-fmc">, Group<f_Group>, Flags<[CC1Option]>,
+   HelpText<"use Objective-C fast method calls">;
+def fno_objc_fmc : Flag<["-"], "fno-objc-fmc">, Group<f_Group>, Flags<[CC1Option]>,
+   HelpText<"don't use Objective-C fast method calls">;
+def fobjc_trt : Flag<["-"], "fobjc-trt">, Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"use thread local Objective-C runtime">;
+def fno_objc_trt : Flag<["-"], "fno-objc-trt">, Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"use global Objective-C runtime">;
+def fobjc_aam : Flag<["-"], "fobjc-aam">, Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"AlwaysAutoreleaseMode, +alloc becomes +instantiate">;
+def fno_objc_aam : Flag<["-"], "fno-objc-aam">, Group<f_Group>;
+// mulle-objc@ options <
 def fobjc_arc : Flag<["-"], "fobjc-arc">, Group<f_Group>, Flags<[CC1Option]>,
   HelpText<"Synthesize retain and release calls for Objective-C pointers">;
 def fno_objc_arc : Flag<["-"], "fno-objc-arc">, Group<f_Group>;

@@ -4165,6 +4165,8 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
                     options::OPT_fno_assume_sane_operator_new))
     CmdArgs.push_back("-fno-assume-sane-operator-new");
 
+// @mulle-objc@ blocks are just no good for mulle-clang>
+#if 0
   // -fblocks=0 is default.
   if (Args.hasFlag(options::OPT_fblocks, options::OPT_fno_blocks,
                    getToolChain().IsBlocksDefault()) ||
@@ -4177,10 +4179,11 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
         !getToolChain().hasBlocksRuntime())
       CmdArgs.push_back("-fblocks-runtime-optional");
   }
-
   // -fencode-extended-block-signature=1 is default.
   if (getToolChain().IsEncodeExtendedBlockSignatureDefault())
     CmdArgs.push_back("-fencode-extended-block-signature");
+#endif
+// @mulle-objc@ blocks are just no good for mulle-clang< 
 
   if (Args.hasFlag(options::OPT_fcoroutines_ts, options::OPT_fno_coroutines_ts,
                    false) &&
@@ -4941,10 +4944,9 @@ ObjCRuntime Clang::AddObjCRuntimeArgs(const ArgList &args,
       getToolChain().getDriver().Diag(diag::err_drv_clang_unsupported) << value;
   } else {
     // Otherwise, determine if we are using the non-fragile ABI.
-    bool nonFragileABIIsDefault =
-        (rewriteKind == RK_NonFragile ||
-         (rewriteKind == RK_None &&
-          getToolChain().IsObjCNonFragileABIDefault()));
+    // @mulle-objc@ nonFragile is always default false >
+    bool nonFragileABIIsDefault = false;
+    // @mulle-objc@ nonFragile is always default false <
     if (args.hasFlag(options::OPT_fobjc_nonfragile_abi,
                      options::OPT_fno_objc_nonfragile_abi,
                      nonFragileABIIsDefault)) {

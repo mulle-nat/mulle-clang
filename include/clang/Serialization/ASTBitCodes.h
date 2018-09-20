@@ -1205,16 +1205,13 @@ namespace serialization {
       /// Objective-C "SEL" redefinition type
       SPECIAL_TYPE_OBJC_SEL_REDEFINITION       = 6,
 
-      /// C ucontext_t typedef type
-      SPECIAL_TYPE_UCONTEXT_T                  = 7
-
 /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
 /// unfortunately need to edit SPECIAL_TYPE_UCONTEXT_T to 8
 /// and add 1 to NumSpecialTypeIDs
-      SPECIAL_TYPE_OBJC_PROTOCOL_REDEFINITION  = 8,
+      SPECIAL_TYPE_OBJC_PROTOCOL_REDEFINITION  = 7,
 
-      /// \brief C ucontext_t typedef type
-      SPECIAL_TYPE_UCONTEXT_T                  = 9
+      /// C ucontext_t typedef type
+      SPECIAL_TYPE_UCONTEXT_T                  = 8
     };
 
     /// \brief The number of special type IDs.

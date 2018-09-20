@@ -1429,7 +1429,7 @@ struct NullReturnState {
               e = Method->param_end(); i != e; ++i, ++I) {
             const ParmVarDecl *ParamDecl = (*i);
             if (ParamDecl->hasAttr<NSConsumedAttr>()) {
-               RValue RV = I->RV;
+               RValue RV = I->getKnownRValue();
                assert(RV.isScalar() &&
                       "NullReturnState::complete - arg not on object");
                CGF.EmitARCRelease(RV.getScalarVal(), ARCImpreciseLifetime);
@@ -2428,7 +2428,7 @@ CodeGen::RValue   CGObjCMulleRuntime::CommonFunctionCall(CodeGen::CodeGenFunctio
    CGCallee Callee = CGCallee::forDirect(Fn);
    RValue rvalue = CGF.EmitCall( FI, Callee, Return, ActualArgs);
 
-   RValue param = ActualArgs.size() >= 3 ? ActualArgs[ 2].RV : rvalue; // rvalue is just bogus, wont be used then
+   RValue param = ActualArgs.size() >= 3 ? ActualArgs[ 2].getKnownRValue() : rvalue; // rvalue is just bogus, wont be used then
 
    rvalue = CGF.EmitMetaABIReadReturnValue( Method, rvalue, param, Return, ResultType);
    // it would be a good time to end the lifetime of the arg[2] alloca now
@@ -3790,10 +3790,12 @@ bool CGObjCMulleRuntime::OptimizeReuseParam( CodeGenFunction &CGF,
    RValue loaded       = CGF.EmitLoadOfLValue( ParentRecord, SourceLocation());
 
    // only memcpy, if there are actual parameters
-   CGF.EmitAggregateCopy( Address( loaded.getScalarVal(), CGM.getPointerAlign()),
-                          RecordAddress,
+   LValue DstLV = CGF.MakeAddrLValue( Address( loaded.getScalarVal(), CGM.getPointerAlign()), record_info.recTy);
+   LValue SrcLV = CGF.MakeAddrLValue( RecordAddress, record_info.recTy);
+   CGF.EmitAggregateCopy( DstLV,
+                          SrcLV,
                           record_info.recTy,
-                          false);
+                          AggValueSlot::DoesNotOverlap);
 
    // dont need the original alloca anymore
    if( Marker.SizeV)
@@ -3886,7 +3888,7 @@ void  CGObjCMulleRuntime::PushCallArgsIntoRecord( CodeGenFunction &CGF,
 
    for( RecordDecl::field_iterator CurField = RD->field_begin(), SentinelField = RD->field_end(); CurField != SentinelField; CurField++)
    {
-      RValue   RHS = Args[ i].RV;
+      RValue   RHS = Args[ i].getKnownRValue();
       LValue   LHS = CGF.EmitLValueForFieldInitialization( Record, *CurField);
       CGF.EmitStoreThroughLValue( RHS, LHS, true);
       ++i;

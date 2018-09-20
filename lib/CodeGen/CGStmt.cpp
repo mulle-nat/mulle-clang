@@ -1104,8 +1104,8 @@ void CodeGenFunction::EmitReturnStmt(const ReturnStmt &S) {
                                             Qualifiers(),
                                             AggValueSlot::IsDestructed,
                                             AggValueSlot::DoesNotNeedGCBarriers,
-                                            AggValueSlot::IsNotAliased),
-                                            overlapForReturnValue());
+                                            AggValueSlot::IsNotAliased,
+                                            overlapForReturnValue()));
       break;
     }
   }

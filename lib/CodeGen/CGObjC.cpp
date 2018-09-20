@@ -695,7 +695,11 @@ void   CodeGenFunction::EmitMetaABIWriteAggregateReturnValue( const Decl *FuncDe
                                                               QualType ExprType)
 {
    // surprisingly easy, too easy ?
-   EmitAggregateCopy( Param, ExprResult, ExprType);
+
+   EmitAggregateCopy( MakeAddrLValue( Param, ExprType),
+                      MakeAddrLValue( ExprResult, ExprType),
+                      ExprType,
+                      overlapForReturnValue()); // copy/paste. Is this correct ?
 }
 
 
@@ -734,7 +738,8 @@ void   CodeGenFunction::EmitMetaABIWriteReturnValue( const Decl *FuncDecl, const
                                                   Qualifiers(),
                                                   AggValueSlot::IsDestructed,
                                                   AggValueSlot::DoesNotNeedGCBarriers,
-                                                  AggValueSlot::IsNotAliased));
+                                                  AggValueSlot::IsNotAliased,
+                                                  AggValueSlot::DoesNotOverlap));
             return;
          }
 
@@ -752,10 +757,11 @@ void   CodeGenFunction::EmitMetaABIWriteReturnValue( const Decl *FuncDecl, const
          paramAddr = Builder.CreateBitCast( Builder.CreateAlignedLoad( param.getPointer(), alignment, "_param.rval"), getTypes().ConvertTypeForMem( RV->getType())->getPointerTo());
 
          EmitAggExpr(RV, AggValueSlot::forAddr( CodeGen::Address( paramAddr, alignment),
-                                               Qualifiers(),
-                                               AggValueSlot::IsDestructed,
-                                               AggValueSlot::DoesNotNeedGCBarriers,
-                                               AggValueSlot::IsNotAliased));
+                                                Qualifiers(),
+                                                AggValueSlot::IsDestructed,
+                                                AggValueSlot::DoesNotNeedGCBarriers,
+                                                AggValueSlot::IsNotAliased,
+                                                AggValueSlot::DoesNotOverlap));
 
          // store pointer in returnValue
          // OMIT this, it's superflous
@@ -808,9 +814,10 @@ CodeGen::RValue   CodeGenFunction::EmitMetaABIReadReturnValue( const ObjCMethodD
          // memcpy stuff from _param
          //
 
-         Address   Src = Address( V, Alignment);
+         LValue SrcLV = MakeAddrLValue( Address( V, Alignment), ResultType);
+         LValue DstLV = MakeAddrLValue( Dst, ResultType);
 
-         EmitAggregateCopy( Dst, Src,  ResultType, true);
+         EmitAggregateCopy( DstLV, SrcLV,  ResultType, overlapForReturnValue());  // copy/paste
          Rvalue = RValue::getAggregate( Dst); // I hope this works fine...
       }
       else

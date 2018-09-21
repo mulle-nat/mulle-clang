@@ -9,6 +9,8 @@
 # compile it like LLVM does (everything all the time)
 # only useful if you're creating installers IMO
 BY_THE_BOOK="YES"
+USE_LLVM_CLANG="NO"
+USE_LLVM_LLDB="NO"
 
 # our compiler version
 MULLE_CLANG_VERSION="7.0.0.0"
@@ -26,37 +28,6 @@ CMAKE_VERSION_MINOR="12"
 CMAKE_VERSION_PATCH="2"
 
 
-if [ -z "${MULLE_CLANG_RC}" ]
-then
-   MULLE_CLANG_ARCHIVENAME="${MULLE_CLANG_VERSION}"
-else
-   MULLE_CLANG_ARCHIVENAME="${MULLE_CLANG_VERSION}-RC${MULLE_CLANG_RC}"
-fi
-MULLE_CLANG_ARCHIVE="https://github.com/Codeon-GmbH/mulle-clang/archive/${MULLE_CLANG_ARCHIVENAME}.tar.gz"
-MULLE_CLANG_UNPACKNAME="mulle-clang-${MULLE_CLANG_ARCHIVENAME}"
-
-if [ -z "${MULLE_LLDB_RC}" ]
-then
-   MULLE_LLDB_ARCHIVENAME="${MULLE_LLDB_VERSION}"
-else
-   MULLE_LLDB_ARCHIVENAME="${MULLE_LLDB_VERSION}-RC${MULLE_LLDB_RC}"
-fi
-MULLE_LLDB_ARCHIVE="https://github.com/Codeon-GmbH/mulle-lldb/archive/${MULLE_LLDB_ARCHIVENAME}.tar.gz"
-MULLE_LLDB_UNPACKNAME="mulle-lldb-${MULLE_LLDB_ARCHIVENAME}"
-
-
-if [ -z "${LLVM_RC}" ]
-then
-   #regular releases
-   LLVM_ARCHIVE="http://llvm.org/releases/${LLVM_VERSION}/llvm-${LLVM_VERSION}.src.tar.xz"
-   LIBCXX_ARCHIVE="http://llvm.org/releases/${LLVM_VERSION}/libcxx-${LLVM_VERSION}.src.tar.xz"
-   LIBCXXABI_ARCHIVE="http://llvm.org/releases/${LLVM_VERSION}/libcxxabi-${LLVM_VERSION}.src.tar.xz"
-else
-# prereleases
-   LLVM_ARCHIVE="http://prereleases.llvm.org/${LLVM_VERSION}/rc${LLVM_RC}/llvm-${LLVM_VERSION}rc${LLVM_RC}.src.tar.xz"
-   LIBCXX_ARCHIVE="http://prereleases.llvm.org/${LLVM_VERSION}/rc${LLVM_RC}/libcxx-${LLVM_VERSION}rc${LLVM_RC}.src.tar.xz"
-   LIBCXXABI_ARCHIVE="http://prereleases.llvm.org/${LLVM_VERSION}/rc${LLVM_RC}/libcxxabi-${LLVM_VERSION}rc${LLVM_RC}.src.tar.xz"
-fi
 
 #
 #
@@ -112,6 +83,63 @@ Commands:
    uninstall            : remove links
 EOF
    exit 1
+}
+
+
+setup_fetch_environment()
+{
+   if [ "${USE_LLVM_CLANG}" = "NO" ]
+   then
+      if [ -z "${MULLE_CLANG_RC}" ]
+      then
+         MULLE_CLANG_ARCHIVENAME="${MULLE_CLANG_VERSION}"
+      else
+         MULLE_CLANG_ARCHIVENAME="${MULLE_CLANG_VERSION}-RC${MULLE_CLANG_RC}"
+      fi
+      MULLE_CLANG_ARCHIVE="https://github.com/Codeon-GmbH/mulle-clang/archive/${MULLE_CLANG_ARCHIVENAME}.tar.gz"
+      MULLE_CLANG_UNPACKNAME="mulle-clang-${MULLE_CLANG_ARCHIVENAME}"
+   fi
+
+   if [ "${USE_LLVM_LLDB}" = "NO" ]
+   then
+      if [ -z "${MULLE_LLDB_RC}" ]
+      then
+         MULLE_LLDB_ARCHIVENAME="${MULLE_LLDB_VERSION}"
+      else
+         MULLE_LLDB_ARCHIVENAME="${MULLE_LLDB_VERSION}-RC${MULLE_LLDB_RC}"
+      fi
+      MULLE_LLDB_ARCHIVE="https://github.com/Codeon-GmbH/mulle-lldb/archive/${MULLE_LLDB_ARCHIVENAME}.tar.gz"
+      MULLE_LLDB_UNPACKNAME="mulle-lldb-${MULLE_LLDB_ARCHIVENAME}"
+   fi
+
+   if [ -z "${LLVM_RC}" ]
+   then
+      #regular releases
+      LLVM_ARCHIVE="http://llvm.org/releases/${LLVM_VERSION}/llvm-${LLVM_VERSION}.src.tar.xz"
+      LIBCXX_ARCHIVE="http://llvm.org/releases/${LLVM_VERSION}/libcxx-${LLVM_VERSION}.src.tar.xz"
+      LIBCXXABI_ARCHIVE="http://llvm.org/releases/${LLVM_VERSION}/libcxxabi-${LLVM_VERSION}.src.tar.xz"
+      if [ "${USE_LLVM_CLANG}" = "YES" ]
+      then
+         CLANG_ARCHIVE="http://llvm.org/releases/${LLVM_VERSION}/cfe-${LLVM_VERSION}.src.tar.xz"
+      fi
+      if [ "${USE_LLVM_LLDB}" = "YES" ]
+      then
+         LLDB_ARCHIVE="http://llvm.org/releases/${LLVM_VERSION}/lldb-${LLVM_VERSION}.src.tar.xz"
+      fi
+   else
+   # prereleases
+      LLVM_ARCHIVE="http://prereleases.llvm.org/${LLVM_VERSION}/rc${LLVM_RC}/llvm-${LLVM_VERSION}rc${LLVM_RC}.src.tar.xz"
+      LIBCXX_ARCHIVE="http://prereleases.llvm.org/${LLVM_VERSION}/rc${LLVM_RC}/libcxx-${LLVM_VERSION}rc${LLVM_RC}.src.tar.xz"
+      LIBCXXABI_ARCHIVE="http://prereleases.llvm.org/${LLVM_VERSION}/rc${LLVM_RC}/libcxxabi-${LLVM_VERSION}rc${LLVM_RC}.src.tar.xz"
+      if [ "${USE_LLVM_CLANG}" = "YES" ]
+      then
+         CLANG_ARCHIVE="http://prereleases.llvm.org/${LLVM_VERSION}/rc${LLVM_RC}/clang-${LLVM_VERSION}rc${LLVM_RC}.src.tar.xz"
+      fi
+      if [ "${USE_LLVM_LLDB}" = "YES" ]
+      then
+         LLDB_ARCHIVE="http://prereleases.llvm.org/${LLVM_VERSION}/rc${LLVM_RC}/lldb-${LLVM_VERSION}rc${LLVM_RC}.src.tar.xz"
+      fi
+   fi
 }
 
 
@@ -973,7 +1001,7 @@ download_llvm()
 {
    if [ ! -d "${LLVM_DIR}" ]
    then
-      log_info "mulle-llvm ${LLVM_VERSION}"
+      log_info "llvm ${LLVM_VERSION}"
 
       exekutor mkdir -p "`dirname -- "${SRC_DIR}"`" 2> /dev/null || exit 1
 
@@ -1002,6 +1030,26 @@ download_llvm()
       fi
    else
       log_fluff "Skipped libcxx"
+   fi
+
+   if [ "${USE_LLVM_CLANG}" = "YES" ]
+   then
+      if [ ! -d "${LLVM_DIR}/projects/clang" ]
+      then
+         _llvm_module_download "clang" "${CLANG_ARCHIVE}" "${LLVM_DIR}/projects/clang"
+      else
+         log_fluff "\"${LLVM_DIR}/projects/clang\" already exists"
+      fi
+   fi
+
+   if [ "${USE_LLVM_LLDB}" = "YES" ]
+   then
+      if [ ! -d "${LLVM_DIR}/projects/lldb" ]
+      then
+         _llvm_module_download "lldb" "${LLDB_ARCHIVE}" "${LLVM_DIR}/projects/lldb"
+      else
+         log_fluff "\"${LLVM_DIR}/projects/lldb\" already exists"
+      fi
    fi
 }
 
@@ -1475,15 +1523,15 @@ uninstall_mulle_lldb_link()
 
 install_links()
 {
-   install_mulle_clang_link
-   install_mulle_lldb_link
+   [ "${USE_LLVM_CLANG}" = "NO" ] && install_mulle_clang_link
+   [ "${USE_LLVM_LLDB}" = "NO" ] && install_mulle_lldb_link
 }
 
 
 uninstall_links()
 {
-   uninstall_mulle_clang_link
-   uninstall_mulle_lldb_link
+   [ "${USE_LLVM_CLANG}" = "NO" ] && uninstall_mulle_clang_link
+   [ "${USE_LLVM_LLDB}" = "NO" ] && uninstall_mulle_lldb_link
 }
 
 
@@ -1561,7 +1609,7 @@ main()
             OPTION_LINKER="$1"
          ;;
 
-         # can be usefue when migrating to new llvm version
+         # can be useful when migrating to new llvm version
          --no-clang)
             BUILD_CLANG="NO"
          ;;
@@ -1641,6 +1689,18 @@ main()
             OPTION_WARN="NO"
          ;;
 
+         --llvm-clang)
+            USE_LLVM_CLANG="YES"
+            BUILD_CLANG="NO"
+            BY_THE_BOOK="YES"
+         ;;
+
+         --llvm-lldb)
+            USE_LLVM_LLDB="YES"
+            BUILD_LLDB="NO"
+            BY_THE_BOOK="YES"
+         ;;
+
          -*)
             echo "unknown option $1" >&2
             exit 1
@@ -1653,6 +1713,8 @@ main()
 
       shift
    done
+
+   setup_fetch_environment
 
    COMMAND="${1:-default}"
    [ $# -eq 0 ] || shift

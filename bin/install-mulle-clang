@@ -1114,6 +1114,67 @@ should_build()
    return 1
 }
 
+
+r_generic_cmake_options()
+{
+   # for msbuild
+   C_COMPILER="`command -v "${C_COMPILER}"`"
+   CXX_COMPILER="`command -v "${CXX_COMPILER}"`"
+
+
+   RVAL="\
+-Wno-dev \
+-G '${CMAKE_GENERATOR}' \
+-DCMAKE_INSTALL_MESSAGE="LAZY" \
+-DCMAKE_C_COMPILER='${C_COMPILER}' \
+-DCMAKE_CXX_COMPILER='${CXX_COMPILER}' \
+"
+   case "${MULLE_UNAME}" in
+      linux)
+         if [ "${OPTION_LINKER}" = "ld" ]
+         then
+            RVAL="${RVAL} \
+-DCMAKE_EXE_LINKER_FLAGS=-Wl,--reduce-memory-overheads"
+         fi
+      ;;
+   esac
+}
+
+
+r_generic_clang_options()
+{
+   local links
+
+   links="mulle-clang;mulle-clang-cl;mulle-clang-cpp"
+   case "${MULLE_UNAME}" in
+      mingw*)
+         links="${links};../msbuild-bin/cl"
+      ;;
+   esac
+
+   RVAL="\
+-DCLANG_VENDOR='{CLANG_VENDOR}' \
+-DCLANG_LINKS_TO_CREATE='${links}' \
+"
+}
+
+
+r_generic_llvm_options()
+{
+   RVAL="\
+-DLLVM_OPTIMIZED_TABLEGEN=ON \
+-DLLVM_USE_LINKER='${OPTION_LINKER}' \
+-DLLVM_ENABLE_CXX1Y:BOOL=OFF \
+"
+# -DBUILD_SHARED_LIBS=ON is broken in 7.0 due to gtest dependency
+   if [ "${LLVM_BUILD_TYPE}" = "Debug" ]
+   then
+      cmdline="${cmdline} \
+-DLLVM_BUILD_TARGETS='X86'"
+   fi
+}
+
+
 #
 # on Debian, llvm doesn't build properly with clang
 # use gcc, which is the default compiler for cmake
@@ -1136,61 +1197,32 @@ _build_llvm()
       fi
    fi
 
-   local links
-
-   links="mulle-clang;mulle-clang-cl;mulle-clang-cpp"
-   case "${MULLE_UNAME}" in
-      mingw*)
-         links="${links};../msbuild-bin/cl"
-      ;;
-   esac
-
    #
    # Build llvm
    #
    if should_build "${LLVM_BUILD_DIR}" || [ "${RUN_LLVM_CMAKE}" = "YES" ]
    then
-      (
-         # for msbuild
-         C_COMPILER="`command -v "${C_COMPILER}"`"
-         CXX_COMPILER="`command -v "${CXX_COMPILER}"`"
+      exekutor mkdir -p "${LLVM_BUILD_DIR}" 2> /dev/null
+      [ -d "${LLVM_BUILD_DIR}" ] || fail "Not enough permissions to create \"${LLVM_BUILD_DIR}\""
 
-         exekutor mkdir -p "${LLVM_BUILD_DIR}" 2> /dev/null
-         [ -d "${LLVM_BUILD_DIR}" ] || fail "Not enough permissions to create \"${LLVM_BUILD_DIR}\""
+      local cmdline
+      local RVAL
 
-         local cmdline
+      cmdline="cmake"
+      r_generic_cmake_options
+      cmdline="${cmdline} ${RVAL}"
+      r_generic_llvm_options
+      cmdline="${cmdline} ${RVAL}"
+      r_generic_clang_options
+      cmdline="${cmdline} ${RVAL}"
 
-         cmdline="cmake -Wno-dev \
--G '${CMAKE_GENERATOR}' \
--DLLVM_OPTIMIZED_TABLEGEN=ON \
--DCMAKE_C_COMPILER='${C_COMPILER}' \
--DCMAKE_CXX_COMPILER='${CXX_COMPILER}' \
--DCLANG_VENDOR='{CLANG_VENDOR}' \
--DCLANG_LINKS_TO_CREATE='${links}' \
--DLLVM_USE_LINKER='${OPTION_LINKER}' \
+      cmdline="${cmdline} \
 -DCMAKE_BUILD_TYPE='${LLVM_BUILD_TYPE}' \
--DCMAKE_INSTALL_PREFIX='${LLVM_INSTALL_PREFIX}' \
--DLLVM_ENABLE_CXX1Y:BOOL=OFF"
+-DCMAKE_INSTALL_PREFIX='${LLVM_INSTALL_PREFIX}'"
 
+      cmdline="${cmdline} ${CMAKE_FLAGS} '${BUILD_RELATIVE}/../${LLVM_DIR}'"
 
-# -DBUILD_SHARED_LIBS=ON is broken in 7.0 due to gtest dependency
-         if [ "${LLVM_BUILD_TYPE}" = "Debug" ]
-         then
-            cmdline="${cmdline} \
--DLLVM_BUILD_TARGETS='X86'"
-         fi
-
-         case "${MULLE_UNAME}" in
-            linux)
-               if [ "${OPTION_LINKER}" = "ld" ]
-               then
-                  cmdline="${cmdline} -DCMAKE_EXE_LINKER_FLAGS=-Wl,--reduce-memory-overheads"
-               fi
-            ;;
-         esac
-
-         cmdline="${cmdline} ${CMAKE_FLAGS} '${BUILD_RELATIVE}/../${LLVM_DIR}'"
-
+      (
          exekutor cd "${LLVM_BUILD_DIR}" &&
          eval_exekutor "${cmdline}"
       ) || exit 1
@@ -1237,37 +1269,24 @@ _build_clang()
    #
    if should_build "${MULLE_CLANG_BUILD_DIR}" || [ "${RUN_CLANG_CMAKE}" = "YES" ]
    then
-      (
-         # for msbuild
-         C_COMPILER="`command -v "${C_COMPILER}"`"
-         CXX_COMPILER="`command -v "${CXX_COMPILER}"`"
+      exekutor mkdir -p "${MULLE_CLANG_BUILD_DIR}" 2> /dev/null
 
-         exekutor mkdir -p "${MULLE_CLANG_BUILD_DIR}" 2> /dev/null
+      local cmdline
+      local RVAL
 
-         exekutor cd "${MULLE_CLANG_BUILD_DIR}" &&
+      cmdline="cmake"
+      r_generic_cmake_options
+      cmdline="${cmdline} ${RVAL}"
+      r_generic_llvm_options
+      cmdline="${cmdline} ${RVAL}"
+      r_generic_clang_options
+      cmdline="${cmdline} ${RVAL}"
 
-         local links
-
-         links="mulle-clang;mulle-clang-cl;mulle-clang-cpp"
-         case "${MULLE_UNAME}" in
-            mingw)
-               links="${links};../msbuild-bin/cl"
-            ;;
-         esac
             # cmake -DCMAKE_BUILD_TYPE=Debug "../${MULLE_CLANG_DIR}"
             # try to build cmake with cmake
-         exekutor cmake \
-               -Wno-dev \
-               -G "${CMAKE_GENERATOR}" \
-               -DCMAKE_C_COMPILER="${C_COMPILER}" \
-               -DCMAKE_CXX_COMPILER="${CXX_COMPILER}" \
-               -DCLANG_VENDOR="${CLANG_VENDOR}" \
-               -DCLANG_LINKS_TO_CREATE="${links}" \
-               -DLLVM_USE_LINKER="${OPTION_LINKER}" \
-               -DCMAKE_BUILD_TYPE="${MULLE_CLANG_BUILD_TYPE}" \
-               -DCMAKE_INSTALL_PREFIX="${MULLE_CLANG_INSTALL_PREFIX}" \
-               ${CMAKE_FLAGS} \
-               "${BUILD_RELATIVE}/../${MULLE_CLANG_DIR}"
+      (
+         exekutor cd "${MULLE_CLANG_BUILD_DIR}" &&
+         eval_exekutor "${cmdline} ${CMAKE_FLAGS} '${BUILD_RELATIVE}/../${MULLE_CLANG_DIR}'"
       ) || exit 1
    fi
 

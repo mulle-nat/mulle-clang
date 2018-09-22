@@ -1153,7 +1153,7 @@ r_generic_clang_options()
    esac
 
    RVAL="\
--DCLANG_VENDOR='{CLANG_VENDOR}' \
+-DCLANG_VENDOR='${CLANG_VENDOR}' \
 -DCLANG_LINKS_TO_CREATE='${links}' \
 "
 }
@@ -1277,10 +1277,12 @@ _build_clang()
       cmdline="cmake"
       r_generic_cmake_options
       cmdline="${cmdline} ${RVAL}"
-      r_generic_llvm_options
-      cmdline="${cmdline} ${RVAL}"
       r_generic_clang_options
       cmdline="${cmdline} ${RVAL}"
+
+      cmdline="${cmdline} \
+-DCMAKE_BUILD_TYPE='${MULLE_CLANG_BUILD_TYPE}' \
+-DCMAKE_INSTALL_PREFIX='${MULLE_CLANG_INSTALL_PREFIX}'"
 
             # cmake -DCMAKE_BUILD_TYPE=Debug "../${MULLE_CLANG_DIR}"
             # try to build cmake with cmake

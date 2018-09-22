@@ -9,6 +9,8 @@
 # compile it like LLVM does (everything all the time)
 # only useful if you're creating installers IMO
 BY_THE_BOOK="YES"
+USE_LLVM_CLANG="NO"
+USE_LLVM_LLDB="NO"
 
 # our compiler version
 MULLE_CLANG_VERSION="7.0.0.0"
@@ -16,47 +18,18 @@ MULLE_CLANG_VERSION="7.0.0.0"
 MULLE_LLDB_VERSION="7.0.0.0"
 #MULLE_LLDB_RC="4"
 
-
 # required LLVM version
 LLVM_VERSION="7.0.0"
 # LLVM_RC="5" # leave empty for releases
 
+#
+# cmake min for 7 is 3.4.2 (so still good), try to keep as low as possible
+# for distributions with old cmakes. That said 3.5.2 works for me
+#
 CMAKE_VERSION_MAJOR="3"
-CMAKE_VERSION_MINOR="12"
+CMAKE_VERSION_MINOR="5"
 CMAKE_VERSION_PATCH="2"
 
-
-if [ -z "${MULLE_CLANG_RC}" ]
-then
-   MULLE_CLANG_ARCHIVENAME="${MULLE_CLANG_VERSION}"
-else
-   MULLE_CLANG_ARCHIVENAME="${MULLE_CLANG_VERSION}-RC${MULLE_CLANG_RC}"
-fi
-MULLE_CLANG_ARCHIVE="https://github.com/Codeon-GmbH/mulle-clang/archive/${MULLE_CLANG_ARCHIVENAME}.tar.gz"
-MULLE_CLANG_UNPACKNAME="mulle-clang-${MULLE_CLANG_ARCHIVENAME}"
-
-if [ -z "${MULLE_LLDB_RC}" ]
-then
-   MULLE_LLDB_ARCHIVENAME="${MULLE_LLDB_VERSION}"
-else
-   MULLE_LLDB_ARCHIVENAME="${MULLE_LLDB_VERSION}-RC${MULLE_LLDB_RC}"
-fi
-MULLE_LLDB_ARCHIVE="https://github.com/Codeon-GmbH/mulle-lldb/archive/${MULLE_LLDB_ARCHIVENAME}.tar.gz"
-MULLE_LLDB_UNPACKNAME="mulle-lldb-${MULLE_LLDB_ARCHIVENAME}"
-
-
-if [ -z "${LLVM_RC}" ]
-then
-   #regular releases
-   LLVM_ARCHIVE="http://llvm.org/releases/${LLVM_VERSION}/llvm-${LLVM_VERSION}.src.tar.xz"
-   LIBCXX_ARCHIVE="http://llvm.org/releases/${LLVM_VERSION}/libcxx-${LLVM_VERSION}.src.tar.xz"
-   LIBCXXABI_ARCHIVE="http://llvm.org/releases/${LLVM_VERSION}/libcxxabi-${LLVM_VERSION}.src.tar.xz"
-else
-# prereleases
-   LLVM_ARCHIVE="http://prereleases.llvm.org/${LLVM_VERSION}/rc${LLVM_RC}/llvm-${LLVM_VERSION}rc${LLVM_RC}.src.tar.xz"
-   LIBCXX_ARCHIVE="http://prereleases.llvm.org/${LLVM_VERSION}/rc${LLVM_RC}/libcxx-${LLVM_VERSION}rc${LLVM_RC}.src.tar.xz"
-   LIBCXXABI_ARCHIVE="http://prereleases.llvm.org/${LLVM_VERSION}/rc${LLVM_RC}/libcxxabi-${LLVM_VERSION}rc${LLVM_RC}.src.tar.xz"
-fi
 
 #
 #
@@ -115,11 +88,68 @@ EOF
 }
 
 
+setup_fetch_environment()
+{
+   if [ "${USE_LLVM_CLANG}" = "NO" ]
+   then
+      if [ -z "${MULLE_CLANG_RC}" ]
+      then
+         MULLE_CLANG_ARCHIVENAME="${MULLE_CLANG_VERSION}"
+      else
+         MULLE_CLANG_ARCHIVENAME="${MULLE_CLANG_VERSION}-RC${MULLE_CLANG_RC}"
+      fi
+      MULLE_CLANG_ARCHIVE="https://github.com/Codeon-GmbH/mulle-clang/archive/${MULLE_CLANG_ARCHIVENAME}.tar.gz"
+      MULLE_CLANG_UNPACKNAME="mulle-clang-${MULLE_CLANG_ARCHIVENAME}"
+   fi
+
+   if [ "${USE_LLVM_LLDB}" = "NO" ]
+   then
+      if [ -z "${MULLE_LLDB_RC}" ]
+      then
+         MULLE_LLDB_ARCHIVENAME="${MULLE_LLDB_VERSION}"
+      else
+         MULLE_LLDB_ARCHIVENAME="${MULLE_LLDB_VERSION}-RC${MULLE_LLDB_RC}"
+      fi
+      MULLE_LLDB_ARCHIVE="https://github.com/Codeon-GmbH/mulle-lldb/archive/${MULLE_LLDB_ARCHIVENAME}.tar.gz"
+      MULLE_LLDB_UNPACKNAME="mulle-lldb-${MULLE_LLDB_ARCHIVENAME}"
+   fi
+
+   if [ -z "${LLVM_RC}" ]
+   then
+      #regular releases
+      LLVM_ARCHIVE="http://llvm.org/releases/${LLVM_VERSION}/llvm-${LLVM_VERSION}.src.tar.xz"
+      LIBCXX_ARCHIVE="http://llvm.org/releases/${LLVM_VERSION}/libcxx-${LLVM_VERSION}.src.tar.xz"
+      LIBCXXABI_ARCHIVE="http://llvm.org/releases/${LLVM_VERSION}/libcxxabi-${LLVM_VERSION}.src.tar.xz"
+      if [ "${USE_LLVM_CLANG}" = "YES" ]
+      then
+         CLANG_ARCHIVE="http://llvm.org/releases/${LLVM_VERSION}/cfe-${LLVM_VERSION}.src.tar.xz"
+      fi
+      if [ "${USE_LLVM_LLDB}" = "YES" ]
+      then
+         LLDB_ARCHIVE="http://llvm.org/releases/${LLVM_VERSION}/lldb-${LLVM_VERSION}.src.tar.xz"
+      fi
+   else
+   # prereleases
+      LLVM_ARCHIVE="http://prereleases.llvm.org/${LLVM_VERSION}/rc${LLVM_RC}/llvm-${LLVM_VERSION}rc${LLVM_RC}.src.tar.xz"
+      LIBCXX_ARCHIVE="http://prereleases.llvm.org/${LLVM_VERSION}/rc${LLVM_RC}/libcxx-${LLVM_VERSION}rc${LLVM_RC}.src.tar.xz"
+      LIBCXXABI_ARCHIVE="http://prereleases.llvm.org/${LLVM_VERSION}/rc${LLVM_RC}/libcxxabi-${LLVM_VERSION}rc${LLVM_RC}.src.tar.xz"
+      if [ "${USE_LLVM_CLANG}" = "YES" ]
+      then
+         CLANG_ARCHIVE="http://prereleases.llvm.org/${LLVM_VERSION}/rc${LLVM_RC}/clang-${LLVM_VERSION}rc${LLVM_RC}.src.tar.xz"
+      fi
+      if [ "${USE_LLVM_LLDB}" = "YES" ]
+      then
+         LLDB_ARCHIVE="http://prereleases.llvm.org/${LLVM_VERSION}/rc${LLVM_RC}/lldb-${LLVM_VERSION}rc${LLVM_RC}.src.tar.xz"
+      fi
+   fi
+}
+
+
 environment_initialize()
 {
-   UNAME="`uname -s`"
-   case "${UNAME}" in
-      MINGW*)
+   MULLE_UNAME="`uname -s | tr '[A-Z]' '[a-z]'`"
+   case "${MULLE_UNAME}" in
+      mingw*)
          CLANG_SUFFIX="-cl"
          EXE_EXTENSION=".exe"
          SYMLINK_PREFIX="~"
@@ -138,8 +168,8 @@ log_initialize()
 {
    if [ -z "${NO_COLOR}" ]
    then
-      case "${UNAME}" in
-         Darwin|Linux|FreeBSD|MINGW*)
+      case "${MULLE_UNAME}" in
+         darwin|linux|freebsd|mingw*)
             C_RESET="\033[0m"
 
             # Useable Foreground colours, for black/white white/black
@@ -241,8 +271,8 @@ internal_fail()
 
 tar_fail()
 {
-   case "${UNAME}" in
-      MINGW*)
+   case "${MULLE_UNAME}" in
+      mingw*)
          log_warning "$@" "ignored, because we're on MinGW and crossing fingers, that just tests are affected"
       ;;
 
@@ -287,6 +317,19 @@ exekutor()
       "$@"
    fi
 }
+
+
+
+eval_exekutor()
+{
+   exekutor_trace "$@"
+
+   if [ "${MULLE_FLAG_EXECUTOR_DRY_RUN}" != "YES" ]
+   then
+      eval "$@"
+   fi
+}
+
 
 
 is_root()
@@ -372,14 +415,14 @@ patch_llvm()
 
 fetch_brew()
 {
-   case "${UNAME}" in
-      Darwin)
+   case "${MULLE_UNAME}" in
+      darwin)
          log_fluff "Installing OS X brew"
 
          exekutor ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)" || fail "ruby"
       ;;
 
-      Linux)
+      linux)
          install_binary_if_missing "curl"
          install_binary_if_missing "python-setuptools"
          install_binary_if_missing "build-essential"
@@ -414,12 +457,12 @@ install_with_brew()
 install_library_if_missing()
 {
    # we just install if there is no sudo needed
-   case "${UNAME}" in
-      Darwin)
+   case "${MULLE_UNAME}" in
+      darwin)
          install_with_brew "$@" || exit 1
       ;;
 
-      Linux)
+      linux)
 #         if command -v "brew" > /dev/null 2>&1
 #         then
 #            install_with_brew "$@" || exit 1
@@ -482,12 +525,12 @@ install_binary_if_missing()
       return
    fi
 
-   case "${UNAME}" in
-      Darwin)
+   case "${MULLE_UNAME}" in
+      darwin)
          install_with_brew "$@" || exit 1
       ;;
 
-      Linux)
+      linux)
 #         if command -v "brew" > /dev/null 2>&1
 #         then
 #            install_with_brew "$@" || exit 1
@@ -765,8 +808,8 @@ setup_build_environment()
    # should check version
    # Set some defaults so stuff possibly just magically works.
    #
-   case "${UNAME}" in
-      MINGW*)
+   case "${MULLE_UNAME}" in
+      mingw*)
          log_fluff "Detected MinGW on Windows"
          PATH="$PATH:/c/Program Files/CMake/bin/cmake:/c/Program Files (x86)/Microsoft Visual Studio 14.0/VC/bin"
 
@@ -850,11 +893,11 @@ setup_build_environment()
    then
       install_binary_if_missing "swig" "http://swig.org/download.html"
 
-      case "${UNAME}" in
-         Darwin)
+      case "${MULLE_UNAME}" in
+         darwin)
          ;;
 
-         Linux)
+         linux)
             install_library_if_missing "python-dev" "https://www.python.org/downloads/release"
             install_library_if_missing "libncurses5-dev" "https://www.gnu.org/software/ncurses"
             install_library_if_missing "libxml2-dev" "http://xmlsoft.org"
@@ -973,7 +1016,7 @@ download_llvm()
 {
    if [ ! -d "${LLVM_DIR}" ]
    then
-      log_info "mulle-llvm ${LLVM_VERSION}"
+      log_info "llvm ${LLVM_VERSION}"
 
       exekutor mkdir -p "`dirname -- "${SRC_DIR}"`" 2> /dev/null || exit 1
 
@@ -1002,6 +1045,26 @@ download_llvm()
       fi
    else
       log_fluff "Skipped libcxx"
+   fi
+
+   if [ "${USE_LLVM_CLANG}" = "YES" ]
+   then
+      if [ ! -d "${LLVM_DIR}/projects/clang" ]
+      then
+         _llvm_module_download "clang" "${CLANG_ARCHIVE}" "${LLVM_DIR}/projects/clang"
+      else
+         log_fluff "\"${LLVM_DIR}/projects/clang\" already exists"
+      fi
+   fi
+
+   if [ "${USE_LLVM_LLDB}" = "YES" ]
+   then
+      if [ ! -d "${LLVM_DIR}/projects/lldb" ]
+      then
+         _llvm_module_download "lldb" "${LLDB_ARCHIVE}" "${LLVM_DIR}/projects/lldb"
+      else
+         log_fluff "\"${LLVM_DIR}/projects/lldb\" already exists"
+      fi
    fi
 }
 
@@ -1076,8 +1139,8 @@ _build_llvm()
    local links
 
    links="mulle-clang;mulle-clang-cl;mulle-clang-cpp"
-   case "${UNAME}" in
-      MINGW*)
+   case "${MULLE_UNAME}" in
+      mingw*)
          links="${links};../msbuild-bin/cl"
       ;;
    esac
@@ -1095,20 +1158,41 @@ _build_llvm()
          exekutor mkdir -p "${LLVM_BUILD_DIR}" 2> /dev/null
          [ -d "${LLVM_BUILD_DIR}" ] || fail "Not enough permissions to create \"${LLVM_BUILD_DIR}\""
 
+         local cmdline
+
+         cmdline="cmake -Wno-dev \
+-G '${CMAKE_GENERATOR}' \
+-DLLVM_OPTIMIZED_TABLEGEN=ON \
+-DCMAKE_C_COMPILER='${C_COMPILER}' \
+-DCMAKE_CXX_COMPILER='${CXX_COMPILER}' \
+-DCLANG_VENDOR='{CLANG_VENDOR}' \
+-DCLANG_LINKS_TO_CREATE='${links}' \
+-DLLVM_USE_LINKER='${OPTION_LINKER}' \
+-DCMAKE_BUILD_TYPE='${LLVM_BUILD_TYPE}' \
+-DCMAKE_INSTALL_PREFIX='${LLVM_INSTALL_PREFIX}' \
+-DLLVM_ENABLE_CXX1Y:BOOL=OFF"
+
+
+# -DBUILD_SHARED_LIBS=ON is broken in 7.0 due to gtest dependency
+         if [ "${LLVM_BUILD_TYPE}" = "Debug" ]
+         then
+            cmdline="${cmdline} \
+-DLLVM_BUILD_TARGETS='X86'"
+         fi
+
+         case "${MULLE_UNAME}" in
+            linux)
+               if [ "${OPTION_LINKER}" = "ld" ]
+               then
+                  cmdline="${cmdline} -DCMAKE_EXE_LINKER_FLAGS=-Wl,--reduce-memory-overheads"
+               fi
+            ;;
+         esac
+
+         cmdline="${cmdline} ${CMAKE_FLAGS} '${BUILD_RELATIVE}/../${LLVM_DIR}'"
+
          exekutor cd "${LLVM_BUILD_DIR}" &&
-         exekutor cmake \
-               -Wno-dev \
-               -G "${CMAKE_GENERATOR}" \
-               -DCMAKE_C_COMPILER="${C_COMPILER}" \
-               -DCMAKE_CXX_COMPILER="${CXX_COMPILER}" \
-               -DCLANG_VENDOR="${CLANG_VENDOR}" \
-               -DCLANG_LINKS_TO_CREATE="${links}" \
-               -DLLVM_USE_LINKER="${OPTION_LINKER}" \
-               -DCMAKE_BUILD_TYPE="${LLVM_BUILD_TYPE}" \
-               -DCMAKE_INSTALL_PREFIX="${LLVM_INSTALL_PREFIX}" \
-               -DLLVM_ENABLE_CXX1Y:BOOL=OFF \
-               ${CMAKE_FLAGS} \
-               "${BUILD_RELATIVE}/../${LLVM_DIR}"
+         eval_exekutor "${cmdline}"
       ) || exit 1
    fi
 
@@ -1118,8 +1202,8 @@ _build_llvm()
       exekutor ${MAKE} ${MAKE_FLAGS} "$@"
    ) || exit 1
 
-   case "${UNAME}" in
-      MINGW*)
+   case "${MULLE_UNAME}" in
+      mingw*)
          if [ ! -x "${MULLE_CLANG_INSTALL_PREFIX}/bin/mulle-scan-build.bat" ]
          then
             log_verbose "Creating mulle-lldb link ..."
@@ -1165,7 +1249,7 @@ _build_clang()
          local links
 
          links="mulle-clang;mulle-clang-cl;mulle-clang-cpp"
-         case "${UNAME}" in
+         case "${MULLE_UNAME}" in
             mingw)
                links="${links};../msbuild-bin/cl"
             ;;
@@ -1394,8 +1478,8 @@ before you can install"
    install_executable "${MULLE_CLANG_INSTALL_PREFIX}/bin/scan-build" \
                       "mulle-scan-build"
 
-   case "${UNAME}" in
-      MINGW*)
+   case "${MULLE_UNAME}" in
+      mingw*)
          install_file "${MULLE_CLANG_INSTALL_PREFIX}/bin/mulle-scan-build.bat" \
                             "mulle-scan-build.bat"
       ;;
@@ -1475,15 +1559,15 @@ uninstall_mulle_lldb_link()
 
 install_links()
 {
-   install_mulle_clang_link
-   install_mulle_lldb_link
+   [ "${USE_LLVM_CLANG}" = "NO" ] && install_mulle_clang_link
+   [ "${USE_LLVM_LLDB}" = "NO" ] && install_mulle_lldb_link
 }
 
 
 uninstall_links()
 {
-   uninstall_mulle_clang_link
-   uninstall_mulle_lldb_link
+   [ "${USE_LLVM_CLANG}" = "NO" ] && uninstall_mulle_clang_link
+   [ "${USE_LLVM_LLDB}" = "NO" ] && uninstall_mulle_lldb_link
 }
 
 
@@ -1522,7 +1606,7 @@ main()
             MULLE_FLAG_EXECUTOR_DRY_RUN="YES"
          ;;
 
-         -V)
+         -lx|-V)
             MULLE_FLAG_LOG_EXECUTOR="YES"
          ;;
 
@@ -1561,7 +1645,7 @@ main()
             OPTION_LINKER="$1"
          ;;
 
-         # can be usefue when migrating to new llvm version
+         # can be useful when migrating to new llvm version
          --no-clang)
             BUILD_CLANG="NO"
          ;;
@@ -1641,6 +1725,18 @@ main()
             OPTION_WARN="NO"
          ;;
 
+         --llvm-clang)
+            USE_LLVM_CLANG="YES"
+            BUILD_CLANG="NO"
+            BY_THE_BOOK="YES"
+         ;;
+
+         --llvm-lldb)
+            USE_LLVM_LLDB="YES"
+            BUILD_LLDB="NO"
+            BY_THE_BOOK="YES"
+         ;;
+
          -*)
             echo "unknown option $1" >&2
             exit 1
@@ -1653,6 +1749,8 @@ main()
 
       shift
    done
+
+   setup_fetch_environment
 
    COMMAND="${1:-default}"
    [ $# -eq 0 ] || shift
@@ -1686,8 +1784,8 @@ main()
       local linker
       local linkerpreferences
 
-      case "${UNAME}" in
-         MINGW*)
+      case "${MULLE_UNAME}" in
+         mingw*)
             # todo: untested
             linkerpreferences="lld ld.lld ld link.exe"
          ;;
@@ -1733,8 +1831,8 @@ main()
    BUILD_RELATIVE=".."
 
    # different builds for OS Versions on OS X
-   case "${UNAME}" in
-      Darwin)
+   case "${MULLE_UNAME}" in
+      darwin)
          osxversion="`sw_vers -productVersion | cut -d. -f 1-2`"
          BUILD_DIR="build-${osxversion}"
          if [ "${PREFIX}" = "${OWD}" ]

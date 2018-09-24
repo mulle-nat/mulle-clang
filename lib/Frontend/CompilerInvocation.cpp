@@ -2224,17 +2224,18 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
         Diags.Report(diag::err_drv_unknown_objc_runtime) << value;
     }
 
-    // @mulle-objc@: handle AAM and TPS options
+    // @mulle-objc@: handle AAM and TPS options >
     if( Args.hasArg( OPT_fno_objc_tps))
       Opts.ObjCDisableTaggedPointers = 1;
     if( Args.hasArg( OPT_fno_objc_fmc))
       Opts.ObjCDisableFastMethodCalls = 1;
     if( Args.hasArg( OPT_fobjc_trt))
       Opts.ObjCHasThreadLocalRuntime = 1;
-
     if( Args.hasArg( OPT_fobjc_aam))
       Opts.ObjCAllocsAutoreleasedObjects = 1;
-    else if (Args.hasArg(OPT_fobjc_gc_only))
+    // @mulle-objc@: handle AAM and TPS options <
+
+    if (Args.hasArg(OPT_fobjc_gc_only))
       Opts.setGC(LangOptions::GCOnly);
     else if (Args.hasArg(OPT_fobjc_gc))
       Opts.setGC(LangOptions::HybridGC);
@@ -2464,7 +2465,9 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
   Opts.ConceptsTS = Args.hasArg(OPT_fconcepts_ts);
   Opts.HeinousExtensions = Args.hasArg(OPT_fheinous_gnu_extensions);
   Opts.AccessControl = !Args.hasArg(OPT_fno_access_control);
-  Opts.ElideConstructors = !Args.hasArg(OPT_fno_elide_constructors);
+  // @mulle-objc@ ElideConstructors interferes with C code >
+  Opts.ElideConstructors = 0; // !Args.hasArg(OPT_fno_elide_constructors);
+  // @mulle-objc@ ElideConstructors interferes with C code <
   Opts.MathErrno = !Opts.OpenCL && Args.hasArg(OPT_fmath_errno);
   Opts.InstantiationDepth =
       getLastArgIntValue(Args, OPT_ftemplate_depth, 1024, Diags);

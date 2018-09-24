@@ -18,15 +18,17 @@ MULLE_CLANG_VERSION="7.0.0.0"
 MULLE_LLDB_VERSION="7.0.0.0"
 #MULLE_LLDB_RC="4"
 
-
 # required LLVM version
 LLVM_VERSION="7.0.0"
 # LLVM_RC="5" # leave empty for releases
 
+#
+# cmake min for 7 is 3.4.2 (so still good), try to keep as low as possible
+# for distributions with old cmakes. That said 3.5.2 works for me
+#
 CMAKE_VERSION_MAJOR="3"
-CMAKE_VERSION_MINOR="12"
+CMAKE_VERSION_MINOR="5"
 CMAKE_VERSION_PATCH="2"
-
 
 
 #
@@ -145,9 +147,9 @@ setup_fetch_environment()
 
 environment_initialize()
 {
-   UNAME="`uname -s`"
-   case "${UNAME}" in
-      MINGW*)
+   MULLE_UNAME="`uname -s | tr '[A-Z]' '[a-z]'`"
+   case "${MULLE_UNAME}" in
+      mingw*)
          CLANG_SUFFIX="-cl"
          EXE_EXTENSION=".exe"
          SYMLINK_PREFIX="~"
@@ -166,8 +168,8 @@ log_initialize()
 {
    if [ -z "${NO_COLOR}" ]
    then
-      case "${UNAME}" in
-         Darwin|Linux|FreeBSD|MINGW*)
+      case "${MULLE_UNAME}" in
+         darwin|linux|freebsd|mingw*)
             C_RESET="\033[0m"
 
             # Useable Foreground colours, for black/white white/black
@@ -269,8 +271,8 @@ internal_fail()
 
 tar_fail()
 {
-   case "${UNAME}" in
-      MINGW*)
+   case "${MULLE_UNAME}" in
+      mingw*)
          log_warning "$@" "ignored, because we're on MinGW and crossing fingers, that just tests are affected"
       ;;
 
@@ -315,6 +317,19 @@ exekutor()
       "$@"
    fi
 }
+
+
+
+eval_exekutor()
+{
+   exekutor_trace "$@"
+
+   if [ "${MULLE_FLAG_EXECUTOR_DRY_RUN}" != "YES" ]
+   then
+      eval "$@"
+   fi
+}
+
 
 
 is_root()
@@ -400,14 +415,14 @@ patch_llvm()
 
 fetch_brew()
 {
-   case "${UNAME}" in
-      Darwin)
+   case "${MULLE_UNAME}" in
+      darwin)
          log_fluff "Installing OS X brew"
 
          exekutor ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)" || fail "ruby"
       ;;
 
-      Linux)
+      linux)
          install_binary_if_missing "curl"
          install_binary_if_missing "python-setuptools"
          install_binary_if_missing "build-essential"
@@ -442,12 +457,12 @@ install_with_brew()
 install_library_if_missing()
 {
    # we just install if there is no sudo needed
-   case "${UNAME}" in
-      Darwin)
+   case "${MULLE_UNAME}" in
+      darwin)
          install_with_brew "$@" || exit 1
       ;;
 
-      Linux)
+      linux)
 #         if command -v "brew" > /dev/null 2>&1
 #         then
 #            install_with_brew "$@" || exit 1
@@ -510,12 +525,12 @@ install_binary_if_missing()
       return
    fi
 
-   case "${UNAME}" in
-      Darwin)
+   case "${MULLE_UNAME}" in
+      darwin)
          install_with_brew "$@" || exit 1
       ;;
 
-      Linux)
+      linux)
 #         if command -v "brew" > /dev/null 2>&1
 #         then
 #            install_with_brew "$@" || exit 1
@@ -793,8 +808,8 @@ setup_build_environment()
    # should check version
    # Set some defaults so stuff possibly just magically works.
    #
-   case "${UNAME}" in
-      MINGW*)
+   case "${MULLE_UNAME}" in
+      mingw*)
          log_fluff "Detected MinGW on Windows"
          PATH="$PATH:/c/Program Files/CMake/bin/cmake:/c/Program Files (x86)/Microsoft Visual Studio 14.0/VC/bin"
 
@@ -878,11 +893,11 @@ setup_build_environment()
    then
       install_binary_if_missing "swig" "http://swig.org/download.html"
 
-      case "${UNAME}" in
-         Darwin)
+      case "${MULLE_UNAME}" in
+         darwin)
          ;;
 
-         Linux)
+         linux)
             install_library_if_missing "python-dev" "https://www.python.org/downloads/release"
             install_library_if_missing "libncurses5-dev" "https://www.gnu.org/software/ncurses"
             install_library_if_missing "libxml2-dev" "http://xmlsoft.org"
@@ -1099,6 +1114,67 @@ should_build()
    return 1
 }
 
+
+r_generic_cmake_options()
+{
+   # for msbuild
+   C_COMPILER="`command -v "${C_COMPILER}"`"
+   CXX_COMPILER="`command -v "${CXX_COMPILER}"`"
+
+
+   RVAL="\
+-Wno-dev \
+-G '${CMAKE_GENERATOR}' \
+-DCMAKE_INSTALL_MESSAGE="LAZY" \
+-DCMAKE_C_COMPILER='${C_COMPILER}' \
+-DCMAKE_CXX_COMPILER='${CXX_COMPILER}' \
+"
+   case "${MULLE_UNAME}" in
+      linux)
+         if [ "${OPTION_LINKER}" = "ld" ]
+         then
+            RVAL="${RVAL} \
+-DCMAKE_EXE_LINKER_FLAGS=-Wl,--reduce-memory-overheads"
+         fi
+      ;;
+   esac
+}
+
+
+r_generic_clang_options()
+{
+   local links
+
+   links="mulle-clang;mulle-clang-cl;mulle-clang-cpp"
+   case "${MULLE_UNAME}" in
+      mingw*)
+         links="${links};../msbuild-bin/cl"
+      ;;
+   esac
+
+   RVAL="\
+-DCLANG_VENDOR='{CLANG_VENDOR}' \
+-DCLANG_LINKS_TO_CREATE='${links}' \
+"
+}
+
+
+r_generic_llvm_options()
+{
+   RVAL="\
+-DLLVM_OPTIMIZED_TABLEGEN=ON \
+-DLLVM_USE_LINKER='${OPTION_LINKER}' \
+-DLLVM_ENABLE_CXX1Y:BOOL=OFF \
+"
+# -DBUILD_SHARED_LIBS=ON is broken in 7.0 due to gtest dependency
+   if [ "${LLVM_BUILD_TYPE}" = "Debug" ]
+   then
+      cmdline="${cmdline} \
+-DLLVM_BUILD_TARGETS='X86'"
+   fi
+}
+
+
 #
 # on Debian, llvm doesn't build properly with clang
 # use gcc, which is the default compiler for cmake
@@ -1121,42 +1197,34 @@ _build_llvm()
       fi
    fi
 
-   local links
-
-   links="mulle-clang;mulle-clang-cl;mulle-clang-cpp"
-   case "${UNAME}" in
-      MINGW*)
-         links="${links};../msbuild-bin/cl"
-      ;;
-   esac
-
    #
    # Build llvm
    #
    if should_build "${LLVM_BUILD_DIR}" || [ "${RUN_LLVM_CMAKE}" = "YES" ]
    then
+      exekutor mkdir -p "${LLVM_BUILD_DIR}" 2> /dev/null
+      [ -d "${LLVM_BUILD_DIR}" ] || fail "Not enough permissions to create \"${LLVM_BUILD_DIR}\""
+
+      local cmdline
+      local RVAL
+
+      cmdline="cmake"
+      r_generic_cmake_options
+      cmdline="${cmdline} ${RVAL}"
+      r_generic_llvm_options
+      cmdline="${cmdline} ${RVAL}"
+      r_generic_clang_options
+      cmdline="${cmdline} ${RVAL}"
+
+      cmdline="${cmdline} \
+-DCMAKE_BUILD_TYPE='${LLVM_BUILD_TYPE}' \
+-DCMAKE_INSTALL_PREFIX='${LLVM_INSTALL_PREFIX}'"
+
+      cmdline="${cmdline} ${CMAKE_FLAGS} '${BUILD_RELATIVE}/../${LLVM_DIR}'"
+
       (
-         # for msbuild
-         C_COMPILER="`command -v "${C_COMPILER}"`"
-         CXX_COMPILER="`command -v "${CXX_COMPILER}"`"
-
-         exekutor mkdir -p "${LLVM_BUILD_DIR}" 2> /dev/null
-         [ -d "${LLVM_BUILD_DIR}" ] || fail "Not enough permissions to create \"${LLVM_BUILD_DIR}\""
-
          exekutor cd "${LLVM_BUILD_DIR}" &&
-         exekutor cmake \
-               -Wno-dev \
-               -G "${CMAKE_GENERATOR}" \
-               -DCMAKE_C_COMPILER="${C_COMPILER}" \
-               -DCMAKE_CXX_COMPILER="${CXX_COMPILER}" \
-               -DCLANG_VENDOR="${CLANG_VENDOR}" \
-               -DCLANG_LINKS_TO_CREATE="${links}" \
-               -DLLVM_USE_LINKER="${OPTION_LINKER}" \
-               -DCMAKE_BUILD_TYPE="${LLVM_BUILD_TYPE}" \
-               -DCMAKE_INSTALL_PREFIX="${LLVM_INSTALL_PREFIX}" \
-               -DLLVM_ENABLE_CXX1Y:BOOL=OFF \
-               ${CMAKE_FLAGS} \
-               "${BUILD_RELATIVE}/../${LLVM_DIR}"
+         eval_exekutor "${cmdline}"
       ) || exit 1
    fi
 
@@ -1166,8 +1234,8 @@ _build_llvm()
       exekutor ${MAKE} ${MAKE_FLAGS} "$@"
    ) || exit 1
 
-   case "${UNAME}" in
-      MINGW*)
+   case "${MULLE_UNAME}" in
+      mingw*)
          if [ ! -x "${MULLE_CLANG_INSTALL_PREFIX}/bin/mulle-scan-build.bat" ]
          then
             log_verbose "Creating mulle-lldb link ..."
@@ -1201,37 +1269,24 @@ _build_clang()
    #
    if should_build "${MULLE_CLANG_BUILD_DIR}" || [ "${RUN_CLANG_CMAKE}" = "YES" ]
    then
-      (
-         # for msbuild
-         C_COMPILER="`command -v "${C_COMPILER}"`"
-         CXX_COMPILER="`command -v "${CXX_COMPILER}"`"
+      exekutor mkdir -p "${MULLE_CLANG_BUILD_DIR}" 2> /dev/null
 
-         exekutor mkdir -p "${MULLE_CLANG_BUILD_DIR}" 2> /dev/null
+      local cmdline
+      local RVAL
 
-         exekutor cd "${MULLE_CLANG_BUILD_DIR}" &&
+      cmdline="cmake"
+      r_generic_cmake_options
+      cmdline="${cmdline} ${RVAL}"
+      r_generic_llvm_options
+      cmdline="${cmdline} ${RVAL}"
+      r_generic_clang_options
+      cmdline="${cmdline} ${RVAL}"
 
-         local links
-
-         links="mulle-clang;mulle-clang-cl;mulle-clang-cpp"
-         case "${UNAME}" in
-            mingw)
-               links="${links};../msbuild-bin/cl"
-            ;;
-         esac
             # cmake -DCMAKE_BUILD_TYPE=Debug "../${MULLE_CLANG_DIR}"
             # try to build cmake with cmake
-         exekutor cmake \
-               -Wno-dev \
-               -G "${CMAKE_GENERATOR}" \
-               -DCMAKE_C_COMPILER="${C_COMPILER}" \
-               -DCMAKE_CXX_COMPILER="${CXX_COMPILER}" \
-               -DCLANG_VENDOR="${CLANG_VENDOR}" \
-               -DCLANG_LINKS_TO_CREATE="${links}" \
-               -DLLVM_USE_LINKER="${OPTION_LINKER}" \
-               -DCMAKE_BUILD_TYPE="${MULLE_CLANG_BUILD_TYPE}" \
-               -DCMAKE_INSTALL_PREFIX="${MULLE_CLANG_INSTALL_PREFIX}" \
-               ${CMAKE_FLAGS} \
-               "${BUILD_RELATIVE}/../${MULLE_CLANG_DIR}"
+      (
+         exekutor cd "${MULLE_CLANG_BUILD_DIR}" &&
+         eval_exekutor "${cmdline} ${CMAKE_FLAGS} '${BUILD_RELATIVE}/../${MULLE_CLANG_DIR}'"
       ) || exit 1
    fi
 
@@ -1442,8 +1497,8 @@ before you can install"
    install_executable "${MULLE_CLANG_INSTALL_PREFIX}/bin/scan-build" \
                       "mulle-scan-build"
 
-   case "${UNAME}" in
-      MINGW*)
+   case "${MULLE_UNAME}" in
+      mingw*)
          install_file "${MULLE_CLANG_INSTALL_PREFIX}/bin/mulle-scan-build.bat" \
                             "mulle-scan-build.bat"
       ;;
@@ -1570,7 +1625,7 @@ main()
             MULLE_FLAG_EXECUTOR_DRY_RUN="YES"
          ;;
 
-         -V)
+         -lx|-V)
             MULLE_FLAG_LOG_EXECUTOR="YES"
          ;;
 
@@ -1748,8 +1803,8 @@ main()
       local linker
       local linkerpreferences
 
-      case "${UNAME}" in
-         MINGW*)
+      case "${MULLE_UNAME}" in
+         mingw*)
             # todo: untested
             linkerpreferences="lld ld.lld ld link.exe"
          ;;
@@ -1795,8 +1850,8 @@ main()
    BUILD_RELATIVE=".."
 
    # different builds for OS Versions on OS X
-   case "${UNAME}" in
-      Darwin)
+   case "${MULLE_UNAME}" in
+      darwin)
          osxversion="`sw_vers -productVersion | cut -d. -f 1-2`"
          BUILD_DIR="build-${osxversion}"
          if [ "${PREFIX}" = "${OWD}" ]

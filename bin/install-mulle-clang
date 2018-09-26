@@ -800,6 +800,10 @@ setup_build_environment()
       then
          MAKE_FLAGS="-l ${loadavg}"
       fi
+      if [ "${VERBOSE}" = "YES" ]
+      then
+         MAKE_FLAGS="-v ${MAKE_FLAGS}"
+      fi
       MAKE_BUILD_COMMAND=""
    fi
 

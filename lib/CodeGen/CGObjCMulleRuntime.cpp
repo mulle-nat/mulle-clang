@@ -112,8 +112,8 @@ namespace {
          // be called a lot.
          switch( optLevel)
          {
-         default : name = "mulle_objc_object_inline_constant_methodid_call"; break;
-         case 1  : name = "mulle_objc_object_constant_methodid_call"; break;
+         default : name = "mulle_objc_object_inlinecall_constantmethodid"; break;
+         case 1  : name = "mulle_objc_object_call_constantmethodid"; break;
          case -1 :
          case 0  : name = "mulle_objc_object_call"; break;
          }
@@ -137,8 +137,8 @@ namespace {
          // be called a lot.
          switch( optLevel)
          {
-         default : name = "mulle_objc_object_inline_constant_methodid_call"; break;
-         case 1  : name = "mulle_objc_object_constant_methodid_call"; break;
+         default : name = "mulle_objc_object_inlinecall_constantmethodid"; break;
+         case 1  : name = "mulle_objc_object_call_constantmethodid"; break;
          case -1 :
          case 0  : name = "mulle_objc_object_call"; break;
          }
@@ -161,14 +161,14 @@ namespace {
          llvm::Type *params[] = { ObjectPtrTy };
          return CGM.CreateRuntimeFunction(llvm::FunctionType::get( ObjectPtrTy,
                                                                   params, false),
-                                          "mulle_objc_object_retain");
+                                          "mulle_objc_object_inlineretain");
       }
 
       llvm::Constant *getMessageSendReleaseFn() const {
          llvm::Type *params[] = { ObjectPtrTy };
          return CGM.CreateRuntimeFunction(llvm::FunctionType::get(CGM.VoidTy,
                                                                   params, false),
-                                          "mulle_objc_object_release");
+                                          "mulle_objc_object_inlinerelease");
       }
 
       // improve legacy code to basically a no-op
@@ -189,8 +189,8 @@ namespace {
          StringRef    name;
          switch( optLevel)
          {
-         default : name = "_mulle_objc_object_inline_supercall"; break;
-         case 1  : name = "_mulle_objc_object_partialinline_supercall"; break;
+         default : name = "_mulle_objc_object_inlinesupercall"; break;
+         case 1  : name = "_mulle_objc_object_partialinlinesupercall"; break;
          case -1 :
          case 0  : name = "_mulle_objc_object_supercall"; break;
          }
@@ -305,11 +305,11 @@ namespace {
          StringRef    name;
          switch( optLevel)
          {
-         default : name = "mulle_objc_inline_unfailingfastlookup_infraclass";
+         default : name = "mulle_objc_inlinefastlookup_infraclass_nofail";
                    break;
          case 1  :
          case -1 :
-         case 0  : name = "mulle_objc_unfailingfastlookup_infraclass";
+         case 0  : name = "mulle_objc_fastlookup_infraclass_nofail";
                    break;
          }
 
@@ -620,7 +620,7 @@ namespace {
          llvm::Type *params[] = { getExceptionDataTy( CGM)->getPointerTo() };
          return CGM.CreateRuntimeFunction(
                                           llvm::FunctionType::get(CGM.VoidTy, params, false),
-                                          "mulle_objc_exception_try_enter");
+                                          "mulle_objc_exception_tryenter");
       }
 
       /// ExceptionTryExitFn - LLVM objc_exception_try_exit function.
@@ -628,7 +628,7 @@ namespace {
          llvm::Type *params[] = { getExceptionDataTy( CGM)->getPointerTo() };
          return CGM.CreateRuntimeFunction(
                                           llvm::FunctionType::get(CGM.VoidTy, params, false),
-                                          "mulle_objc_exception_try_exit");
+                                          "mulle_objc_exception_tryexit");
       }
 
       /// ExceptionExtractFn - LLVM objc_exception_extract function.
@@ -1890,7 +1890,7 @@ llvm::Value *CGObjCMulleRuntime::GetClass(CodeGenFunction &CGF,
 
    int optLevel = CGM.getLangOpts().OptimizeSize ? -1 : CGM.getCodeGenOpts().OptimizationLevel;
    classPtr = CGF.EmitNounwindRuntimeCall(ObjCTypes.getGetRuntimeClassFn( optLevel),
-                                          classID, "mulle_objc_unfailingfastlookup_infraclass"); // string what for ??
+                                          classID, "mulle_objc_fastlookup_infraclass_nofail"); // string what for ??
    rval     = CGF.Builder.CreateBitCast( classPtr, ObjCTypes.ObjectPtrTy);
    return rval;
 }
@@ -5256,7 +5256,7 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
   llvm::FunctionType *FT =
     llvm::FunctionType::get(Builder.getVoidTy(),
                             llvm::PointerType::getUnqual(ObjCTypes.LoadInfoTy), true);
-  llvm::Value *Register = CGM.CreateRuntimeFunction( FT, "mulle_objc_loadinfo_unfailingenqueue");
+  llvm::Value *Register = CGM.CreateRuntimeFunction( FT, "mulle_objc_loadinfo_enqueue_nofail");
   Builder.CreateCall( Register, LoadInfo);
   Builder.CreateRetVoid();
 

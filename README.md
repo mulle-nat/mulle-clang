@@ -118,21 +118,21 @@ defined in the runtime.
 
 ### -O2
 
-* `mulle_objc_inline_unfailingfastlookup_infraclass`
-* `mulle_objc_object_inline_constant_methodid_call`
-* `_mulle_objc_object_inline_supercall`
-* `mulle_objc_object_retain`
-* `mulle_objc_object_release`
+* `mulle_objc_inlinefastlookup_infraclass_nofail`
+* `mulle_objc_object_inlinecall_constantmethodid`
+* `_mulle_objc_object_inlinesupercall`
+* `mulle_objc_object_inlineretain`
+* `mulle_objc_object_inlinerelease`
 
 ### -O1
 
-* `mulle_objc_inline_unfailingfastlookup_infraclass`
-* `mulle_objc_object_constant_methodid_call`
-* `_mulle_objc_object_partialinline_supercall`
+* `mulle_objc_inlinefastlookup_infraclass_nofail`
+* `mulle_objc_object_call_constantmethodid`
+* `_mulle_objc_object_partialinlinesupercall`
 
 ### -O0, -Os
 
-* `mulle_objc_unfailingfastlookup_infraclass`
+* `mulle_objc_fastlookup_infraclass_nofail`
 * `mulle_objc_object_call`
 * `_mulle_objc_object_supercall`
 
@@ -141,8 +141,8 @@ defined in the runtime.
 * `mulle_objc_object_get_property_value`
 * `mulle_objc_object_set_property_value`
 * `mulle_objc_object_zone`
-* `mulle_objc_exception_try_enter`
-* `mulle_objc_exception_try_exit`
+* `mulle_objc_exception_tryenter`
+* `mulle_objc_exception_tryexit`
 * `mulle_objc_exception_extract`
 * `mulle_objc_exception_match`
 
@@ -176,7 +176,7 @@ sudo apt-get update &&
 sudo apt-get install mulle-clang
 ```
 
-#### Debian 
+#### Debian
 
 You can install on Debian (and Ubuntu) with:
 

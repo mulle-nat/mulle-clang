@@ -8,7 +8,14 @@
 
 # compile it like LLVM does (everything all the time)
 # only useful if you're creating installers IMO
-BY_THE_BOOK="YES"
+# You have three options
+#
+# STRICT   : stuff will be placed into src/llvm/tools
+# SEPARATE : stuff will be parallel to src/llvm and build there
+# HACK     : like NO, but place symlinks into src/llvm/tools and build there
+
+BY_THE_BOOK="HACK"
+
 USE_LLVM_CLANG="NO"
 USE_LLVM_LLDB="NO"
 
@@ -1180,7 +1187,7 @@ r_generic_llvm_options()
 
 
 #
-# on Debian, llvm doesn't build properly with clang
+# on Debian, llvm may not build properly with clang
 # use gcc, which is the default compiler for cmake
 #
 _build_llvm()
@@ -1189,7 +1196,7 @@ _build_llvm()
    # if on windows you notice that lldb doesnt compile
    # you want to throw it away with --no-lldb
    #
-   if [ "${BUILD_LLDB}" = "NO" -a "${BY_THE_BOOK}" = "YES" ]
+   if [ "${BUILD_LLDB}" = "NO" -a "${BY_THE_BOOK}" != "SEPARATE" ]
    then
       if [ -d "${MULLE_LLDB_DIR}" ]
       then
@@ -1320,7 +1327,7 @@ download()
 # instead of downloading llvm first for an hour...
 # but this won't work if we are doing it by the book
 #
-   if [ "${BUILD_LLVM}" = "YES" -a "${BY_THE_BOOK}" = "YES" ]
+   if [ "${BUILD_LLVM}" = "YES" -a "${BY_THE_BOOK}" != "SEPARATE" ]
    then
       download_llvm
    fi
@@ -1352,9 +1359,16 @@ download()
 #      log_verbose "LLDB_VENDOR=${LLDB_VENDOR}"
    fi
 
+   case "${BY_THE_BOOK}" in
+      'HACK')
+         exekutor ln -s "${SRC_DIR}/mulle-clang" "${LLVM_DIR}/tools/clang"
+         exekutor ln -s "${SRC_DIR}/mulle-lldb" "${LLVM_DIR}/tools/lldb"
+      ;;
+   esac
+
 # should check if llvm is installed, if yes
 # check proper version and then use it
-   if [ "${BUILD_LLVM}" = "YES" -a "${BY_THE_BOOK}" = "NO" ]
+   if [ "${BUILD_LLVM}" = "YES" -a "${BY_THE_BOOK}" = "SEPARATE" ]
    then
       download_llvm
    fi
@@ -1399,7 +1413,7 @@ is likely to get reused. If this is not what you want, [CTRL]-[C] now and do:
       fi
    fi
 
-   if [ "${BUILD_CLANG}" = "YES" -a "${BY_THE_BOOK}" = "NO" ]
+   if [ "${BUILD_CLANG}" = "YES" -a "${BY_THE_BOOK}" != "YES" ]
    then
       build_clang "${MAKE_INSTALL_COMMAND}"
    fi
@@ -1420,7 +1434,7 @@ _build()
       fi
    fi
 
-   if [ "${BUILD_CLANG}" = "YES" -a "${BY_THE_BOOK}" = "NO" ]
+   if [ "${BUILD_CLANG}" = "YES" -a "${BY_THE_BOOK}" != "YES" ]
    then
       _build_clang "${MAKE_INSTALL_COMMAND}"
    fi
@@ -1647,11 +1661,15 @@ main()
          ;;
 
          --all-in-one)
-            BY_THE_BOOK="YES"
+            BY_THE_BOOK="STRICT"
+         ;;
+
+         --all-in-one-with-symlinks)
+            BY_THE_BOOK="HACK"
          ;;
 
          --separate)
-            BY_THE_BOOK="NO"
+            BY_THE_BOOK="SEPARATE"
             BUILD_LLDB="NO"  # implies
          ;;
 
@@ -1753,13 +1771,13 @@ main()
          --llvm-clang)
             USE_LLVM_CLANG="YES"
             BUILD_CLANG="NO"
-            BY_THE_BOOK="YES"
+            BY_THE_BOOK="STRICT"
          ;;
 
          --llvm-lldb)
             USE_LLVM_LLDB="YES"
             BUILD_LLDB="NO"
-            BY_THE_BOOK="YES"
+            BY_THE_BOOK="STRICT"
          ;;
 
          -*)
@@ -1841,16 +1859,24 @@ main()
    MULLE_CLANG_BUILD_TYPE="${MULLE_CLANG_BUILD_TYPE:-Release}"
 
    LLVM_DIR="${SRC_DIR}/llvm"
-   if [ "${BY_THE_BOOK}" = "YES" ]
-   then
-      # must use "clang" as name, because lldb will expect it there
-      # and then use lldb also for consistency
-      MULLE_CLANG_DIR="${LLVM_DIR}/tools/clang"
-      MULLE_LLDB_DIR="${LLVM_DIR}/tools/lldb"
-   else
-      MULLE_CLANG_DIR="${SRC_DIR}/mulle-clang"
-      MULLE_LLDB_DIR="${SRC_DIR}/mulle-lldb"
-   fi
+   case "${BY_THE_BOOK}" in
+      'STRICT')
+         # must use "clang" as name, because lldb will expect it there
+         # and then use lldb also for consistency
+         MULLE_CLANG_DIR="${LLVM_DIR}/tools/clang"
+         MULLE_LLDB_DIR="${LLVM_DIR}/tools/lldb"
+      ;;
+
+      'HACK'|'SEPARATE')
+         MULLE_CLANG_DIR="${SRC_DIR}/mulle-clang"
+         MULLE_LLDB_DIR="${SRC_DIR}/mulle-lldb"
+      ;;
+
+      'SEPARATE')
+         MULLE_CLANG_DIR="${SRC_DIR}/mulle-clang"
+         MULLE_LLDB_DIR="${SRC_DIR}/mulle-lldb"
+      ;;
+   esac
 
    BUILD_DIR="build"
    BUILD_RELATIVE=".."
@@ -1863,6 +1889,13 @@ main()
          if [ "${PREFIX}" = "${OWD}" ]
          then
             PREFIX="${OWD}/${osxversion}"
+         fi
+      ;;
+
+      mingw)
+         if [ "${BY_THE_BOOK}" = "HACK" ]
+         then
+            fail "No symlinks available on mingw. Use --all-in-one"
          fi
       ;;
    esac
@@ -1894,7 +1927,7 @@ main()
       RUN_LLVM_CMAKE="YES"
    fi
 
-   if [ "${BUILD_LLDB}" = "YES" -a "${BY_THE_BOOK}" = "NO" ]
+   if [ "${BUILD_LLDB}" = "YES" -a "${BY_THE_BOOK}" = "SEPARATE" ]
    then
       fail "You can't use --separate with --with-lldb"
    fi

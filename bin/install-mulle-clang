@@ -1374,6 +1374,26 @@ download()
    fi
 }
 
+_build()
+{
+# should check if llvm is installed, if yes
+# check proper version and then use it
+   if [ "${BUILD_LLVM}" = "YES" ]
+   then
+      if [ "${INSTALL_LLVM}" = "YES" ]
+      then
+         _build_llvm "${MAKE_INSTALL_COMMAND}"
+      else
+         _build_llvm "${MAKE_BUILD_COMMAND}"
+      fi
+   fi
+
+   if [ "${BUILD_CLANG}" = "YES" -a "${BY_THE_BOOK}" = "SEPARATE" ]
+   then
+      _build_clang "${MAKE_INSTALL_COMMAND}"
+   fi
+}
+
 
 build()
 {
@@ -1401,43 +1421,7 @@ is likely to get reused. If this is not what you want, [CTRL]-[C] now and do:
       fi
    fi
 
-# should check if llvm is installed, if yes
-# check proper version and then use it
-   if [ "${BUILD_LLVM}" = "YES" ]
-   then
-      if [ "${INSTALL_LLVM}" = "YES" ]
-      then
-         build_llvm "${MAKE_INSTALL_COMMAND}"
-      else
-         build_llvm "${MAKE_BUILD_COMMAND}"
-      fi
-   fi
-
-   if [ "${BUILD_CLANG}" = "YES" -a "${BY_THE_BOOK}" != "YES" ]
-   then
-      build_clang "${MAKE_INSTALL_COMMAND}"
-   fi
-}
-
-
-_build()
-{
-# should check if llvm is installed, if yes
-# check proper version and then use it
-   if [ "${BUILD_LLVM}" = "YES" ]
-   then
-      if [ "${INSTALL_LLVM}" = "YES" ]
-      then
-         _build_llvm "${MAKE_INSTALL_COMMAND}"
-      else
-         _build_llvm "${MAKE_BUILD_COMMAND}"
-      fi
-   fi
-
-   if [ "${BUILD_CLANG}" = "YES" -a "${BY_THE_BOOK}" != "YES" ]
-   then
-      _build_clang "${MAKE_INSTALL_COMMAND}"
-   fi
+   _build
 }
 
 

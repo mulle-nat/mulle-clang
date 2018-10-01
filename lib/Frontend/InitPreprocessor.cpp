@@ -669,7 +669,7 @@ static void InitializePredefinedMacros(const TargetInfo &TI,
        Builder.defineMacro("__MULLE_OBJC__");
        Builder.defineMacro( LangOpts.ObjCAllocsAutoreleasedObjects ? "__MULLE_OBJC_AAM__" : "__MULLE_OBJC_NO_AAM__");
        Builder.defineMacro( LangOpts.ObjCDisableTaggedPointers ? "__MULLE_OBJC_NO_TPS__" : "__MULLE_OBJC_TPS__");
-       Builder.defineMacro( LangOpts.ObjCHasThreadLocalRuntime ? "__MULLE_OBJC_TRT__" : "__MULLE_OBJC_NO_TRT__");
+       Builder.defineMacro( LangOpts.ObjCHasThreadLocalUniverse ? "__MULLE_OBJC_TLU__" : "__MULLE_OBJC_GLU__");
        Builder.defineMacro( LangOpts.ObjCDisableFastMethodCalls ? "__MULLE_OBJC_NO_FMC__" : "__MULLE_OBJC_FMC__");
     }
     // @mulle-objc@ language: announce that we are running <

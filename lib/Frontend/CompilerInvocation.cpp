@@ -2229,8 +2229,8 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
       Opts.ObjCDisableTaggedPointers = 1;
     if( Args.hasArg( OPT_fno_objc_fmc))
       Opts.ObjCDisableFastMethodCalls = 1;
-    if( Args.hasArg( OPT_fobjc_trt))
-      Opts.ObjCHasThreadLocalRuntime = 1;
+    if( Args.hasArg( OPT_fobjc_tlu))
+      Opts.ObjCHasThreadLocalUniverse = 1;
     if( Args.hasArg( OPT_fobjc_aam))
       Opts.ObjCAllocsAutoreleasedObjects = 1;
     // @mulle-objc@: handle AAM and TPS options <

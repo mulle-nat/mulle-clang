@@ -1520,7 +1520,7 @@ ObjCTypes(cgm) {
 
    foundation_version   = 0;
    user_version         = 0;
-   thread_local_runtime = CGM.getLangOpts().ObjCHasThreadLocalRuntime;
+   thread_local_runtime = CGM.getLangOpts().ObjCHasThreadLocalUniverse;
    no_tagged_pointers   = CGM.getLangOpts().ObjCDisableTaggedPointers;
    no_fast_method_calls = CGM.getLangOpts().ObjCDisableFastMethodCalls;
 

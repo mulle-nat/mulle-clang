@@ -1448,10 +1448,10 @@ def fobjc_fmc : Flag<["-"], "fobjc-fmc">, Group<f_Group>, Flags<[CC1Option]>,
    HelpText<"use Objective-C fast method calls">;
 def fno_objc_fmc : Flag<["-"], "fno-objc-fmc">, Group<f_Group>, Flags<[CC1Option]>,
    HelpText<"don't use Objective-C fast method calls">;
-def fobjc_trt : Flag<["-"], "fobjc-trt">, Group<f_Group>, Flags<[CC1Option]>,
-  HelpText<"use thread local Objective-C runtime">;
-def fno_objc_trt : Flag<["-"], "fno-objc-trt">, Group<f_Group>, Flags<[CC1Option]>,
-  HelpText<"use global Objective-C runtime">;
+def fobjc_tlu : Flag<["-"], "fobjc-tlu">, Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"use thread local Objective-C universe">;
+def fobjc_glu : Flag<["-"], "fobjc-glu">, Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"use global Objective-C universe">;
 def fobjc_aam : Flag<["-"], "fobjc-aam">, Group<f_Group>, Flags<[CC1Option]>,
   HelpText<"AlwaysAutoreleaseMode, +alloc becomes +instantiate">;
 def fno_objc_aam : Flag<["-"], "fno-objc-aam">, Group<f_Group>;

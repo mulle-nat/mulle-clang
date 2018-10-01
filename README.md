@@ -52,38 +52,30 @@ Your ARC code may not run in AAM, but AAM code should run in ARC with no
 problems. If you can't do something in AAM, put it in a category in regular
 Objective-C style.
 
-
-## Additional File Types
-
 The compiler handles `.aam` files, which enables AAM ("Always Autoreleased
 Mode").
 
+## Additional Compiler options and defined macros
 
-## Additional Options
-
-Name           | Description
----------------|--------------------------------------
--fobjc-aam     | Enable AAM
--fno-objc-tps  | Disable tagged pointers
--fno-objc-fmc  | Disable fast method calls
+With the exception of `__MULLE_OBJC__` the following table represents
+option pairs, that logically exclude each other.
 
 
-## Additional Compiler defined Macros
-
-In the cases where there exists a `_NO_` variant, the compiler always specifies
-either of both but not both together or none of the two.
-
-Name                    | Description
-------------------------|--------------------------------------
-`__MULLE_OBJC__`        | Compiling for mulle-objc
-`__MULLE_OBJC_AAM__`    | AAM is enabled
-`__MULLE_OBJC_NO_AAM__` | AAM is not enabled
-`__MULLE_OBJC_TPS__`    | TPS (tagged pointers) is enabled
-`__MULLE_OBJC_NO_TPS__` | TPS is not enabled
-`__MULLE_OBJC_TRT__`    | TRT (thread-local runtime) is enabled
-`__MULLE_OBJC_NO_TRT__` | TRT is not enabled
-`__MULLE_OBJC_FMC__`    | FMC (fast method calling) is enabled
-`__MULLE_OBJC_NO_FMC__` | FMC is not enabled
+Name                    | Compiler      | Default | Description
+------------------------|---------------|------|--------------------
+`__MULLE_OBJC__`        |  -            | -    | Compiling for mulle-objc
+ &nbsp;                 | &nbsp;        |&nbsp;|
+`__MULLE_OBJC_AAM__`    | .aam file     | -    | AAM is enabled
+`__MULLE_OBJC_NO_AAM__` | .m file       | -    | AAM is not enabled
+ &nbsp;                 | &nbsp;        |&nbsp;|
+`__MULLE_OBJC_TPS__`    | -fobjc-tps    | YES  | TPS (tagged pointer support) is enabled
+`__MULLE_OBJC_NO_TPS__` | -fno-objc-tps | NO   | TPS is not enabled
+ &nbsp;                 | &nbsp;        |&nbsp;|
+`__MULLE_OBJC_TLU__`    | -fobjc-tlu    | NO   | TLU (thread-local universe) is enabled
+`__MULLE_OBJC_GLU__`    | -fobjc-glu    | YES  | GLU (global universe) is enabled
+ &nbsp;                 | &nbsp;        |&nbsp;|
+`__MULLE_OBJC_FMC__`    | -fobjc-fmc    | YES  | FMC (fast method calling) is enabled
+`__MULLE_OBJC_NO_FMC__` | -fno-objc_fmc | NO   | FMC is not enabled
 
 
 ## Macros used in Code Generation

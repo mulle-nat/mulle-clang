@@ -1823,12 +1823,12 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
       }
 
       // possibly make this a #pragma sometime
-      if( GetMacroDefinitionUnsignedIntegerValue( PP, "__MULLE_OBJC_TRT__", &value))
+      if( GetMacroDefinitionUnsignedIntegerValue( PP, "__MULLE_OBJC_TLU__", &value))
       {
          thread_local_runtime = value;
       }
 
-      if( GetMacroDefinitionUnsignedIntegerValue( PP, "__MULLE_OBJC_NO_TRT__", &value))
+      if( GetMacroDefinitionUnsignedIntegerValue( PP, "__MULLE_OBJC_GLU__", &value))
       {
          thread_local_runtime = ! value;
       }

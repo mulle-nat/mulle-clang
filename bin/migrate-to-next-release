@@ -100,10 +100,15 @@ migrate()
 
    git checkout -b "${NEW_MULLE_DEV_BRANCH}" "${LLVM_REMOTE}/${NEW_LLVM_BRANCH}" || exit 1
 
-   echo "### 6: Cherry pick" >&2
+   echo "### 6: Clean rubbish" >&2
+
+   git clean -d -x -f || exit 1
+
+   echo "### 7: Cherry pick" >&2
 
    if ! git cherry-pick "tmp_${NEW_MULLE_DEV_BRANCH}"
    then
+      echo "${BEFORELIST}" > tags-BEFORE.txt
       git status -s
       exit 1
    fi
@@ -113,6 +118,8 @@ migrate()
 
    if [ "${BEFORELIST}" != "${AFTERLIST}" ]
    then
+      echo "${AFTERLIST}" > tags-AFTER.txt
+
       echo "Some @mulle-objc tags got lost in the merge" >&2
       diff  <(echo "$BEFORELIST" ) <(echo "$AFTERLIST") >&2
       exit 1
@@ -123,7 +130,7 @@ migrate()
    # resolve conflicts manually.
    # Check with grep '@mulle-objc' ... | wc -l, that all changes are present
    #
-   echo "### 7: Tmp branch delete" >&2
+   echo "### 8: Tmp branch delete" >&2
 
    git branch -D "tmp_${NEW_MULLE_DEV_BRANCH}" || exit 1
 }

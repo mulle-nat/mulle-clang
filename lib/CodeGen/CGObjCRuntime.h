@@ -276,6 +276,9 @@ public:
   /// interface decl.
   virtual llvm::Value *GetClass(CodeGenFunction &CGF,
                                 const ObjCInterfaceDecl *OID) = 0;
+  virtual llvm::Value *GetClass(CodeGenFunction &CGF,
+                                const ObjCInterfaceDecl *OID,
+                                llvm::Value *self) = 0;
 
 
   virtual llvm::Value *EmitNSAutoreleasePoolClassRef(CodeGenFunction &CGF) {

@@ -2231,6 +2231,14 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
       Opts.ObjCDisableFastMethodCalls = 1;
     if( Args.hasArg( OPT_fobjc_tlu))
       Opts.ObjCHasThreadLocalUniverse = 1;
+    if (Arg *arg = Args.getLastArg(OPT_fobjc_mtu_EQ)) {
+      if(Opts.ObjCHasThreadLocalUniverse)
+        Diags.Report(diag::err_drv_mulle_universe_flag_tlu_mismatch);
+      if( ! Opts.ObjCDisableTaggedPointers)
+        Diags.Report(diag::err_drv_mulle_universe_flag_tps_mismatch);
+      StringRef value = arg->getValue();
+      Opts.ObjCUniverseName = value;
+    }
     if( Args.hasArg( OPT_fobjc_aam))
       Opts.ObjCAllocsAutoreleasedObjects = 1;
     // @mulle-objc@: handle AAM and TPS options <

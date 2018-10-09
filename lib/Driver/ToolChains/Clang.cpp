@@ -2737,6 +2737,24 @@ static void RenderObjCOptions(const ToolChain &TC, const Driver &D,
     Args.ClaimAllArgs(options::OPT_fno_objc_arc_exceptions);
   }
 
+  // @mulle-objc@ arguments >
+  if( Runtime.hasMulleMetaABI())
+  {
+      // just do what's not default
+      if( Args.hasArg( options::OPT_fno_objc_tps))
+         CmdArgs.push_back( "-fno-objc-tps");  
+      if( Args.hasArg( options::OPT_fno_objc_fmc))
+         CmdArgs.push_back( "-fno-objc-fmc");  
+      if( Args.hasArg( options::OPT_fobjc_tlu))
+         CmdArgs.push_back( "-fobjc-tlu");  
+      if( Args.hasArg( options::OPT_fobjc_mtu_EQ))
+         CmdArgs.push_back( "-fobjc-mtu");  
+      Args.ClaimAllArgs(options::OPT_fobjc_tps);
+      Args.ClaimAllArgs(options::OPT_fobjc_fmc);
+      Args.ClaimAllArgs(options::OPT_fobjc_mtu_EQ);
+  }
+  // @mulle-objc@ arguments <
+
   // -fobjc-infer-related-result-type is the default, except in the Objective-C
   // rewriter.
   if (InferCovariantReturns)

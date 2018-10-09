@@ -6,7 +6,7 @@
       {
          "label": "mulle-clang",
          "type": "shell",
-         "command": "cd ../.. ; ./src/mulle-clang/bin/install-mulle-clang --clang-debug --no-warn --no-lldb --separate",
+         "command": "cd ../.. ; ./src/mulle-clang/bin/install-mulle-clang -lx --clang-debug --no-warn --no-lldb --separate",
          "problemMatcher": [
             "$gcc"
          ],

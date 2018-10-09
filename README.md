@@ -61,21 +61,22 @@ With the exception of `__MULLE_OBJC__` the following table represents
 option pairs, that logically exclude each other.
 
 
-Name                    | Compiler      | Default | Description
-------------------------|---------------|------|--------------------
-`__MULLE_OBJC__`        |  -            | -    | Compiling for mulle-objc
- &nbsp;                 | &nbsp;        |&nbsp;|
-`__MULLE_OBJC_AAM__`    | .aam file     | -    | AAM is enabled
-`__MULLE_OBJC_NO_AAM__` | .m file       | -    | AAM is not enabled
- &nbsp;                 | &nbsp;        |&nbsp;|
-`__MULLE_OBJC_TPS__`    | -fobjc-tps    | YES  | TPS (tagged pointer support) is enabled
-`__MULLE_OBJC_NO_TPS__` | -fno-objc-tps | NO   | TPS is not enabled
- &nbsp;                 | &nbsp;        |&nbsp;|
-`__MULLE_OBJC_TLU__`    | -fobjc-tlu    | NO   | TLU (thread-local universe) is enabled
-`__MULLE_OBJC_GLU__`    | -fobjc-glu    | YES  | GLU (global universe) is enabled
- &nbsp;                 | &nbsp;        |&nbsp;|
-`__MULLE_OBJC_FMC__`    | -fobjc-fmc    | YES  | FMC (fast method calling) is enabled
-`__MULLE_OBJC_NO_FMC__` | -fno-objc_fmc | NO   | FMC is not enabled
+Name                    | Compiler        | Default | Description
+------------------------|-----------------|-------|--------------------
+`__MULLE_OBJC__`        |  -              | -     | Compiling for mulle-objc
+ &nbsp;                 | &nbsp;          | &nbsp;|
+`__MULLE_OBJC_AAM__`    | .aam file       | -     | AAM is enabled
+`__MULLE_OBJC_NO_AAM__` | .m file         | -     | AAM is not enabled
+ &nbsp;                 | &nbsp;          | &nbsp;|
+`__MULLE_OBJC_TPS__`    | -fobjc-tps      | YES   | TPS (tagged pointer support) is enabled
+`__MULLE_OBJC_NO_TPS__` | -fno-objc-tps   | NO    | TPS is not enabled
+ &nbsp;                 | &nbsp;          | &nbsp;|
+`__MULLE_OBJC_TLU__`    | -fobjc-tlu      | NO    | TLU (thread-local universe) is enabled
+`__MULLE_OBJC_GLU__`    | &nbsp;          | YES   | GLU (global universe) is enabled
+`__MULLE_OBJC_MTU__`    | -fobjc-mtu=name | NO    | MLU (multiverse) is enabled
+`&nbsp;                 | &nbsp;          | &nbsp;|
+`__MULLE_OBJC_FMC__`    | -fobjc-fmc      | YES   | FMC (fast method calling) is enabled
+`__MULLE_OBJC_NO_FMC__` | -fno-objc_fmc   | NO    | FMC is not enabled
 
 
 ## Macros used in Code Generation

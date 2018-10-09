@@ -589,6 +589,11 @@ public:
                            const ObjCMethodDecl *Method) override;
   llvm::Value *GetClass(CodeGenFunction &CGF,
                         const ObjCInterfaceDecl *OID) override;
+  // @mulle-objc@ get class >                        
+  llvm::Value *GetClass(CodeGenFunction &CGF,
+                        const ObjCInterfaceDecl *OID,
+                        llvm::Value *self) override;                        
+  // @mulle-objc@ get class <                        
   llvm::Value *GetSelector(CodeGenFunction &CGF, Selector Sel) override;
   Address GetAddrOfSelector(CodeGenFunction &CGF, Selector Sel) override;
   llvm::Value *GetSelector(CodeGenFunction &CGF,
@@ -2179,6 +2184,15 @@ llvm::Value *CGObjCGNU::GetClass(CodeGenFunction &CGF,
     CGM.setGVProperties(ClassSymbol, OID);
   return Value;
 }
+
+// @mulle-objc@ get class > 
+llvm::Value *CGObjCGNU::GetClass(CodeGenFunction &CGF,
+                                 const ObjCInterfaceDecl *OID,
+                                 llvm::Value *self) 
+{
+   return( GetClass( CGF, OID));   
+}  
+// @mulle-objc@ get class <                        
 
 llvm::Value *CGObjCGNU::EmitNSAutoreleasePoolClassRef(CodeGenFunction &CGF) {
   auto *Value  = GetClassNamed(CGF, "NSAutoreleasePool", false);

@@ -64,7 +64,7 @@
 #include "llvm/Support/Compiler.h"
 
 
-#define COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION  13
+#define COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION  14
 
 
 using namespace clang;
@@ -225,6 +225,7 @@ namespace {
 
       /// ObjectPtrTy - LLVM type for object handles (typeof(id))
       llvm::Type *ObjectPtrTy;
+      llvm::Type *UniversePtrTy;
 
       /// PtrObjectPtrTy - LLVM type for id *
       llvm::Type *PtrObjectPtrTy;
@@ -233,6 +234,7 @@ namespace {
       // no energy for "pe" after "Ty" :D
       llvm::Type *ParamsPtrTy;
 
+      llvm::Type *UniverseIDTy;
       llvm::Type *ClassIDTy;
       llvm::Type *CategoryIDTy;
       llvm::Type *IvarIDTy;
@@ -253,6 +255,7 @@ namespace {
       llvm::StructType *HashNameTy;
 
       // the structures that get exported
+      llvm::Type *UniverseTy;
       llvm::Type *ClassListTy;
       llvm::Type *CategoryListTy;
       llvm::Type *StaticStringListTy;
@@ -297,33 +300,18 @@ namespace {
       /// CachePtrTy - LLVM type for struct objc_cache *.
       llvm::Type *CachePtrTy;
 
-
-      // TODO: use different code for different optlevel, like mulle_objc_uninlined_unfailing_get_or_lookup_infraclass
-      llvm::Constant *getGetRuntimeClassFn( int optLevel) {
-         llvm::Type *params[] = { ClassIDTy };
+      llvm::Constant *getRuntimeFn( StringRef name, ArrayRef<llvm::Type *> params) {
          llvm::Constant *fn;
-         StringRef    name;
-         switch( optLevel)
-         {
-         default : name = "mulle_objc_inlinefastlookup_infraclass_nofail";
-                   break;
-         case 1  :
-         case -1 :
-         case 0  : name = "mulle_objc_fastlookup_infraclass_nofail";
-                   break;
-         }
 
          llvm::AttributeList   attributes = llvm::AttributeList::get(CGM.getLLVMContext(),
                                                                   llvm::AttributeList::FunctionIndex,
                                                                   llvm::Attribute::ReadNone);
          attributes.addAttribute(CGM.getLLVMContext(),
-                                                                  llvm::AttributeList::FunctionIndex,
-                                                                  llvm::Attribute::NoUnwind);
-         fn = CGM.CreateRuntimeFunction(llvm::FunctionType::get( ObjectPtrTy,
-
-                                                                  params, false),
-                                          name,
-                                          attributes);
+                                 llvm::AttributeList::FunctionIndex,
+                                 llvm::Attribute::NoUnwind);
+         fn = CGM.CreateRuntimeFunction(llvm::FunctionType::get( ObjectPtrTy, params, false),
+                                        name,
+                                        attributes);
          return( fn);
       }
 
@@ -784,11 +772,13 @@ namespace {
       llvm::LLVMContext &VMContext;
       struct mulle_clang_objccompilerinfo   runtime_info;
 
-      uint32_t   foundation_version;
-      uint32_t   user_version;
-      int32_t    thread_local_runtime;
-      int32_t    no_tagged_pointers;
-      int32_t    no_fast_method_calls;
+      uint32_t      foundation_version;
+      uint32_t      user_version;
+      int32_t       thread_local_runtime;
+      int32_t       no_tagged_pointers;
+      int32_t       no_fast_method_calls;
+      std::string   universe_name;
+      llvm::ConstantInt   *UniverseID;
 
 #define MULLE_OBJC_S_FASTCLASSES   64
 
@@ -796,7 +786,8 @@ namespace {
       uint32_t  fastclassids_defined;
       bool      struct_read;
       bool      _trace_fastids;
-
+      
+      
       // gc ivar layout bitmap calculation helper caches.
       SmallVector<GC_IVAR, 16> SkipIvars;
       SmallVector<GC_IVAR, 16> IvarsInfo;
@@ -1152,12 +1143,15 @@ namespace {
       llvm::Constant *EmitStaticStringList(Twine Name,
                                            const char *Section,
                                            ArrayRef<llvm::Constant*> StaticStrings);
+      llvm::Constant *EmitUniverse( Twine Name,
+                                    const char *Section);                                    
       llvm::Constant *EmitHashNameList(Twine Name,
                                        const char *Section,
                                        ArrayRef<llvm::Constant*> HashNames);
 
       llvm::Constant *EmitLoadInfoList(Twine Name,
                                           const char *Section,
+                                          llvm::Constant *Universe,
                                           llvm::Constant *ClassList,
                                           llvm::Constant *CategoryList,
                                           llvm::Constant *SuperList,
@@ -1243,6 +1237,10 @@ namespace {
 
       llvm::Value *GetClass(CodeGenFunction &CGF,
                             const ObjCInterfaceDecl *ID) override;
+      llvm::Value *GetClass(CodeGenFunction &CGF,
+                            const ObjCInterfaceDecl *ID,
+                            llvm::Value *self) override;
+
       llvm::Value *GetClass(CodeGenFunction &CGF,
                             llvm::Value  *classID);
       llvm::Value *GetClass(CodeGenFunction &CGF,
@@ -1521,6 +1519,8 @@ ObjCTypes(cgm) {
    foundation_version   = 0;
    user_version         = 0;
    thread_local_runtime = CGM.getLangOpts().ObjCHasThreadLocalUniverse;
+   universe_name        = CGM.getLangOpts().ObjCUniverseName;
+   UniverseID           = universe_name.length() ? _HashConstantForString( universe_name) : 0;
    no_tagged_pointers   = CGM.getLangOpts().ObjCDisableTaggedPointers;
    no_fast_method_calls = CGM.getLangOpts().ObjCDisableFastMethodCalls;
 
@@ -1832,6 +1832,11 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
       {
          thread_local_runtime = ! value;
       }
+
+      if( GetMacroDefinitionUnsignedIntegerValue( PP, "__MULLE_OBJC_MTU__", &value))
+      {
+         universe_name = value;
+      }   
    }
 
    // optional anyway
@@ -1880,19 +1885,60 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
 }
 
 
+static const char   *getObjectLookupClassFunctionName( int optLevel) {
+   switch( optLevel)
+   {
+   default : return( "mulle_objc_object_inlinefastlookup_infraclass_nofail");
+   case 1  :
+   case -1 :
+   case 0  : return( "mulle_objc_object_fastlookup_infraclass_nofail"); 
+   }
+}      
+
+
+static const char   *getRuntimeNoFMCLookupClassFunctionName( int optLevel) {
+   switch( optLevel)
+   {
+   default : return( "mulle_objc_inlinelookup_infraclass_nofail");
+   case 1  :
+   case -1 :
+   case 0  : return( "mulle_objc_lookup_infraclass_nofail"); 
+   }
+}
+
+
+static const char   *getRuntimeFMCLookupClassFunctionName( int optLevel) {
+   switch( optLevel)
+   {
+   default : return( "mulle_objc_inlinefastlookup_infraclass_nofail");
+   case 1  :
+   case -1 :
+   case 0  : return( "mulle_objc_fastlookup_infraclass_nofail"); 
+   }
+}
+
 /// GetClass - Return a reference to the class for the given interface
 /// decl.
 llvm::Value *CGObjCMulleRuntime::GetClass(CodeGenFunction &CGF,
                                           llvm::Value  *classID)
 {
-   llvm::Value *rval;
    llvm::Value *classPtr;
+   StringRef  name;
 
    int optLevel = CGM.getLangOpts().OptimizeSize ? -1 : CGM.getCodeGenOpts().OptimizationLevel;
-   classPtr = CGF.EmitNounwindRuntimeCall(ObjCTypes.getGetRuntimeClassFn( optLevel),
-                                          classID, "mulle_objc_fastlookup_infraclass_nofail"); // string what for ??
-   rval     = CGF.Builder.CreateBitCast( classPtr, ObjCTypes.ObjectPtrTy);
-   return rval;
+   name     = getRuntimeLookupClassFunctionName( optLevel);
+
+   SmallVector<llvm::Type *,1> Types;
+   Types.push_back( ObjCTypes.ClassIDTy);
+
+   SmallVector<llvm::Value *,1> Params;
+   Params.push_back( classID);
+
+   classPtr = CGF.EmitNounwindRuntimeCall( ObjCTypes.getRuntimeFn( name, Types),
+                                           Params, 
+                                           name);
+   classPtr = CGF.Builder.CreateBitCast( classPtr, ObjCTypes.ObjectPtrTy);
+   return classPtr;
 }
 
 /// GetClass - Return a reference to the class for the given interface
@@ -1908,7 +1954,7 @@ llvm::Value *CGObjCMulleRuntime::GetClass(CodeGenFunction &CGF,
 
 
 /// GetClass - Return a reference to the class for the given interface
-/// decl.
+/// decl. Called by CGObjC
 llvm::Value *CGObjCMulleRuntime::GetClass(CodeGenFunction &CGF,
                                           const ObjCInterfaceDecl *ID)
 {
@@ -1917,6 +1963,55 @@ llvm::Value *CGObjCMulleRuntime::GetClass(CodeGenFunction &CGF,
    classID  = _HashConstantForString( ID->getName());
    return( GetClass( CGF, classID));
 }
+
+
+ llvm::Value *CGObjCMulleRuntime::GetClass(CodeGenFunction &CGF,
+                                           const ObjCInterfaceDecl *OID,
+                                           llvm::Value *Self)
+ {
+   llvm::Value  *classID;
+   llvm::Value  *universePtr;
+   llvm::Value  *classPtr;
+   StringRef    name;
+
+    // Runtime:
+    // 
+    // universe = mulle_objc_inlineobject_get_universe( self, universeid);
+    // _mulle_objc_universe_lookup_infraclass_no_fail( universe, classid);
+   SmallVector<llvm::Type *,2> Types;
+   Types.push_back( ObjCTypes.ObjectPtrTy);
+   Types.push_back( ObjCTypes.UniverseIDTy);
+
+   SmallVector<llvm::Value *,3> Params;
+   Params.push_back( Self);
+   Params.push_back( UniverseID);
+
+   int optLevel = CGM.getLangOpts().OptimizeSize ? -1 : CGM.getCodeGenOpts().OptimizationLevel;
+
+   name     = getObjectLookupUniverseFunctionName( optLevel);
+   universePtr = CGF.EmitNounwindRuntimeCall( ObjCTypes.getRuntimeFn( name, Types),
+                                              Params, 
+                                              name); 
+   universePtr = CGF.Builder.CreateBitCast( universePtr, ObjCTypes.UniversePtrTy);
+
+   name     = getUniverseLookupClassFunctionName( optLevel);
+   classID  = _HashConstantForString( OID->getName());
+
+   SmallVector<llvm::Type *,2> Types2;
+   Types2.push_back( ObjCTypes.UniversePtrTy);
+   Types2.push_back( ObjCTypes.ClassIDTy);
+
+   SmallVector<llvm::Value *,2> Params2;
+   Params2.push_back( universePtr);
+   Params2.push_back( classID);
+
+   classPtr = CGF.EmitNounwindRuntimeCall(ObjCTypes.getRuntimeFn( name, Types2),
+                                          Params2,
+                                          name); 
+   classPtr = CGF.Builder.CreateBitCast( classPtr, ObjCTypes.ObjectPtrTy);
+   return classPtr;
+
+ }                                
 
 /// GetSelector - Return the pointer to the unique'd string for this selector.
 llvm::Constant *CGObjCMulleRuntime::GetSelector(CodeGenFunction &CGF, Selector Sel) {
@@ -4432,11 +4527,7 @@ llvm::Constant *CGObjCCommonMulleRuntime::EmitPropertyList(Twine Name,
 llvm::Constant *CGObjCCommonMulleRuntime::GetSourceLocationDescription( SourceLocation  loc)
 {
    PresumedLoc PLoc = CGM.getContext().getSourceManager().getPresumedLoc( loc);
-
-   SmallString<128> FN;
-
-   FN += PLoc.getFilename();
-   llvm::GlobalVariable *Entry = CreateCStringLiteral( FN, "OBJC_DEBUG_INFO_");
+   llvm::GlobalVariable *Entry = CreateCStringLiteral( PLoc.getFilename(), "OBJC_DEBUG_INFO_");
    return( getConstantGEP(VMContext, Entry, 0, 0));
 }
 
@@ -5041,6 +5132,29 @@ llvm::Constant *CGObjCMulleRuntime::EmitStaticStringList(Twine Name,
 }
 
 
+llvm::Constant *CGObjCMulleRuntime::EmitUniverse( Twine Name,
+                                                  const char *Section)
+{
+   // Return null for empty list.
+   if( ! universe_name.length())
+      return llvm::Constant::getNullValue( llvm::PointerType::getUnqual( ObjCTypes.UniverseTy));
+
+   llvm::GlobalVariable *Entry = CreateCStringLiteral( universe_name, "OBJC_UNIVERSE_NAME");
+   llvm::Constant       *Hash  = _HashConstantForString( universe_name);
+
+   llvm::Constant *Values[2];
+
+   Values[0] = Hash;
+   Values[1] = getConstantGEP(VMContext, Entry, 0, 0);
+
+   llvm::Constant *Init = llvm::ConstantStruct::getAnon(Values);
+
+   //
+   llvm::GlobalVariable *GV = CreateMetadataVar( Name, Init, Section, 4);
+   return llvm::ConstantExpr::getBitCast(GV, llvm::PointerType::getUnqual( ObjCTypes.UniverseTy));
+}
+
+
 llvm::Constant *CGObjCMulleRuntime::EmitHashNameList(Twine Name,
                                                      const char *Section,
                                                      ArrayRef<llvm::Constant*> HashNames)
@@ -5064,13 +5178,14 @@ llvm::Constant *CGObjCMulleRuntime::EmitHashNameList(Twine Name,
 
 llvm::Constant *CGObjCMulleRuntime::EmitLoadInfoList(Twine Name,
                                                      const char *Section,
+                                                     llvm::Constant *Universe,
                                                      llvm::Constant *ClassList,
                                                      llvm::Constant *CategoryList,
                                                      llvm::Constant *SuperList,
                                                      llvm::Constant *StringList,
                                                      llvm::Constant *HashNameList)
 {
-   llvm::Constant   *Values[10];
+   llvm::Constant   *Values[11];
 
    //
    // should get these values from the header
@@ -5099,11 +5214,12 @@ llvm::Constant *CGObjCMulleRuntime::EmitLoadInfoList(Twine Name,
    //
    Values[4] = llvm::ConstantInt::get(ObjCTypes.IntTy, bits);
 
-   Values[5] = ClassList;
-   Values[6] = CategoryList;
-   Values[7] = SuperList;
-   Values[8] = StringList;
-   Values[9] = HashNameList;
+   Values[5] = Universe;
+   Values[6] = ClassList;
+   Values[7] = CategoryList;
+   Values[8] = SuperList;
+   Values[9] = StringList;
+   Values[10] = HashNameList;
 
    llvm::Constant *Init = llvm::ConstantStruct::getAnon(Values);
 
@@ -5229,12 +5345,13 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
       return( nullptr);
    }
 
+  llvm::Constant *Universe     = EmitUniverse( "OBJC_UNIVERSE_LOAD", "__DATA,_objc_load_info");
   llvm::Constant *ClassList    = EmitClassList( "OBJC_CLASS_LOADS", "__DATA,_objc_load_info", LoadClasses);
   llvm::Constant *CategoryList = EmitCategoryList( "OBJC_CATEGORY_LOADS", "__DATA,_objc_load_info", LoadCategories);
   llvm::Constant *SuperList    = EmitSuperList( "OBJC_SUPER_LOADS", "__DATA,_objc_load_info", LoadSupers);
   llvm::Constant *StringList   = EmitStaticStringList( "OBJC_STATICSTRING_LOADS", "__DATA,_objc_load_info", LoadStrings);
   llvm::Constant *HashNameList = EmitHashNameList( "OBJC_HASHNAME_LOADS", "__DATA,_objc_load_info", EmitHashes);
-  llvm::Constant *LoadInfo     = EmitLoadInfoList( "OBJC_LOAD_INFO", "__DATA,_objc_load_info", ClassList, CategoryList, SuperList, StringList, HashNameList);
+  llvm::Constant *LoadInfo     = EmitLoadInfoList( "OBJC_LOAD_INFO", "__DATA,_objc_load_info", Universe, ClassList, CategoryList, SuperList, StringList, HashNameList);
 
    // take collected initializers and create a __attribute__(constructor)
    // static void   __load_mulle_objc() function
@@ -6260,10 +6377,8 @@ llvm::Constant *CGObjCMulleRuntime::EmitModuleSymbols() {
 
 
 llvm::Constant *CGObjCMulleRuntime::EmitClassRefFromId(CodeGenFunction &CGF,
-                                           IdentifierInfo *II) {
-   CallArgList  ActualArgs;
+                                                      IdentifierInfo *II) {
    llvm::Constant  *Hash;
-   ReturnValueSlot Return;
 
    Hash = _HashConstantForString( II->getName());
    return( Hash);
@@ -6557,6 +6672,7 @@ ObjCCommonTypesHelper::ObjCCommonTypesHelper(CodeGen::CodeGenModule &cgm)
    Int8PtrPtrTy = CGM.Int8PtrPtrTy;
 
    // @mulle-objc@ uniqueid: make it 32 bit here
+   UniverseIDTy = 
    ClassIDTy    =
    CategoryIDTy =
    SelectorIDTy =
@@ -6583,6 +6699,7 @@ ObjCCommonTypesHelper::ObjCCommonTypesHelper(CodeGen::CodeGenModule &cgm)
    ObjectPtrTy    = Types.ConvertType(Ctx.getObjCIdType());
    PtrObjectPtrTy = llvm::PointerType::getUnqual(ObjectPtrTy);
    ParamsPtrTy    = llvm::PointerType::getUnqual(Types.ConvertType(Ctx.VoidTy));
+   UniversePtrTy    = llvm::PointerType::getUnqual(Types.ConvertType(Ctx.VoidTy));
 
    // I'm not sure I like this. The implicit coordination is a bit
    // gross. We should solve this in a reasonable fashion because this
@@ -6881,6 +6998,9 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
    //
    // some stuff we only use to emit the structure as input to load
    //
+   UniverseTy = llvm::StructType::create("struct._mulle_objc_loaduniverse",
+                            IntTy,
+                            Int8PtrTy);
    ClassListTy = llvm::StructType::create("struct._mulle_objc_loadclasslist",
                             IntTy,
                             llvm::PointerType::getUnqual( ClassPtrTy));
@@ -6900,6 +7020,8 @@ ObjCTypesHelper::ObjCTypesHelper(CodeGen::CodeGenModule &cgm)
                             IntTy,
                             IntTy,
                             IntTy,
+                            IntTy,
+                            llvm::PointerType::getUnqual( UniverseTy),
                             llvm::PointerType::getUnqual( ClassListTy),
                             llvm::PointerType::getUnqual( CategoryListTy),
                             llvm::PointerType::getUnqual( SuperListTy),

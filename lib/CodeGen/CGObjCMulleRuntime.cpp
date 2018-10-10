@@ -1885,7 +1885,18 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
 }
 
 
-static const char   *getObjectLookupClassFunctionName( int optLevel) {
+static const char   *getObjectNoFMCLookupClassFunctionName( int optLevel) {
+   switch( optLevel)
+   {
+   default : return( "mulle_objc_object_inlinelookup_infraclass_nofail");
+   case 1  :
+   case -1 :
+   case 0  : return( "mulle_objc_object_lookup_infraclass_nofail"); 
+   }
+}      
+
+
+static const char   *getObjectFMCLookupClassFunctionName( int optLevel) {
    switch( optLevel)
    {
    default : return( "mulle_objc_object_inlinefastlookup_infraclass_nofail");
@@ -1894,6 +1905,7 @@ static const char   *getObjectLookupClassFunctionName( int optLevel) {
    case 0  : return( "mulle_objc_object_fastlookup_infraclass_nofail"); 
    }
 }      
+
 
 
 static const char   *getRuntimeNoFMCLookupClassFunctionName( int optLevel) {

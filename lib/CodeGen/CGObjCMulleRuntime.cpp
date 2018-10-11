@@ -605,7 +605,7 @@ namespace {
       public:
       /// ExceptionTryEnterFn - LLVM objc_exception_try_enter function.
       llvm::Constant *getExceptionTryEnterFn() {
-         llvm::Type *params[] = { getExceptionDataTy( CGM)->getPointerTo() };
+         llvm::Type *params[] = { getExceptionDataTy( CGM)->getPointerTo(), UniverseIDTy };
          return CGM.CreateRuntimeFunction(
                                           llvm::FunctionType::get(CGM.VoidTy, params, false),
                                           "mulle_objc_exception_tryenter");
@@ -613,7 +613,7 @@ namespace {
 
       /// ExceptionTryExitFn - LLVM objc_exception_try_exit function.
       llvm::Constant *getExceptionTryExitFn() {
-         llvm::Type *params[] = { getExceptionDataTy( CGM)->getPointerTo() };
+         llvm::Type *params[] = { getExceptionDataTy( CGM)->getPointerTo(), UniverseIDTy };
          return CGM.CreateRuntimeFunction(
                                           llvm::FunctionType::get(CGM.VoidTy, params, false),
                                           "mulle_objc_exception_tryexit");
@@ -621,7 +621,7 @@ namespace {
 
       /// ExceptionExtractFn - LLVM objc_exception_extract function.
       llvm::Constant *getExceptionExtractFn() {
-         llvm::Type *params[] = { getExceptionDataTy( CGM)->getPointerTo() };
+         llvm::Type *params[] = { getExceptionDataTy( CGM)->getPointerTo(), UniverseIDTy };
          return CGM.CreateRuntimeFunction(llvm::FunctionType::get(ObjectPtrTy,
                                                                   params, false),
                                           "mulle_objc_exception_extract");
@@ -629,7 +629,7 @@ namespace {
 
       /// ExceptionMatchFn - LLVM objc_exception_match function.
       llvm::Constant *getExceptionMatchFn() {
-         llvm::Type *params[] = { ClassIDTy, ObjectPtrTy };
+         llvm::Type *params[] = { ObjectPtrTy, UniverseIDTy, ClassIDTy };
          return CGM.CreateRuntimeFunction(
                                           llvm::FunctionType::get(CGM.Int32Ty, params, false),
                                           "mulle_objc_exception_match");
@@ -776,9 +776,9 @@ namespace {
       uint32_t      user_version;
       int32_t       thread_local_runtime;
       int32_t       no_tagged_pointers;
-      int32_t       no_fast_method_calls;
+      int32_t       no_fast_calls;
       std::string   universe_name;
-      llvm::ConstantInt   *UniverseID;
+      llvm::Constant  *UniverseID;
 
 #define MULLE_OBJC_S_FASTCLASSES   64
 
@@ -1169,6 +1169,8 @@ namespace {
       bool  GetMacroDefinitionUnsignedIntegerValue( clang::Preprocessor *PP,
                                                     StringRef name,
                                                     uint64_t *value);
+      StringRef  GetMacroDefinitionStringValue( clang::Preprocessor *PP,
+                                                StringRef name);
 
       RecordDecl  *CreateCompilerInfoRecordDecl( void);
       VarDecl     *CreateCompilerInfoVarDecl( void);
@@ -1518,11 +1520,20 @@ ObjCTypes(cgm) {
 
    foundation_version   = 0;
    user_version         = 0;
-   thread_local_runtime = CGM.getLangOpts().ObjCHasThreadLocalUniverse;
    universe_name        = CGM.getLangOpts().ObjCUniverseName;
-   UniverseID           = universe_name.length() ? _HashConstantForString( universe_name) : 0;
+   if( universe_name.length())
+   {
+      UniverseID = _HashConstantForString( universe_name);
+   }
+   else
+   {
+      const llvm::APInt zero(32, 0);
+      
+      UniverseID = llvm::Constant::getIntegerValue(CGM.Int32Ty, zero);
+   }
+
    no_tagged_pointers   = CGM.getLangOpts().ObjCDisableTaggedPointers;
-   no_fast_method_calls = CGM.getLangOpts().ObjCDisableFastMethodCalls;
+   no_fast_calls = CGM.getLangOpts().ObjCDisableFastCalls;
 
    memset( fastclassids, 0, sizeof( fastclassids));
 
@@ -1724,6 +1735,40 @@ struct mulle_clang_objccompilerinfo  *CGObjCMulleRuntime::getMulleObjCRuntimeInf
 }
 
 
+StringRef  CGObjCMulleRuntime::GetMacroDefinitionStringValue( clang::Preprocessor *PP,
+                                                              StringRef name)
+{
+   IdentifierInfo    *identifier;
+   MacroDefinition   definition;
+   MacroInfo         *info;
+   const Token       *token;
+   SmallString<128>  SpellingBuffer;
+   llvm::APInt       tmp(64, 0);
+   
+   identifier = &CGM.getContext().Idents.get( name);
+   definition = PP->getMacroDefinition( identifier);
+   if( ! definition)
+      return( StringRef());
+   
+   // default: NULL if just defined
+   info = definition.getMacroInfo();
+   if( ! info->getNumTokens())
+      return( StringRef());
+   
+   token = &info->getReplacementToken( 0);
+   if( token->getKind() != tok::numeric_constant)
+   {
+      CGM.getDiags().Report( diag::err_mulle_objc_preprocessor_not_integer_value);
+      return( StringRef());
+   }
+   
+   // How can this be even possibly fail ? It's impossible. More is more!
+   bool Invalid = false;
+   StringRef TokSpelling = PP->getSpelling( *token, SpellingBuffer, &Invalid);
+   return( TokSpelling);
+}
+
+
 bool  CGObjCMulleRuntime::GetMacroDefinitionUnsignedIntegerValue( clang::Preprocessor *PP,
                                                                   StringRef name,
                                                                   uint64_t *value)
@@ -1778,7 +1823,8 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
    uint64_t  minor;
    uint64_t  patch;
    uint64_t  value;
-
+   StringRef  str;
+   
    // it's cool if versions aren't defined, when just compiling C stuff
    PP = &P->getPreprocessor();
    if( ! this->runtime_info.runtime_version)
@@ -1812,31 +1858,22 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
       }
 
       // possibly make this a #pragma sometime
-      if( GetMacroDefinitionUnsignedIntegerValue( PP, "__MULLE_OBJC_FMC__", &value))
+      if( GetMacroDefinitionUnsignedIntegerValue( PP, "__MULLE_OBJC_FCS__", &value))
       {
-         no_fast_method_calls = ! value;
+         no_fast_calls = ! value;
       }
 
-      if( GetMacroDefinitionUnsignedIntegerValue( PP, "__MULLE_OBJC_NO_FMC__", &value))
+      if( GetMacroDefinitionUnsignedIntegerValue( PP, "__MULLE_OBJC_NO_FCS__", &value))
       {
-         no_fast_method_calls = value;
+         no_fast_calls = value;
       }
 
-      // possibly make this a #pragma sometime
-      if( GetMacroDefinitionUnsignedIntegerValue( PP, "__MULLE_OBJC_TLU__", &value))
+      str = GetMacroDefinitionStringValue( PP, "__MULLE_OBJC_UNIVERSE_NAME__");
+      if( str.size())
       {
-         thread_local_runtime = value;
+         universe_name = str;
+         UniverseID    = _HashConstantForString( universe_name);
       }
-
-      if( GetMacroDefinitionUnsignedIntegerValue( PP, "__MULLE_OBJC_GLU__", &value))
-      {
-         thread_local_runtime = ! value;
-      }
-
-      if( GetMacroDefinitionUnsignedIntegerValue( PP, "__MULLE_OBJC_MTU__", &value))
-      {
-         universe_name = value;
-      }   
    }
 
    // optional anyway
@@ -1885,7 +1922,7 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
 }
 
 
-static const char   *getObjectNoFMCLookupClassFunctionName( int optLevel) {
+static const char   *getObjectNoFCSLookupClassFunctionName( int optLevel) {
    switch( optLevel)
    {
    default : return( "mulle_objc_object_inlinelookup_infraclass_nofail");
@@ -1896,7 +1933,7 @@ static const char   *getObjectNoFMCLookupClassFunctionName( int optLevel) {
 }      
 
 
-static const char   *getObjectFMCLookupClassFunctionName( int optLevel) {
+static const char   *getObjectFCSLookupClassFunctionName( int optLevel) {
    switch( optLevel)
    {
    default : return( "mulle_objc_object_inlinefastlookup_infraclass_nofail");
@@ -1908,7 +1945,7 @@ static const char   *getObjectFMCLookupClassFunctionName( int optLevel) {
 
 
 
-static const char   *getRuntimeNoFMCLookupClassFunctionName( int optLevel) {
+static const char   *getRuntimeNoFCSLookupClassFunctionName( int optLevel) {
    switch( optLevel)
    {
    default : return( "mulle_objc_inlinelookup_infraclass_nofail");
@@ -1919,7 +1956,7 @@ static const char   *getRuntimeNoFMCLookupClassFunctionName( int optLevel) {
 }
 
 
-static const char   *getRuntimeFMCLookupClassFunctionName( int optLevel) {
+static const char   *getRuntimeFCSLookupClassFunctionName( int optLevel) {
    switch( optLevel)
    {
    default : return( "mulle_objc_inlinefastlookup_infraclass_nofail");
@@ -1938,7 +1975,10 @@ llvm::Value *CGObjCMulleRuntime::GetClass(CodeGenFunction &CGF,
    StringRef  name;
 
    int optLevel = CGM.getLangOpts().OptimizeSize ? -1 : CGM.getCodeGenOpts().OptimizationLevel;
-   name     = getRuntimeLookupClassFunctionName( optLevel);
+   if( this->no_fast_calls)
+      name = getRuntimeNoFCSLookupClassFunctionName( optLevel);
+   else
+      name = getRuntimeFCSLookupClassFunctionName( optLevel);
 
    SmallVector<llvm::Type *,1> Types;
    Types.push_back( ObjCTypes.ClassIDTy);
@@ -1982,48 +2022,36 @@ llvm::Value *CGObjCMulleRuntime::GetClass(CodeGenFunction &CGF,
                                            llvm::Value *Self)
  {
    llvm::Value  *classID;
-   llvm::Value  *universePtr;
    llvm::Value  *classPtr;
    StringRef    name;
-
-    // Runtime:
-    // 
-    // universe = mulle_objc_inlineobject_get_universe( self, universeid);
-    // _mulle_objc_universe_lookup_infraclass_no_fail( universe, classid);
-   SmallVector<llvm::Type *,2> Types;
-   Types.push_back( ObjCTypes.ObjectPtrTy);
-   Types.push_back( ObjCTypes.UniverseIDTy);
-
-   SmallVector<llvm::Value *,3> Params;
-   Params.push_back( Self);
-   Params.push_back( UniverseID);
-
-   int optLevel = CGM.getLangOpts().OptimizeSize ? -1 : CGM.getCodeGenOpts().OptimizationLevel;
-
-   name     = getObjectLookupUniverseFunctionName( optLevel);
-   universePtr = CGF.EmitNounwindRuntimeCall( ObjCTypes.getRuntimeFn( name, Types),
-                                              Params, 
-                                              name); 
-   universePtr = CGF.Builder.CreateBitCast( universePtr, ObjCTypes.UniversePtrTy);
-
-   name     = getUniverseLookupClassFunctionName( optLevel);
+   int          optLevel;
+    
+   optLevel = CGM.getLangOpts().OptimizeSize ? -1 : CGM.getCodeGenOpts().OptimizationLevel;
    classID  = _HashConstantForString( OID->getName());
 
-   SmallVector<llvm::Type *,2> Types2;
-   Types2.push_back( ObjCTypes.UniversePtrTy);
-   Types2.push_back( ObjCTypes.ClassIDTy);
+   SmallVector<llvm::Type *,3> Types;
+    
+   Types.push_back( ObjCTypes.ObjectPtrTy);
+   Types.push_back( ObjCTypes.UniverseIDTy);
+   Types.push_back( ObjCTypes.ClassIDTy);
 
-   SmallVector<llvm::Value *,2> Params2;
-   Params2.push_back( universePtr);
-   Params2.push_back( classID);
+   SmallVector<llvm::Value *,3> Params;
+    
+   Params.push_back( Self);
+   Params.push_back( UniverseID);
+   Params.push_back( classID);
 
-   classPtr = CGF.EmitNounwindRuntimeCall(ObjCTypes.getRuntimeFn( name, Types2),
-                                          Params2,
+    if( this->no_fast_calls)
+       name = getObjectNoFCSLookupClassFunctionName( optLevel);
+    else
+       name = getObjectFCSLookupClassFunctionName( optLevel);
+
+   classPtr = CGF.EmitNounwindRuntimeCall(ObjCTypes.getRuntimeFn( name, Types),
+                                          Params,
                                           name); 
    classPtr = CGF.Builder.CreateBitCast( classPtr, ObjCTypes.ObjectPtrTy);
    return classPtr;
-
- }                                
+}
 
 /// GetSelector - Return the pointer to the unique'd string for this selector.
 llvm::Constant *CGObjCMulleRuntime::GetSelector(CodeGenFunction &CGF, Selector Sel) {
@@ -5217,7 +5245,7 @@ llvm::Constant *CGObjCMulleRuntime::EmitLoadInfoList(Twine Name,
    bits  = optLevel << 8;
    bits |= this->no_tagged_pointers ? 0x4 : 0x0;
    bits |= this->thread_local_runtime  ? 0x8 : 0x0;
-   bits |= this->no_fast_method_calls  ? 0x10 : 0x0;
+   bits |= this->no_fast_calls  ? 0x10 : 0x0;
    bits |= CGM.getLangOpts().ObjCAllocsAutoreleasedObjects ? 0x2 : 0;
    bits |= 0;         // we are sorted, so unsorted == 0
 
@@ -5440,14 +5468,17 @@ namespace {
       Address SyncArgSlot;
       Address CallTryExitVar;
       Address ExceptionData;
+      llvm::Constant *UniverseID;
       ObjCTypesHelper &ObjCTypes;
+      
       PerformFragileFinally(const Stmt *S,
                             Address SyncArgSlot,
                             Address CallTryExitVar,
                             Address ExceptionData,
+                            llvm::Constant *UniverseID,
                             ObjCTypesHelper *ObjCTypes)
       : S(*S), SyncArgSlot(SyncArgSlot), CallTryExitVar(CallTryExitVar),
-      ExceptionData(ExceptionData), ObjCTypes(*ObjCTypes) {}
+      ExceptionData(ExceptionData), UniverseID( UniverseID), ObjCTypes(*ObjCTypes) {}
 
       void Emit(CodeGenFunction &CGF, Flags flags) override {
          // Check whether we need to call objc_exception_try_exit.
@@ -5460,8 +5491,11 @@ namespace {
                                   FinallyCallExit, FinallyNoCallExit);
 
          CGF.EmitBlock(FinallyCallExit);
+
+         llvm::Value *TryExitArgs[] = { ExceptionData.getPointer(), UniverseID };
          CGF.EmitNounwindRuntimeCall(ObjCTypes.getExceptionTryExitFn(),
-                                     ExceptionData.getPointer());
+                                     TryExitArgs,
+                                     "tryexit");
 
          CGF.EmitBlock(FinallyNoCallExit);
 
@@ -5823,13 +5857,16 @@ void CGObjCMulleRuntime::EmitTryOrSynchronizedStmt(CodeGen::CodeGenFunction &CGF
                                                   SyncArgSlot,
                                                   CallTryExitVar,
                                                   ExceptionData,
+                                                  UniverseID,
                                                   &ObjCTypes);
 
    // Enter a try block:
    //  - Call objc_exception_try_enter to push ExceptionData on top of
    //    the EH stack.
+
+   llvm::Value *TryEnterArgs[] = { ExceptionData.getPointer(), UniverseID };
    CGF.EmitNounwindRuntimeCall(ObjCTypes.getExceptionTryEnterFn(),
-                               ExceptionData.getPointer());
+                               TryEnterArgs);
 
    //  - Call setjmp on the exception data buffer.
    llvm::Constant *Zero = llvm::ConstantInt::get(CGF.Builder.getInt32Ty(), 0);
@@ -5877,9 +5914,12 @@ void CGObjCMulleRuntime::EmitTryOrSynchronizedStmt(CodeGen::CodeGenFunction &CGF
    } else {
       // Retrieve the exception object.  We may emit multiple blocks but
       // nothing can cross this so the value is already in SSA form.
+      
+      llvm::Value *CaughtArgs[] = { ExceptionData.getPointer(), UniverseID };
+
       llvm::CallInst *Caught =
       CGF.EmitNounwindRuntimeCall(ObjCTypes.getExceptionExtractFn(),
-                                  ExceptionData.getPointer(), "caught");
+                                  CaughtArgs, "caught");
 
       // Push the exception to rethrow onto the EH value stack for the
       // benefit of any @throws in the handlers.
@@ -5901,8 +5941,9 @@ void CGObjCMulleRuntime::EmitTryOrSynchronizedStmt(CodeGen::CodeGenFunction &CGF
 
          // Enter a new exception try block (in case a @catch block
          // throws an exception).
+         llvm::Value *TryEnterArgs[] = { ExceptionData.getPointer(), UniverseID };
          CGF.EmitNounwindRuntimeCall(ObjCTypes.getExceptionTryEnterFn(),
-                                     ExceptionData.getPointer());
+                                     TryEnterArgs);
 
          llvm::CallInst *SetJmpResult =
          CGF.EmitNounwindRuntimeCall(ObjCTypes.getSetJmpFn(),
@@ -5975,8 +6016,7 @@ void CGObjCMulleRuntime::EmitTryOrSynchronizedStmt(CodeGen::CodeGenFunction &CGF
 
          // Check if the @catch block matches the exception object.
          llvm::Value *Class = EmitClassRef(CGF, IDecl);
-
-         llvm::Value *matchArgs[] = { Class, Caught };
+         llvm::Value *matchArgs[] = { Caught, UniverseID, Class };
          llvm::CallInst *Match =
          CGF.EmitNounwindRuntimeCall(ObjCTypes.getExceptionMatchFn(),
                                      matchArgs, "match");
@@ -6035,9 +6075,12 @@ void CGObjCMulleRuntime::EmitTryOrSynchronizedStmt(CodeGen::CodeGenFunction &CGF
          // Extract the new exception and save it to the
          // propagating-exception slot.
          assert(PropagatingExnVar.isValid());
+         
+         llvm::Value *CaughtArgs[] = { ExceptionData.getPointer(), UniverseID };
+
          llvm::CallInst *NewCaught =
          CGF.EmitNounwindRuntimeCall(ObjCTypes.getExceptionExtractFn(),
-                                     ExceptionData.getPointer(), "caught");
+                                     CaughtArgs, "caught");
          CGF.Builder.CreateStore(NewCaught, PropagatingExnVar);
 
          // Don't pop the catch handler; the throw already did.
@@ -6067,9 +6110,10 @@ void CGObjCMulleRuntime::EmitTryOrSynchronizedStmt(CodeGen::CodeGenFunction &CGF
 
          // Otherwise, just look in the buffer for the exception to throw.
       } else {
+         llvm::Value *CaughtArgs[] = { ExceptionData.getPointer(), UniverseID };
          llvm::CallInst *Caught =
          CGF.EmitNounwindRuntimeCall(ObjCTypes.getExceptionExtractFn(),
-                                     ExceptionData.getPointer());
+                                     CaughtArgs, "caught");
          PropagatingExn = Caught;
       }
 

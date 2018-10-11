@@ -2227,17 +2227,15 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
     // @mulle-objc@: handle AAM and TPS options >
     if( Args.hasArg( OPT_fno_objc_tps))
       Opts.ObjCDisableTaggedPointers = 1;
-    if( Args.hasArg( OPT_fno_objc_fmc))
-      Opts.ObjCDisableFastMethodCalls = 1;
-    if( Args.hasArg( OPT_fobjc_tlu))
-      Opts.ObjCHasThreadLocalUniverse = 1;
-    if (Arg *arg = Args.getLastArg(OPT_fobjc_mtu_EQ)) {
-      if(Opts.ObjCHasThreadLocalUniverse)
-        Diags.Report(diag::err_drv_mulle_universe_flag_tlu_mismatch);
-      if( ! Opts.ObjCDisableTaggedPointers)
-        Diags.Report(diag::err_drv_mulle_universe_flag_tps_mismatch);
+    if( Args.hasArg( OPT_fno_objc_fcs))
+      Opts.ObjCDisableFastCalls = 1;
+    if (Arg *arg = Args.getLastArg(OPT_fobjc_universename_EQ)) {
       StringRef value = arg->getValue();
-      Opts.ObjCUniverseName = value;
+      if( value.size() != 0)
+      {
+         Opts.ObjCDisableTaggedPointers = 1;
+         Opts.ObjCUniverseName          = value;
+      }
     }
     if( Args.hasArg( OPT_fobjc_aam))
       Opts.ObjCAllocsAutoreleasedObjects = 1;

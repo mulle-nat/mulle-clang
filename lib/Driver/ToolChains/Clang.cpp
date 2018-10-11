@@ -2743,15 +2743,21 @@ static void RenderObjCOptions(const ToolChain &TC, const Driver &D,
       // just do what's not default
       if( Args.hasArg( options::OPT_fno_objc_tps))
          CmdArgs.push_back( "-fno-objc-tps");  
-      if( Args.hasArg( options::OPT_fno_objc_fmc))
-         CmdArgs.push_back( "-fno-objc-fmc");  
-      if( Args.hasArg( options::OPT_fobjc_tlu))
-         CmdArgs.push_back( "-fobjc-tlu");  
-      if( Args.hasArg( options::OPT_fobjc_mtu_EQ))
-         CmdArgs.push_back( "-fobjc-mtu");  
+      if( Args.hasArg( options::OPT_fno_objc_fcs))
+         CmdArgs.push_back( "-fno-objc-fcs");  
+     if (Arg *arg = Args.getLastArg(options::OPT_fobjc_universename_EQ)) {
+        StringRef value = arg->getValue();
+        if( value.size() != 0)
+        {
+           std::string   option;
+           
+           option = "-fobjc-universename=" + value.str();
+           CmdArgs.push_back( option.c_str());
+        }
+      }
       Args.ClaimAllArgs(options::OPT_fobjc_tps);
-      Args.ClaimAllArgs(options::OPT_fobjc_fmc);
-      Args.ClaimAllArgs(options::OPT_fobjc_mtu_EQ);
+      Args.ClaimAllArgs(options::OPT_fobjc_fcs);
+      Args.ClaimAllArgs(options::OPT_fobjc_universename_EQ);
   }
   // @mulle-objc@ arguments <
 

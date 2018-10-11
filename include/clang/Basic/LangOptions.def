@@ -240,8 +240,7 @@ LANGOPT(HexagonQdsp6Compat , 1, 0, "hexagon-qdsp6 backward compatibility")
 LANGOPT(ObjCAutoRefCount , 1, 0, "Objective-C automated reference counting")
 // @mulle-objc@ options >
 LANGOPT(ObjCDisableTaggedPointers , 1, 0, "Objective-C tagged pointer generation disabled")
-LANGOPT(ObjCHasThreadLocalUniverse , 1, 0, "Objective-C thread local universe enabled")
-LANGOPT(ObjCDisableFastMethodCalls , 1, 0, "Objective-C fast method calls disabled")
+LANGOPT(ObjCDisableFastCalls , 1, 0, "Objective-C fast method/class calls are disabled")
 LANGOPT(ObjCAllocsAutoreleasedObjects , 1, 0, "Objective-C objects are created autoreleased")
 // @mulle-objc@ options <
 LANGOPT(ObjCWeakRuntime     , 1, 0, "__weak support in the ARC runtime")

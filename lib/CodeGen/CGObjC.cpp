@@ -450,17 +450,16 @@ RValue CodeGenFunction::EmitObjCMessageExpr(const ObjCMessageExpr *E,
     OID = ObjTy->getInterface();
     assert(OID && "Invalid Objective-C class message send");
 
-    // @mulle-objc@ faster class lookup if in a method (not for TPS though) >
-    // other runtimes don't disable TPS...
-    if( method && getLangOpts().ObjCDisableTaggedPointers)
+    // @mulle-objc@ faster class lookup if in a method  >
+    if( method)
     {
       llvm::Value *Self; 
       Self = LoadObjCSelf();
       Receiver = Runtime.GetClass(*this, OID, Self);
     }
-    // @mulle-objc@ faster class lookup if in a method (not for TPS though) <
     else
-    Receiver = Runtime.GetClass(*this, OID);
+       Receiver = Runtime.GetClass(*this, OID);
+    // @mulle-objc@ faster class lookup if in a method <
     isClassMessage = true;
     break;
   }

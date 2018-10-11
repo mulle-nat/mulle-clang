@@ -668,16 +668,10 @@ static void InitializePredefinedMacros(const TargetInfo &TI,
        //       Builder.defineMacro("__MULLE_METAABI__");  // superflous
        Builder.defineMacro("__MULLE_OBJC__");
        Builder.defineMacro( LangOpts.ObjCAllocsAutoreleasedObjects ? "__MULLE_OBJC_AAM__" : "__MULLE_OBJC_NO_AAM__");
+       Builder.defineMacro( LangOpts.ObjCDisableFastCalls ? "__MULLE_OBJC_NO_FCS__" : "__MULLE_OBJC_FCS__");
        Builder.defineMacro( LangOpts.ObjCDisableTaggedPointers ? "__MULLE_OBJC_NO_TPS__" : "__MULLE_OBJC_TPS__");
-       if( LangOpts.ObjCHasThreadLocalUniverse)    
-         Builder.defineMacro( "__MULLE_OBJC_TLU__");
-       else
-         if( LangOpts.ObjCUniverseName.length())
-           Builder.defineMacro( "__MULLE_OBJC_MTU__", LangOpts.ObjCUniverseName);
-         else
-           Builder.defineMacro( "__MULLE_OBJC_GLU__");
-       Builder.defineMacro( LangOpts.ObjCHasThreadLocalUniverse ? "__MULLE_OBJC_TLU__" : "__MULLE_OBJC_GLU__");
-       Builder.defineMacro( LangOpts.ObjCDisableFastMethodCalls ? "__MULLE_OBJC_NO_FMC__" : "__MULLE_OBJC_FMC__");
+       if( LangOpts.ObjCUniverseName.length())
+           Builder.defineMacro( "__MULLE_OBJC_UNIVERSE_NAME__", LangOpts.ObjCUniverseName);
     }
     // @mulle-objc@ language: announce that we are running <
 

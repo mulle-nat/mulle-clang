@@ -451,9 +451,10 @@ RValue CodeGenFunction::EmitObjCMessageExpr(const ObjCMessageExpr *E,
     assert(OID && "Invalid Objective-C class message send");
 
     // @mulle-objc@ faster class lookup if in a method  >
-    if( method)
+    if( dyn_cast<ObjCMethodDecl>(CurFuncDecl)) // CurFuncDecl && dyn_cast<ObjCMethodDecl>(CurFuncDecl)->getSelfDecl())
     {
-      llvm::Value *Self; 
+      llvm::Value *Self;
+
       Self = LoadObjCSelf();
       Receiver = Runtime.GetClass(*this, OID, Self);
     }

@@ -774,7 +774,6 @@ namespace {
 
       uint32_t      foundation_version;
       uint32_t      user_version;
-      int32_t       thread_local_runtime;
       int32_t       no_tagged_pointers;
       int32_t       no_fast_calls;
       std::string   universe_name;
@@ -786,8 +785,8 @@ namespace {
       uint32_t  fastclassids_defined;
       bool      struct_read;
       bool      _trace_fastids;
-      
-      
+
+
       // gc ivar layout bitmap calculation helper caches.
       SmallVector<GC_IVAR, 16> SkipIvars;
       SmallVector<GC_IVAR, 16> IvarsInfo;
@@ -1144,7 +1143,7 @@ namespace {
                                            const char *Section,
                                            ArrayRef<llvm::Constant*> StaticStrings);
       llvm::Constant *EmitUniverse( Twine Name,
-                                    const char *Section);                                    
+                                    const char *Section);
       llvm::Constant *EmitHashNameList(Twine Name,
                                        const char *Section,
                                        ArrayRef<llvm::Constant*> HashNames);
@@ -1528,7 +1527,7 @@ ObjCTypes(cgm) {
    else
    {
       const llvm::APInt zero(32, 0);
-      
+
       UniverseID = llvm::Constant::getIntegerValue(CGM.Int32Ty, zero);
    }
 
@@ -1744,24 +1743,24 @@ StringRef  CGObjCMulleRuntime::GetMacroDefinitionStringValue( clang::Preprocesso
    const Token       *token;
    SmallString<128>  SpellingBuffer;
    llvm::APInt       tmp(64, 0);
-   
+
    identifier = &CGM.getContext().Idents.get( name);
    definition = PP->getMacroDefinition( identifier);
    if( ! definition)
       return( StringRef());
-   
+
    // default: NULL if just defined
    info = definition.getMacroInfo();
    if( ! info->getNumTokens())
       return( StringRef());
-   
+
    token = &info->getReplacementToken( 0);
    if( token->getKind() != tok::numeric_constant)
    {
       CGM.getDiags().Report( diag::err_mulle_objc_preprocessor_not_integer_value);
       return( StringRef());
    }
-   
+
    // How can this be even possibly fail ? It's impossible. More is more!
    bool Invalid = false;
    StringRef TokSpelling = PP->getSpelling( *token, SpellingBuffer, &Invalid);
@@ -1824,7 +1823,7 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
    uint64_t  patch;
    uint64_t  value;
    StringRef  str;
-   
+
    // it's cool if versions aren't defined, when just compiling C stuff
    PP = &P->getPreprocessor();
    if( ! this->runtime_info.runtime_version)
@@ -1928,9 +1927,9 @@ static const char   *getObjectNoFCSLookupClassFunctionName( int optLevel) {
    default : return( "mulle_objc_object_inlinelookup_infraclass_nofail");
    case 1  :
    case -1 :
-   case 0  : return( "mulle_objc_object_lookup_infraclass_nofail"); 
+   case 0  : return( "mulle_objc_object_lookup_infraclass_nofail");
    }
-}      
+}
 
 
 static const char   *getObjectFCSLookupClassFunctionName( int optLevel) {
@@ -1939,9 +1938,9 @@ static const char   *getObjectFCSLookupClassFunctionName( int optLevel) {
    default : return( "mulle_objc_object_inlinefastlookup_infraclass_nofail");
    case 1  :
    case -1 :
-   case 0  : return( "mulle_objc_object_fastlookup_infraclass_nofail"); 
+   case 0  : return( "mulle_objc_object_fastlookup_infraclass_nofail");
    }
-}      
+}
 
 
 
@@ -1951,7 +1950,7 @@ static const char   *getRuntimeNoFCSLookupClassFunctionName( int optLevel) {
    default : return( "mulle_objc_inlinelookup_infraclass_nofail");
    case 1  :
    case -1 :
-   case 0  : return( "mulle_objc_lookup_infraclass_nofail"); 
+   case 0  : return( "mulle_objc_lookup_infraclass_nofail");
    }
 }
 
@@ -1962,7 +1961,7 @@ static const char   *getRuntimeFCSLookupClassFunctionName( int optLevel) {
    default : return( "mulle_objc_inlinefastlookup_infraclass_nofail");
    case 1  :
    case -1 :
-   case 0  : return( "mulle_objc_fastlookup_infraclass_nofail"); 
+   case 0  : return( "mulle_objc_fastlookup_infraclass_nofail");
    }
 }
 
@@ -1987,7 +1986,7 @@ llvm::Value *CGObjCMulleRuntime::GetClass(CodeGenFunction &CGF,
    Params.push_back( classID);
 
    classPtr = CGF.EmitNounwindRuntimeCall( ObjCTypes.getRuntimeFn( name, Types),
-                                           Params, 
+                                           Params,
                                            name);
    classPtr = CGF.Builder.CreateBitCast( classPtr, ObjCTypes.ObjectPtrTy);
    return classPtr;
@@ -2025,18 +2024,18 @@ llvm::Value *CGObjCMulleRuntime::GetClass(CodeGenFunction &CGF,
    llvm::Value  *classPtr;
    StringRef    name;
    int          optLevel;
-    
+
    optLevel = CGM.getLangOpts().OptimizeSize ? -1 : CGM.getCodeGenOpts().OptimizationLevel;
    classID  = _HashConstantForString( OID->getName());
 
    SmallVector<llvm::Type *,3> Types;
-    
+
    Types.push_back( ObjCTypes.ObjectPtrTy);
    Types.push_back( ObjCTypes.UniverseIDTy);
    Types.push_back( ObjCTypes.ClassIDTy);
 
    SmallVector<llvm::Value *,3> Params;
-    
+
    Params.push_back( Self);
    Params.push_back( UniverseID);
    Params.push_back( classID);
@@ -2048,7 +2047,7 @@ llvm::Value *CGObjCMulleRuntime::GetClass(CodeGenFunction &CGF,
 
    classPtr = CGF.EmitNounwindRuntimeCall(ObjCTypes.getRuntimeFn( name, Types),
                                           Params,
-                                          name); 
+                                          name);
    classPtr = CGF.Builder.CreateBitCast( classPtr, ObjCTypes.ObjectPtrTy);
    return classPtr;
 }
@@ -5244,8 +5243,7 @@ llvm::Constant *CGObjCMulleRuntime::EmitLoadInfoList(Twine Name,
 
    bits  = optLevel << 8;
    bits |= this->no_tagged_pointers ? 0x4 : 0x0;
-   bits |= this->thread_local_runtime  ? 0x8 : 0x0;
-   bits |= this->no_fast_calls  ? 0x10 : 0x0;
+   bits |= this->no_fast_calls  ? 0x8 : 0x0;
    bits |= CGM.getLangOpts().ObjCAllocsAutoreleasedObjects ? 0x2 : 0;
    bits |= 0;         // we are sorted, so unsorted == 0
 
@@ -5470,7 +5468,7 @@ namespace {
       Address ExceptionData;
       llvm::Constant *UniverseID;
       ObjCTypesHelper &ObjCTypes;
-      
+
       PerformFragileFinally(const Stmt *S,
                             Address SyncArgSlot,
                             Address CallTryExitVar,
@@ -5914,7 +5912,7 @@ void CGObjCMulleRuntime::EmitTryOrSynchronizedStmt(CodeGen::CodeGenFunction &CGF
    } else {
       // Retrieve the exception object.  We may emit multiple blocks but
       // nothing can cross this so the value is already in SSA form.
-      
+
       llvm::Value *CaughtArgs[] = { ExceptionData.getPointer(), UniverseID };
 
       llvm::CallInst *Caught =
@@ -6075,7 +6073,7 @@ void CGObjCMulleRuntime::EmitTryOrSynchronizedStmt(CodeGen::CodeGenFunction &CGF
          // Extract the new exception and save it to the
          // propagating-exception slot.
          assert(PropagatingExnVar.isValid());
-         
+
          llvm::Value *CaughtArgs[] = { ExceptionData.getPointer(), UniverseID };
 
          llvm::CallInst *NewCaught =
@@ -6728,7 +6726,7 @@ ObjCCommonTypesHelper::ObjCCommonTypesHelper(CodeGen::CodeGenModule &cgm)
    Int8PtrPtrTy = CGM.Int8PtrPtrTy;
 
    // @mulle-objc@ uniqueid: make it 32 bit here
-   UniverseIDTy = 
+   UniverseIDTy =
    ClassIDTy    =
    CategoryIDTy =
    SelectorIDTy =

@@ -511,7 +511,7 @@ namespace {
       /// ExceptionThrowFn - LLVM objc_exception_throw function.
       llvm::Constant *getExceptionThrowFn() {
          // void objc_exception_throw(id)
-         llvm::Type *args[] = { ObjectPtrTy };
+         llvm::Type *args[] = { ObjectPtrTy, UniverseIDTy };
          llvm::FunctionType *FTy =
          llvm::FunctionType::get(CGM.VoidTy, args, false);
          return CGM.CreateRuntimeFunction(FTy, "mulle_objc_exception_throw");
@@ -2035,7 +2035,7 @@ llvm::Value *CGObjCMulleRuntime::GetClass(CodeGenFunction &CGF,
 
    SmallVector<llvm::Type *,3> Types;
    llvm::Type *VoidPtrTy = CGF.ConvertType( CGF.getContext().VoidPtrTy);
-    
+
    Types.push_back( VoidPtrTy);
    Types.push_back( ObjCTypes.UniverseIDTy);
    Types.push_back( ObjCTypes.ClassIDTy);
@@ -2043,7 +2043,7 @@ llvm::Value *CGObjCMulleRuntime::GetClass(CodeGenFunction &CGF,
    SmallVector<llvm::Value *,3> Params;
 
    llvm::Value *SelfAsVoid;
-    
+
    SelfAsVoid = CGF.Builder.CreateBitCast( Self, VoidPtrTy);
 
    Params.push_back( SelfAsVoid);
@@ -6125,8 +6125,11 @@ void CGObjCMulleRuntime::EmitTryOrSynchronizedStmt(CodeGen::CodeGenFunction &CGF
          PropagatingExn = Caught;
       }
 
+      llvm::Value *PropagateArgs[] = { PropagatingExn, UniverseID };
+
       CGF.EmitNounwindRuntimeCall(ObjCTypes.getExceptionThrowFn(),
-                                  PropagatingExn);
+                                  PropagateArgs,
+                                  "propagate");
       CGF.Builder.CreateUnreachable();
    }
 
@@ -6148,7 +6151,9 @@ void CGObjCMulleRuntime::EmitThrowStmt(CodeGen::CodeGenFunction &CGF,
       ExceptionAsObject = CGF.ObjCEHValueStack.back();
    }
 
-   CGF.EmitRuntimeCall(ObjCTypes.getExceptionThrowFn(), ExceptionAsObject)
+   llvm::Value *ThrowArgs[] = { ExceptionAsObject, UniverseID };
+
+   CGF.EmitRuntimeCall(ObjCTypes.getExceptionThrowFn(), ThrowArgs, "throw")
    ->setDoesNotReturn();
    CGF.Builder.CreateUnreachable();
 

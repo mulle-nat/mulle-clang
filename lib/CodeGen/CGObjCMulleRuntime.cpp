@@ -1924,6 +1924,18 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
 static const char   *getObjectNoFCSLookupClassFunctionName( int optLevel) {
    switch( optLevel)
    {
+   // inline is same for fast/nofast
+   default : return( "mulle_objc_object_inlinelookup_infraclass_nofail");
+   case 1  :
+   case -1 :
+   case 0  : return( "mulle_objc_object_lookup_infraclass_nofast_nofail");
+   }
+}
+
+
+static const char   *getObjectFCSLookupClassFunctionName( int optLevel) {
+   switch( optLevel)
+   {
    default : return( "mulle_objc_object_inlinelookup_infraclass_nofail");
    case 1  :
    case -1 :
@@ -1932,25 +1944,15 @@ static const char   *getObjectNoFCSLookupClassFunctionName( int optLevel) {
 }
 
 
-static const char   *getObjectFCSLookupClassFunctionName( int optLevel) {
-   switch( optLevel)
-   {
-   default : return( "mulle_objc_object_inlinefastlookup_infraclass_nofail");
-   case 1  :
-   case -1 :
-   case 0  : return( "mulle_objc_object_fastlookup_infraclass_nofail");
-   }
-}
-
-
 
 static const char   *getRuntimeNoFCSLookupClassFunctionName( int optLevel) {
    switch( optLevel)
    {
-   default : return( "mulle_objc_inlinelookup_infraclass_nofail");
+   // inline is same for fast/nofast
+   default : return( "mulle_objc_global_inlinelookup_infraclass_nofail");
    case 1  :
    case -1 :
-   case 0  : return( "mulle_objc_lookup_infraclass_nofail");
+   case 0  : return( "mulle_objc_global_lookup_infraclass_nofast_nofail");
    }
 }
 
@@ -1958,10 +1960,11 @@ static const char   *getRuntimeNoFCSLookupClassFunctionName( int optLevel) {
 static const char   *getRuntimeFCSLookupClassFunctionName( int optLevel) {
    switch( optLevel)
    {
-   default : return( "mulle_objc_inlinefastlookup_infraclass_nofail");
+   // inline is same for fast/nofast
+   default : return( "mulle_objc_global_inlinelookup_infraclass_nofail");
    case 1  :
    case -1 :
-   case 0  : return( "mulle_objc_fastlookup_infraclass_nofail");
+   case 0  : return( "mulle_objc_global_lookup_infraclass_nofail");
    }
 }
 
@@ -1979,10 +1982,12 @@ llvm::Value *CGObjCMulleRuntime::GetClass(CodeGenFunction &CGF,
    else
       name = getRuntimeFCSLookupClassFunctionName( optLevel);
 
-   SmallVector<llvm::Type *,1> Types;
+   SmallVector<llvm::Type *,2> Types;
+   Types.push_back( ObjCTypes.UniverseIDTy);
    Types.push_back( ObjCTypes.ClassIDTy);
 
-   SmallVector<llvm::Value *,1> Params;
+   SmallVector<llvm::Value *,2> Params;
+   Params.push_back( UniverseID);
    Params.push_back( classID);
 
    classPtr = CGF.EmitNounwindRuntimeCall( ObjCTypes.getRuntimeFn( name, Types),
@@ -2029,14 +2034,19 @@ llvm::Value *CGObjCMulleRuntime::GetClass(CodeGenFunction &CGF,
    classID  = _HashConstantForString( OID->getName());
 
    SmallVector<llvm::Type *,3> Types;
-
-   Types.push_back( ObjCTypes.ObjectPtrTy);
+   llvm::Type *VoidPtrTy = CGF.ConvertType( CGF.getContext().VoidPtrTy);
+    
+   Types.push_back( VoidPtrTy);
    Types.push_back( ObjCTypes.UniverseIDTy);
    Types.push_back( ObjCTypes.ClassIDTy);
 
    SmallVector<llvm::Value *,3> Params;
 
-   Params.push_back( Self);
+   llvm::Value *SelfAsVoid;
+    
+   SelfAsVoid = CGF.Builder.CreateBitCast( Self, VoidPtrTy);
+
+   Params.push_back( SelfAsVoid);
    Params.push_back( UniverseID);
    Params.push_back( classID);
 

@@ -2745,16 +2745,10 @@ static void RenderObjCOptions(const ToolChain &TC, const Driver &D,
          CmdArgs.push_back( "-fno-objc-tps");  
       if( Args.hasArg( options::OPT_fno_objc_fcs))
          CmdArgs.push_back( "-fno-objc-fcs");  
-     if (Arg *arg = Args.getLastArg(options::OPT_fobjc_universename_EQ)) {
-        StringRef value = arg->getValue();
-        if( value.size() != 0)
-        {
-           std::string   option;
-           
-           option = "-fobjc-universename=" + value.str();
-           CmdArgs.push_back( option.c_str());
-        }
-      }
+      if (const Arg *A =
+          Args.getLastArg(options::OPT_fobjc_universename_EQ)) {
+          A->render(Args, CmdArgs);
+      } 
       Args.ClaimAllArgs(options::OPT_fobjc_tps);
       Args.ClaimAllArgs(options::OPT_fobjc_fcs);
       Args.ClaimAllArgs(options::OPT_fobjc_universename_EQ);

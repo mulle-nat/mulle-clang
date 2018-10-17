@@ -112,8 +112,8 @@ namespace {
          // be called a lot.
          switch( optLevel)
          {
-         default : name = "mulle_objc_object_inlinecall_constantmethodid"; break;
-         case 1  : name = "mulle_objc_object_call_constantmethodid"; break;
+         case 3  : name = "mulle_objc_object_inlinecall"; break;
+         default : name = "mulle_objc_object_partialinlinecall"; break;
          case -1 :
          case 0  : name = "mulle_objc_object_call"; break;
          }
@@ -137,8 +137,8 @@ namespace {
          // be called a lot.
          switch( optLevel)
          {
-         default : name = "mulle_objc_object_inlinecall_constantmethodid"; break;
-         case 1  : name = "mulle_objc_object_call_constantmethodid"; break;
+         case 3  : name = "mulle_objc_object_inlinecall"; break;
+         default : name = "mulle_objc_object_partialinlinecall"; break;
          case -1 :
          case 0  : name = "mulle_objc_object_call"; break;
          }
@@ -189,8 +189,8 @@ namespace {
          StringRef    name;
          switch( optLevel)
          {
-         default : name = "_mulle_objc_object_inlinesupercall"; break;
-         case 1  : name = "_mulle_objc_object_partialinlinesupercall"; break;
+         case 3  : name = "_mulle_objc_object_inlinesupercall"; break;
+         default : name = "_mulle_objc_object_partialinlinesupercall"; break;
          case -1 :
          case 0  : name = "_mulle_objc_object_supercall"; break;
          }
@@ -1156,7 +1156,7 @@ namespace {
                                           llvm::Constant *SuperList,
                                           llvm::Constant *StringList,
                                           llvm::Constant *HashNameList);
-
+       void  HashUniverseName( void); 
 
    public:
       CGObjCMulleRuntime(CodeGen::CodeGenModule &cgm);
@@ -1507,9 +1507,27 @@ static llvm::Constant *getConstantGEP(llvm::LLVMContext &VMContext,
   return llvm::ConstantExpr::getGetElementPtr(C->getValueType(), C, Idxs);
 }
 
+/* UniverseID hash value is not rembered like other hashes */
+void  CGObjCMulleRuntime::HashUniverseName( void) 
+{
+   if( universe_name.length())
+   {
+      uint32_t   value;
+
+      value = UniqueIdHashForString( universe_name);
+
+      const llvm::APInt SelConstant(32, value);
+      UniverseID = (llvm::ConstantInt *) llvm::ConstantInt::getIntegerValue(CGM.Int32Ty,SelConstant);
+   }
+   else
+   {
+      const llvm::APInt zero(32, 0);
+
+      UniverseID = llvm::Constant::getIntegerValue(CGM.Int32Ty, zero);
+   }
+}
 
 /* *** CGObjCMulleRuntime Public Interface *** */
-
 CGObjCMulleRuntime::CGObjCMulleRuntime(CodeGen::CodeGenModule &cgm) : CGObjCCommonMulleRuntime(cgm),
 ObjCTypes(cgm) {
    struct_read = false;
@@ -1520,17 +1538,9 @@ ObjCTypes(cgm) {
    foundation_version   = 0;
    user_version         = 0;
    universe_name        = CGM.getLangOpts().ObjCUniverseName;
-   if( universe_name.length())
-   {
-      UniverseID = _HashConstantForString( universe_name);
-   }
-   else
-   {
-      const llvm::APInt zero(32, 0);
+   HashUniverseName();
 
-      UniverseID = llvm::Constant::getIntegerValue(CGM.Int32Ty, zero);
-   }
-
+   // fprintf( stderr, "universe_name: \"%s\"\n", universe_name.c_str());
    no_tagged_pointers   = CGM.getLangOpts().ObjCDisableTaggedPointers;
    no_fast_calls = CGM.getLangOpts().ObjCDisableFastCalls;
 
@@ -1755,12 +1765,6 @@ StringRef  CGObjCMulleRuntime::GetMacroDefinitionStringValue( clang::Preprocesso
       return( StringRef());
 
    token = &info->getReplacementToken( 0);
-   if( token->getKind() != tok::numeric_constant)
-   {
-      CGM.getDiags().Report( diag::err_mulle_objc_preprocessor_not_integer_value);
-      return( StringRef());
-   }
-
    // How can this be even possibly fail ? It's impossible. More is more!
    bool Invalid = false;
    StringRef TokSpelling = PP->getSpelling( *token, SpellingBuffer, &Invalid);
@@ -1867,11 +1871,16 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
          no_fast_calls = value;
       }
 
-      str = GetMacroDefinitionStringValue( PP, "__MULLE_OBJC_UNIVERSE_NAME__");
+      str = GetMacroDefinitionStringValue( PP, "__MULLE_OBJC_UNIVERSENAME__");
       if( str.size())
       {
-         universe_name = str;
-         UniverseID    = _HashConstantForString( universe_name);
+         // not caring about escapes here
+         universe_name = str.str();
+         if ( universe_name.front() == '"' ) {
+            universe_name.erase( 0, 1 );
+            universe_name.erase( universe_name.size() - 1 ); 
+         }
+         HashUniverseName();
       }
    }
 

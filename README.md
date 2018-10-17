@@ -71,12 +71,10 @@ Name                    | Compiler        | Default | Description
 `__MULLE_OBJC_TPS__`    | -fobjc-tps      | YES   | TPS (tagged pointer support) is enabled
 `__MULLE_OBJC_NO_TPS__` | -fno-objc-tps   | NO    | TPS is not enabled
  &nbsp;                 | &nbsp;          | &nbsp;|
-`__MULLE_OBJC_TLU__`    | -fobjc-tlu      | NO    | TLU (thread-local universe) is enabled
-`__MULLE_OBJC_GLU__`    | &nbsp;          | YES   | GLU (global universe) is enabled
-`__MULLE_OBJC_MTU__`    | -fobjc-mtu=name | NO    | MLU (multiverse) is enabled
+`__MULLE_OBJC_UNIVERSENAME__`    | -fobjc-universename=name | -    | multiverse is enabled
 `&nbsp;                 | &nbsp;          | &nbsp;|
-`__MULLE_OBJC_FMC__`    | -fobjc-fmc      | YES   | FMC (fast method calling) is enabled
-`__MULLE_OBJC_NO_FMC__` | -fno-objc_fmc   | NO    | FMC is not enabled
+`__MULLE_OBJC_FCS__`    | -fobjc-fcs      | YES   | FCS fast method calls/class lookup is enabled
+`__MULLE_OBJC_NO_FCS__` | -fno-objc_fcs   | NO    | FCS is not enabled
 
 
 ## Macros used in Code Generation
@@ -106,38 +104,64 @@ Name                                  | Description
 
 ## Functions used in Code Generation
 
-These are the runtime functions used for method calling, retain/release management, class lookup and exception handling. They are
-defined in the runtime.
-
-### -O2
-
-* `mulle_objc_inlinefastlookup_infraclass_nofail`
-* `mulle_objc_object_inlinecall_constantmethodid`
-* `_mulle_objc_object_inlinesupercall`
-* `mulle_objc_object_inlineretain`
-* `mulle_objc_object_inlinerelease`
-
-### -O1
-
-* `mulle_objc_inlinefastlookup_infraclass_nofail`
-* `mulle_objc_object_call_constantmethodid`
-* `_mulle_objc_object_partialinlinesupercall`
-
-### -O0, -Os
-
-* `mulle_objc_fastlookup_infraclass_nofail`
-* `mulle_objc_object_call`
-* `_mulle_objc_object_supercall`
+These are the runtime functions used for method calling, retain/release
+management, class lookup and exception handling. They are defined in the
+runtime.
 
 ### All
 
-* `mulle_objc_object_get_property_value`
-* `mulle_objc_object_set_property_value`
-* `mulle_objc_object_zone`
-* `mulle_objc_exception_tryenter`
-* `mulle_objc_exception_tryexit`
-* `mulle_objc_exception_extract`
-* `mulle_objc_exception_match`
+Function                               | Memo
+---------------------------------------|---------
+`mulle_objc_exception_tryenter`        | `@throw`
+`mulle_objc_exception_tryexit`         | `@finally`
+`mulle_objc_exception_extract`         | `@catch`
+`mulle_objc_exception_match`           | `@catch`
+
+
+### -O0, -Os
+
+Function                                            | Memo
+----------------------------------------------------|-------------
+`mulle_objc_object_call`                            | `[self foo:bar]`
+`_mulle_objc_object_supercall`                      | `[super foo:bar]`
+`mulle_objc_object_lookup_infraclass_nofail`        | `[Foo ...` for functions
+`mulle_objc_object_lookup_infraclass_nofast_nofail` | `__MULLE_OBJC_NO_FCS__`
+`mulle_objc_global_lookup_infraclass_nofail`        | `[Foo ...` for methods
+`mulle_objc_global_lookup_infraclass_nofast_nofail` | `__MULLE_OBJC_NO_FCS__`
+
+
+### -O1
+
+Two functions are replaced:
+
+Function                                            | Memo
+----------------------------------------------------|-------------
+`mulle_objc_object_partialinlinecall`               | `[self foo:bar]`
+`_mulle_objc_object_partialinlinesupercall`         | `[super foo:bar]`
+
+
+### -O2
+
+Four functions are replaced with two, and two new functions are used:
+
+Function                                            | Memo
+----------------------------------------------------|-------------
+`mulle_objc_object_inlinelookup_infraclass_nofail`  | for both FCS modes
+`mulle_objc_global_inlinelookup_infraclass_nofail`  |
+`mulle_objc_object_inlineretain`                    | `[foo retain]`
+`mulle_objc_object_inlinerelease`                   | `[foo release]`
+
+
+### -O3
+
+Two functions are replaced:
+
+Function                                            | Memo
+----------------------------------------------------|-------------
+`mulle_objc_object_inlinecall`                      | `[self foo:bar]`
+`_mulle_objc_object_inlinesupercall`                | `[super foo:bar]`
+
+
 
 ## Install
 

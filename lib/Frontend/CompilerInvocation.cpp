@@ -2229,13 +2229,12 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
       Opts.ObjCDisableTaggedPointers = 1;
     if( Args.hasArg( OPT_fno_objc_fcs))
       Opts.ObjCDisableFastCalls = 1;
-    if (Arg *arg = Args.getLastArg(OPT_fobjc_universename_EQ)) {
-      StringRef value = arg->getValue();
-      if( value.size() != 0)
-      {
-         Opts.ObjCDisableTaggedPointers = 1;
-         Opts.ObjCUniverseName          = value;
-      }
+
+    StringRef value = Args.getLastArgValue(OPT_fobjc_universename_EQ);
+    if( value.size() != 0)
+    {
+      Opts.ObjCDisableTaggedPointers = 1;
+      Opts.ObjCUniverseName          = value;
     }
     if( Args.hasArg( OPT_fobjc_aam))
       Opts.ObjCAllocsAutoreleasedObjects = 1;

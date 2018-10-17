@@ -671,7 +671,12 @@ static void InitializePredefinedMacros(const TargetInfo &TI,
        Builder.defineMacro( LangOpts.ObjCDisableFastCalls ? "__MULLE_OBJC_NO_FCS__" : "__MULLE_OBJC_FCS__");
        Builder.defineMacro( LangOpts.ObjCDisableTaggedPointers ? "__MULLE_OBJC_NO_TPS__" : "__MULLE_OBJC_TPS__");
        if( LangOpts.ObjCUniverseName.length())
-           Builder.defineMacro( "__MULLE_OBJC_UNIVERSE_NAME__", LangOpts.ObjCUniverseName);
+       {
+           std::string  quotedname;
+
+           quotedname = std::string( "\"") + LangOpts.ObjCUniverseName +  std::string( "\"");
+           Builder.defineMacro( "__MULLE_OBJC_UNIVERSENAME__", quotedname.c_str());
+       }
     }
     // @mulle-objc@ language: announce that we are running <
 

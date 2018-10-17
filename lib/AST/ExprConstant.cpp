@@ -4582,8 +4582,6 @@ static bool HandleConstructorCall(const Expr *E, const LValue &This,
 extern "C"
 {
 // @mulle-objc@: give access to hash calculation
-// this code is duplicated in CGObjCMulleRuntime.cpp
-// for some stupid C++ linker reasons, don't ask me!
 //
 // nm lib/libclangCodeGen.a | grep HashForString
 // 00000000000006e0 T _MulleObjCUniqueIdHashForString
@@ -4634,11 +4632,9 @@ uint32_t  MulleObjCUniqueIdHashForString( std::string s)
 
    c_str = const_cast< char *>( s.c_str());
    value = mulle_objc_fnv1a_32( (void *) c_str, s.length());
-   //   fprintf( stderr, "%s = %08lx\n", c_str, (long) value);
-
-   // if you change this, remember that there are duplicates in
-   // CGObjCMulleRuntime and SemaExpr.cpp and ExprConstant.cpp
    value = (value << 4) | (value >> (32 - 4));
+
+   //fprintf( stderr, "%s = %08lx\n", c_str, (long) value);
 
    return( value);
 }

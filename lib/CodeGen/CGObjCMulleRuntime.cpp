@@ -6340,8 +6340,11 @@ void CGObjCCommonMulleRuntime::EmitImageInfo() {
    // linker and code-gen.
    llvm::Module &Mod = CGM.getModule();
 
+   //
    // Add the ObjC ABI version to the module flags.
-   Mod.addModuleFlag(llvm::Module::Error, "Objective-C Version", 1848);
+   // Can not be more than 255 though. We use 48
+   //
+   Mod.addModuleFlag(llvm::Module::Error, "Objective-C Version", 48);
    Mod.addModuleFlag(llvm::Module::Error, "Objective-C Image Info Version",
                      this->runtime_info.load_version);
    Mod.addModuleFlag(llvm::Module::Error, "Objective-C Image Info Section",

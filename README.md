@@ -57,24 +57,27 @@ Mode").
 
 ## Additional Compiler options and defined macros
 
-With the exception of `__MULLE_OBJC__` the following table represents
-option pairs, that logically exclude each other.
-
-
 Name                    | Compiler        | Default | Description
 ------------------------|-----------------|-------|--------------------
 `__MULLE_OBJC__`        |  -              | -     | Compiling for mulle-objc
  &nbsp;                 | &nbsp;          | &nbsp;|
+`__MULLE_OBJC_UNIVERSEID__`      | -fobjc-universename=name | -    | id of the universe, or 0 for default universe
+`__MULLE_OBJC_UNIVERSENAME__`    | -fobjc-universename=name | -    | name of the universe, or NULL for default universe
+
+
+The following table represents option pairs, that logically exclude each other.
+Either one is always defined.
+
+Name                    | Compiler        | Default | Description
+------------------------|-----------------|-------|--------------------
 `__MULLE_OBJC_AAM__`    | .aam file       | -     | AAM is enabled
 `__MULLE_OBJC_NO_AAM__` | .m file         | -     | AAM is not enabled
  &nbsp;                 | &nbsp;          | &nbsp;|
 `__MULLE_OBJC_TPS__`    | -fobjc-tps      | YES   | TPS (tagged pointer support) is enabled
 `__MULLE_OBJC_NO_TPS__` | -fno-objc-tps   | NO    | TPS is not enabled
- &nbsp;                 | &nbsp;          | &nbsp;|
-`__MULLE_OBJC_UNIVERSENAME__`    | -fobjc-universename=name | -    | multiverse is enabled
 `&nbsp;                 | &nbsp;          | &nbsp;|
-`__MULLE_OBJC_FCS__`    | -fobjc-fcs      | YES   | FCS fast method calls/class lookup is enabled
-`__MULLE_OBJC_NO_FCS__` | -fno-objc_fcs   | NO    | FCS is not enabled
+`__MULLE_OBJC_FCS__`    | -fobjc-fcs      | YES   | FCS fast method/class support is enabled
+`__MULLE_OBJC_NO_FCS__` | -fno-objc-fcs   | NO    | FCS is not enabled
 
 
 ## Macros used in Code Generation
@@ -132,7 +135,7 @@ Function                                            | Memo
 
 ### -O1
 
-Two functions are replaced:
+Like -O0, but two functions are replaced:
 
 Function                                            | Memo
 ----------------------------------------------------|-------------
@@ -142,19 +145,19 @@ Function                                            | Memo
 
 ### -O2
 
-Four functions are replaced with two, and two new functions are used:
+Like -O1, but four functions are replaced with two, and two new functions are used:
 
 Function                                            | Memo
 ----------------------------------------------------|-------------
-`mulle_objc_object_inlinelookup_infraclass_nofail`  | for both FCS modes
-`mulle_objc_global_inlinelookup_infraclass_nofail`  |
+`mulle_objc_object_inlinelookup_infraclass_nofail`  | `[Foo ...` for both FCS modes
+`mulle_objc_global_inlinelookup_infraclass_nofail`  | `[Foo ...` for both FCS modes
 `mulle_objc_object_inlineretain`                    | `[foo retain]`
 `mulle_objc_object_inlinerelease`                   | `[foo release]`
 
 
 ### -O3
 
-Two functions are replaced:
+Like -O3, but two functions are replaced:
 
 Function                                            | Memo
 ----------------------------------------------------|-------------
@@ -162,9 +165,7 @@ Function                                            | Memo
 `_mulle_objc_object_inlinesupercall`                | `[super foo:bar]`
 
 
-
 ## Install
-
 
 ### OS X
 

@@ -72,7 +72,7 @@ using namespace CodeGen;
 
 
 // @mulle-objc@: >>
-// this is defined in AST for linkage reasons
+// this is defined in ExprConstant for linkage reasons
 extern "C"
 {
    extern uint32_t  MulleObjCUniqueIdHashForString( std::string s);
@@ -1156,7 +1156,7 @@ namespace {
                                           llvm::Constant *SuperList,
                                           llvm::Constant *StringList,
                                           llvm::Constant *HashNameList);
-       void  HashUniverseName( void); 
+       void  HashUniverseName( void);
 
    public:
       CGObjCMulleRuntime(CodeGen::CodeGenModule &cgm);
@@ -1508,7 +1508,7 @@ static llvm::Constant *getConstantGEP(llvm::LLVMContext &VMContext,
 }
 
 /* UniverseID hash value is not rembered like other hashes */
-void  CGObjCMulleRuntime::HashUniverseName( void) 
+void  CGObjCMulleRuntime::HashUniverseName( void)
 {
    if( universe_name.length())
    {
@@ -1878,7 +1878,7 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
          universe_name = str.str();
          if ( universe_name.front() == '"' ) {
             universe_name.erase( 0, 1 );
-            universe_name.erase( universe_name.size() - 1 ); 
+            universe_name.erase( universe_name.size() - 1 );
          }
          HashUniverseName();
       }

@@ -60,7 +60,6 @@ Mode").
 Name                    | Compiler        | Default | Description
 ------------------------|-----------------|-------|--------------------
 `__MULLE_OBJC__`        |  -              | -     | Compiling for mulle-objc
- &nbsp;                 | &nbsp;          | &nbsp;|
 `__MULLE_OBJC_UNIVERSEID__`      | -fobjc-universename=name | -    | id of the universe, or 0 for default universe
 `__MULLE_OBJC_UNIVERSENAME__`    | -fobjc-universename=name | -    | name of the universe, or NULL for default universe
 
@@ -75,7 +74,7 @@ Name                    | Compiler        | Default | Description
  &nbsp;                 | &nbsp;          | &nbsp;|
 `__MULLE_OBJC_TPS__`    | -fobjc-tps      | YES   | TPS (tagged pointer support) is enabled
 `__MULLE_OBJC_NO_TPS__` | -fno-objc-tps   | NO    | TPS is not enabled
-`&nbsp;                 | &nbsp;          | &nbsp;|
+&nbsp;                  | &nbsp;          | &nbsp;|
 `__MULLE_OBJC_FCS__`    | -fobjc-fcs      | YES   | FCS fast method/class support is enabled
 `__MULLE_OBJC_NO_FCS__` | -fno-objc-fcs   | NO    | FCS is not enabled
 

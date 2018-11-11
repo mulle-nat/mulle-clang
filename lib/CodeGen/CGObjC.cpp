@@ -450,8 +450,25 @@ RValue CodeGenFunction::EmitObjCMessageExpr(const ObjCMessageExpr *E,
     OID = ObjTy->getInterface();
     assert(OID && "Invalid Objective-C class message send");
 
+    //
     // @mulle-objc@ faster class lookup if in a method  >
-    if( dyn_cast<ObjCMethodDecl>(CurFuncDecl)) // CurFuncDecl && dyn_cast<ObjCMethodDecl>(CurFuncDecl)->getSelfDecl())
+    //
+    const ObjCMethodDecl   *methodDecl;
+
+    methodDecl = NULL;
+    if( getLangOpts().ObjCClasscallUseSelf)
+    {
+        methodDecl = dyn_cast<ObjCMethodDecl>(CurFuncDecl);
+        //
+        // only use OMF_None methods by default, unless -fobjc-classcall-init-use-self
+        // has been given
+        //
+        if( methodDecl && (methodDecl->getMethodFamily() != OMF_None &&
+                           getLangOpts().ObjCClasscallUseSelf <= 1))
+           methodDecl = NULL;
+    }
+
+    if( methodDecl) // CurFuncDecl && dyn_cast<ObjCMethodDecl>(CurFuncDecl)->getSelfDecl())
     {
       llvm::Value *Self;
 

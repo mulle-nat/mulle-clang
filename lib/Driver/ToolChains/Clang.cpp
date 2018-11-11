@@ -2742,16 +2742,26 @@ static void RenderObjCOptions(const ToolChain &TC, const Driver &D,
   {
       // just do what's not default
       if( Args.hasArg( options::OPT_fno_objc_tps))
-         CmdArgs.push_back( "-fno-objc-tps");  
+         CmdArgs.push_back( "-fno-objc-tps");
       if( Args.hasArg( options::OPT_fno_objc_fcs))
-         CmdArgs.push_back( "-fno-objc-fcs");  
+         CmdArgs.push_back( "-fno-objc-fcs");
+      if( Args.hasArg( options::OPT_fobjc_aam))
+         CmdArgs.push_back( "-fobjc-aam");
       if (const Arg *A =
           Args.getLastArg(options::OPT_fobjc_universename_EQ)) {
           A->render(Args, CmdArgs);
-      } 
+      }
+      if( Args.hasArg( options::OPT_fobjc_classcall_use_self))
+         CmdArgs.push_back( "-fobjc-classcall-use-self");
+      if( Args.hasArg( options::OPT_fobjc_classcall_init_use_self))
+         CmdArgs.push_back( "-fobjc-classcall-init-use-self");
+
       Args.ClaimAllArgs(options::OPT_fobjc_tps);
       Args.ClaimAllArgs(options::OPT_fobjc_fcs);
+      Args.ClaimAllArgs(options::OPT_fno_objc_aam);
+
       Args.ClaimAllArgs(options::OPT_fobjc_universename_EQ);
+      Args.ClaimAllArgs(options::OPT_fno_objc_classcall_use_self);
   }
   // @mulle-objc@ arguments <
 
@@ -4201,7 +4211,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   if (getToolChain().IsEncodeExtendedBlockSignatureDefault())
     CmdArgs.push_back("-fencode-extended-block-signature");
 #endif
-// @mulle-objc@ blocks are just no good for mulle-clang< 
+// @mulle-objc@ blocks are just no good for mulle-clang<
 
   if (Args.hasFlag(options::OPT_fcoroutines_ts, options::OPT_fno_coroutines_ts,
                    false) &&

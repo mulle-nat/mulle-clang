@@ -2235,9 +2235,18 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
     {
       Opts.ObjCDisableTaggedPointers = 1;
       Opts.ObjCUniverseName          = value;
+
+      // by default in multiverse configuration we use this optimization
+      if( ! Args.hasArg( OPT_fno_objc_classcall_use_self))
+         Opts.ObjCClasscallUseSelf = 1;
     }
     if( Args.hasArg( OPT_fobjc_aam))
       Opts.ObjCAllocsAutoreleasedObjects = 1;
+    if( Args.hasArg( OPT_fobjc_classcall_use_self))
+      Opts.ObjCClasscallUseSelf = 1;
+    if( Args.hasArg( OPT_fobjc_classcall_init_use_self))
+      Opts.ObjCClasscallUseSelf = 2;
+
     // @mulle-objc@: handle AAM and TPS options <
 
     if (Args.hasArg(OPT_fobjc_gc_only))

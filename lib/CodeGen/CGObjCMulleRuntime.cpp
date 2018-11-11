@@ -1822,11 +1822,12 @@ bool  CGObjCMulleRuntime::GetMacroDefinitionUnsignedIntegerValue( clang::Preproc
 void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
 {
    clang::Preprocessor  *PP;
-   uint64_t  major;
-   uint64_t  minor;
-   uint64_t  patch;
-   uint64_t  value;
-   StringRef  str;
+   uint64_t     major;
+   uint64_t      minor;
+   uint64_t      patch;
+   uint64_t      value;
+   StringRef     str;
+   std::string   s;
 
    // it's cool if versions aren't defined, when just compiling C stuff
    PP = &P->getPreprocessor();
@@ -1874,13 +1875,19 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
       str = GetMacroDefinitionStringValue( PP, "__MULLE_OBJC_UNIVERSENAME__");
       if( str.size())
       {
-         // not caring about escapes here
-         universe_name = str.str();
-         if ( universe_name.front() == '"' ) {
-            universe_name.erase( 0, 1 );
-            universe_name.erase( universe_name.size() - 1 );
+         s = str.str();
+         if (s.compare( "NULL") != 0)
+         {
+            if ( s.front() != '"' || s.back() != '"' )
+                CGM.getDiags().Report( diag::err_mulle_objc_universename_not_a_string) << s;
+            s.erase( 0, 1 );
+            s.erase( s.size() - 1 );
+            if( s.find_first_not_of( "abcdefghijklmnopqrstuvxyz_0123456789") != std::string::npos)
+               CGM.getDiags().Report( diag::err_mulle_objc_universename_not_an_identifier) << s;
+
+            universe_name = s;
+            HashUniverseName();
          }
-         HashUniverseName();
       }
    }
 

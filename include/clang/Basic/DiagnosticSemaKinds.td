@@ -6186,6 +6186,10 @@ def err_mulle_objc_setjmp_not_included: Error<
    "include <setjmp.h> before using Mulle ObjC exceptions">;
 def err_mulle_objc_jmpbuf_size_unknown: Error<
    "the compiler failed to figure out sizeof( struct jmpbuf)">;
+def err_mulle_objc_universename_not_a_string: Error<
+   "the universename '%0' must be a string (in double quotes)">;
+def err_mulle_objc_universename_not_an_identifier: Error<
+   "the universename '%0' must only contain lowercase identifier characters">;
 
 // @mulle-objc@ compiler: error message definitions end
 

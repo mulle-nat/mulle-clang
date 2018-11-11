@@ -1537,12 +1537,13 @@ ObjCTypes(cgm) {
 
    foundation_version   = 0;
    user_version         = 0;
+
    universe_name        = CGM.getLangOpts().ObjCUniverseName;
    HashUniverseName();
 
    // fprintf( stderr, "universe_name: \"%s\"\n", universe_name.c_str());
-   no_tagged_pointers   = CGM.getLangOpts().ObjCDisableTaggedPointers;
-   no_fast_calls = CGM.getLangOpts().ObjCDisableFastCalls;
+   no_tagged_pointers = CGM.getLangOpts().ObjCDisableTaggedPointers;
+   no_fast_calls      = CGM.getLangOpts().ObjCDisableFastCalls;
 
    memset( fastclassids, 0, sizeof( fastclassids));
 
@@ -1765,7 +1766,7 @@ StringRef  CGObjCMulleRuntime::GetMacroDefinitionStringValue( clang::Preprocesso
       return( StringRef());
 
    token = &info->getReplacementToken( 0);
-   // How can this be even possibly fail ? It's impossible. More is more!
+   // How can this even possibly fail ? It's impossible. More is more!
    bool Invalid = false;
    StringRef TokSpelling = PP->getSpelling( *token, SpellingBuffer, &Invalid);
    return( TokSpelling);
@@ -1870,10 +1871,16 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
       if( GetMacroDefinitionUnsignedIntegerValue( PP, "__MULLE_OBJC_NO_FCS__", &value))
       {
          no_fast_calls = value;
+         // probably what I should do here
+         // CGM.getLangOpts().ObjCUniverseName = universe_name;
       }
 
+      //
+      // this is usually always defined by InitPreprocessor. This code allows
+      // redefinition and grabs the universe
+      //
       str = GetMacroDefinitionStringValue( PP, "__MULLE_OBJC_UNIVERSENAME__");
-      if( str.size())
+      if( str.size() && str.compare( "NULL") != 0)
       {
          s = str.str();
          if (s.compare( "NULL") != 0)
@@ -5518,8 +5525,7 @@ namespace {
 
          llvm::Value *TryExitArgs[] = { ExceptionData.getPointer(), UniverseID };
          CGF.EmitNounwindRuntimeCall(ObjCTypes.getExceptionTryExitFn(),
-                                     TryExitArgs,
-                                     "tryexit");
+                                     TryExitArgs);
 
          CGF.EmitBlock(FinallyNoCallExit);
 
@@ -6144,8 +6150,7 @@ void CGObjCMulleRuntime::EmitTryOrSynchronizedStmt(CodeGen::CodeGenFunction &CGF
       llvm::Value *PropagateArgs[] = { PropagatingExn, UniverseID };
 
       CGF.EmitNounwindRuntimeCall(ObjCTypes.getExceptionThrowFn(),
-                                  PropagateArgs,
-                                  "propagate");
+                                  PropagateArgs);
       CGF.Builder.CreateUnreachable();
    }
 
@@ -6169,7 +6174,7 @@ void CGObjCMulleRuntime::EmitThrowStmt(CodeGen::CodeGenFunction &CGF,
 
    llvm::Value *ThrowArgs[] = { ExceptionAsObject, UniverseID };
 
-   CGF.EmitRuntimeCall(ObjCTypes.getExceptionThrowFn(), ThrowArgs, "throw")
+   CGF.EmitRuntimeCall(ObjCTypes.getExceptionThrowFn(), ThrowArgs)
    ->setDoesNotReturn();
    CGF.Builder.CreateUnreachable();
 

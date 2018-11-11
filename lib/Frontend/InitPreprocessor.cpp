@@ -692,6 +692,7 @@ static void InitializePredefinedMacros(const TargetInfo &TI,
        }
        else
        {
+           // do not assume presence of NULL
            Builder.defineMacro( "__MULLE_OBJC_UNIVERSENAME__", "NULL");
            Builder.defineMacro( "__MULLE_OBJC_UNIVERSEID__", "0");
        }

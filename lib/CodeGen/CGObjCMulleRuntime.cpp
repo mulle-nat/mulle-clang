@@ -1880,7 +1880,7 @@ void   CGObjCMulleRuntime::ParserDidFinish( clang::Parser *P)
       // redefinition and grabs the universe
       //
       str = GetMacroDefinitionStringValue( PP, "__MULLE_OBJC_UNIVERSENAME__");
-      if( str.size() && str.compare( "NULL") != 0)
+      if( str.size()
       {
          s = str.str();
          if (s.compare( "NULL") != 0)

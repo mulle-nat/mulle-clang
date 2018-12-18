@@ -126,9 +126,9 @@ Function                                            | Memo
 ----------------------------------------------------|-------------
 `mulle_objc_object_call`                            | `[self foo:bar]`
 `_mulle_objc_object_supercall`                      | `[super foo:bar]`
-`mulle_objc_object_lookup_infraclass_nofail`        | `[Foo ...` for functions
+`mulle_objc_object_lookup_infraclass_nofail`        | `[Foo ...` for methods
 `mulle_objc_object_lookup_infraclass_nofast_nofail` | `__MULLE_OBJC_NO_FCS__`
-`mulle_objc_global_lookup_infraclass_nofail`        | `[Foo ...` for methods
+`mulle_objc_global_lookup_infraclass_nofail`        | `[Foo ...` for functions
 `mulle_objc_global_lookup_infraclass_nofast_nofail` | `__MULLE_OBJC_NO_FCS__`
 
 

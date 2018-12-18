@@ -62,7 +62,8 @@ EOF
    --no-clang           : do not build clang
    --no-lldb            : do not build mulle-lldb
    --no-ninja           : use make instead of ninja
-   --debug              : build everyting DEBUG (not recommended)
+   --clang-debug        : build clang debug
+   --lldb-debug         : build lldb with debug
    --separate           : place mulle-clang outside of src/llvm (implied -no-lldb)
    -n                   : dry run
    -v                   : be verbose
@@ -74,6 +75,8 @@ EOF
    --clang-prefix <dir> : install prefix for clang
    --lldb-prefix <dir>  : install prefix for lldb
    --llvm-prefix <dir>  : install prefix for llvm
+   --llvm-debug         : build llvm debug
+   --debug              : build everything DEBUG (not recommended)
    --no-libcxx          : do not build libcxx
    --prefix <dir>       : default install prefix
    --vs32bit            : compile for Visual Studo 32 bit
@@ -1117,9 +1120,15 @@ r_generic_llvm_options()
 # -DBUILD_SHARED_LIBS=ON is broken in 7.0 due to gtest dependency
    if [ "${LLVM_BUILD_TYPE}" = "Debug" ]
    then
-      cmdline="${cmdline} \
+      RVAL="${RVAL} \
 -DLLVM_BUILD_TARGETS='X86'"
    fi
+
+   if [ "${LLVM_BUILD_TYPE}" = "Release" ]
+   then
+      RVAL="${RVAL} \
+-DLLVM_ENABLE_ASSERTIONS:OFF"
+  fi
 }
 
 
@@ -1224,6 +1233,8 @@ _build_clang()
 
       cmdline="cmake"
       r_generic_cmake_options
+      cmdline="${cmdline} ${RVAL}"
+      r_generic_llvm_options
       cmdline="${cmdline} ${RVAL}"
       r_generic_clang_options
       cmdline="${cmdline} ${RVAL}"

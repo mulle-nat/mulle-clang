@@ -4,7 +4,7 @@
 
 This is an Objective-C compiler based on clang 6.0, written for the
 [mulle-objc](//www.mulle-kybernetik.com/weblog/2015/mulle_objc_a_new_objective_c_.html)
-runtime. It corresponds to mulle-objc-runtime v0.13 or better.
+runtime. It corresponds to mulle-objc-runtime v0.14 or better.
 
 > See [README.txt](README.txt) for more information about clang
 
@@ -180,7 +180,7 @@ brew install codeon-gmbh/software/mulle-clang
 
 ### Ubuntu
 
-You can install mulle-clang with mulle-lldb via **apt-get** on Ubuntu bionic and trusty:
+You can install mulle-clang with mulle-lldb via **apt-get** on Ubuntu trusty:
 
 ```
 sudo apt-get update &&
@@ -199,14 +199,13 @@ You can install on Debian (and Ubuntu) with:
 
 ```
 OS="`lsb_release -s -c`" \
-curl -O -L http://download.codeon.de/dists/${OS}/main/binary-amd64/mulle-clang-6.0.0.4-${OS}-amd64.deb && \
-sudo dpkg --install mulle-clang-6.0.0.4-${OS}-amd64.deb
+curl -O -L http://download.codeon.de/dists/${OS}/main/binary-amd64/mulle-clang-7.0.0.0-${OS}-amd64.deb && \
+sudo dpkg --install mulle-clang-7.0.0.0-${OS}-amd64.deb
 ```
 
 Checksum         | OS     | Result
 -----------------|--------|-------------
-shasum -b -a 256 | trusty | 98b5364d6cb23d662813680431183b45e523a15fbca5f92909c3e79df0a3603b
-shasum -b -a 256 | bionic | 373daf1e82229270b11855cf867bc21b98d129fa96cf6a03a42d7844881a9567
+shasum -b -a 256 | trusty | 728d09cdceac2c238b8f5f1a9ced7707ce02089c3f6c1157467e1872dbecc4b0
 
 ### FreeBSD, Windows and others
 

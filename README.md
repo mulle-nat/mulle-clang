@@ -203,9 +203,11 @@ curl -O -L http://download.codeon.de/dists/${OS}/main/binary-amd64/mulle-clang-7
 sudo dpkg --install mulle-clang-7.0.0.0-${OS}-amd64.deb
 ```
 
-Checksum         | OS     | Result
------------------|--------|-------------
-shasum -b -a 256 | trusty | 728d09cdceac2c238b8f5f1a9ced7707ce02089c3f6c1157467e1872dbecc4b0
+OS     | `shasum -b -a 256` 
+-------|-----------------------------------------------------------------
+trusty | d976ee9f1dec4e264f5678fd86cd1c5f606486fa152f768cadd49abeed839816
+bionic | dde8ced948847f4f647d5f4a90800615dbc7e2c8b5c9e3bbb2a082b27938e6a9
+cosmic | 8f900d4177df23ce1b042fe532fbfb1d452dd3cc6aefb827ca203814fdf6cae5
 
 ### FreeBSD, Windows and others
 

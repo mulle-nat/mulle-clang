@@ -25,8 +25,8 @@ If you are configuring a virtual machine, give it some more cores!
 
 ## Installing on Linux or FreeBSD
 
-You need the **bash** shell and you may want to get **sudo** happening to
-install packages (or run the script as **root**). bash is already present.
+You need the **bash** shell and **curl** (or **wget** )and you may want to get **sudo** happening to
+install packages (or run the script as **root**). bash is usually already present.
 
 
 <a name="common-generic"></a>

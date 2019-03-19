@@ -1829,6 +1829,9 @@ static InputKind ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
                 .Case("hip", InputKind::HIP)
                 .Case("c++", InputKind::CXX)
                 .Case("objective-c", InputKind::ObjC)
+                // @mulle-objc@ AAM:  .aam filename extension support >
+                .Case("objective-c-aam", InputKind::ObjCAAM)
+                // @mulle-objc@ AAM:  .aam filename extension support <
                 .Case("objective-c++", InputKind::ObjCXX)
                 .Case("renderscript", InputKind::RenderScript)
                 .Default(InputKind::Unknown);
@@ -2064,6 +2067,14 @@ void CompilerInvocation::setLangDefaults(LangOptions &Opts, InputKind IK,
     Opts.ObjC = 1;
   }
 
+   // @mulle-objc@ AAM:  .aam filename extension support >
+  if( IK.getLanguage() == InputKind::ObjCAAM)
+  {
+     Opts.ObjCAllocsAutoreleasedObjects = 1;
+     Opts.ObjC = 1;
+  }
+   // @mulle-objc@ AAM:  .aam filename extension support <
+
   if (LangStd == LangStandard::lang_unspecified) {
     // Based on the base language, pick one.
     switch (IK.getLanguage()) {
@@ -2089,11 +2100,12 @@ void CompilerInvocation::setLangDefaults(LangOptions &Opts, InputKind IK,
 #endif
       break;
     case InputKind::ObjC:
-#if defined(CLANG_DEFAULT_STD_C)
-      LangStd = CLANG_DEFAULT_STD_C;
-#else
-      LangStd = LangStandard::lang_gnu11;
-#endif
+    // @mulle-objc@ AAM: .aam filename extension support ->
+    case InputKind::ObjCAAM:
+    // @mulle-objc@ AAM: .aam filename extension support -<
+    // @mulle-objc@ C11 should be standard now -<
+      LangStd = LangStandard::lang_c11;
+    // @mulle-objc@ C11 should be standard now -<
       break;
     case InputKind::CXX:
     case InputKind::ObjCXX:
@@ -2213,6 +2225,9 @@ static bool IsInputCompatibleWithStandard(InputKind IK,
 
   case InputKind::C:
   case InputKind::ObjC:
+  // @mulle-objc@ ObjCAAM >
+  case InputKind::ObjCAAM:
+  // @mulle-objc@ ObjCAAM <
   case InputKind::RenderScript:
     return S.getLanguage() == InputKind::C;
 
@@ -2249,6 +2264,10 @@ static const StringRef GetInputKindName(InputKind IK) {
     return "C";
   case InputKind::ObjC:
     return "Objective-C";
+  // @mulle-objc@ ObjCAAM >
+  case InputKind::ObjCAAM:
+    return "Objective-C AAM";
+  // @mulle-objc@ ObjCAAM <
   case InputKind::CXX:
     return "C++";
   case InputKind::ObjCXX:
@@ -2401,6 +2420,31 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
       if (Opts.ObjCRuntime.tryParse(value))
         Diags.Report(diag::err_drv_unknown_objc_runtime) << value;
     }
+
+    // @mulle-objc@: handle AAM and TPS options >
+    if( Args.hasArg( OPT_fno_objc_tps))
+      Opts.ObjCDisableTaggedPointers = 1;
+    if( Args.hasArg( OPT_fno_objc_fcs))
+      Opts.ObjCDisableFastCalls = 1;
+
+    StringRef value = Args.getLastArgValue(OPT_fobjc_universename_EQ);
+    if( value.size() != 0)
+    {
+      Opts.ObjCDisableTaggedPointers = 1;
+      Opts.ObjCUniverseName          = value;
+
+      // by default in multiverse configuration we use this optimization
+      if( ! Args.hasArg( OPT_fno_objc_classcall_use_self))
+         Opts.ObjCClasscallUseSelf = 1;
+    }
+    if( Args.hasArg( OPT_fobjc_aam))
+      Opts.ObjCAllocsAutoreleasedObjects = 1;
+    if( Args.hasArg( OPT_fobjc_classcall_use_self))
+      Opts.ObjCClasscallUseSelf = 1;
+    if( Args.hasArg( OPT_fobjc_classcall_init_use_self))
+      Opts.ObjCClasscallUseSelf = 2;
+
+    // @mulle-objc@: handle AAM and TPS options <
 
     if (Args.hasArg(OPT_fobjc_gc_only))
       Opts.setGC(LangOptions::GCOnly);
@@ -2580,8 +2624,12 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
 
   Opts.RTTI = Opts.CPlusPlus && !Args.hasArg(OPT_fno_rtti);
   Opts.RTTIData = Opts.RTTI && !Args.hasArg(OPT_fno_rtti_data);
+// @mulle-objc@ can not deal with blocks >
+#if 0
   Opts.Blocks = Args.hasArg(OPT_fblocks) || (Opts.OpenCL
     && Opts.OpenCLVersion == 200);
+#endif
+// @mulle-objc@ can not deal with blocks <
   Opts.BlocksRuntimeOptional = Args.hasArg(OPT_fblocks_runtime_optional);
   Opts.CoroutinesTS = Args.hasArg(OPT_fcoroutines_ts);
 
@@ -2642,7 +2690,9 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
   Opts.ConceptsTS = Args.hasArg(OPT_fconcepts_ts);
   Opts.HeinousExtensions = Args.hasArg(OPT_fheinous_gnu_extensions);
   Opts.AccessControl = !Args.hasArg(OPT_fno_access_control);
-  Opts.ElideConstructors = !Args.hasArg(OPT_fno_elide_constructors);
+  // @mulle-objc@ ElideConstructors interferes with C code >
+  Opts.ElideConstructors = 0; // !Args.hasArg(OPT_fno_elide_constructors);
+  // @mulle-objc@ ElideConstructors interferes with C code <
   Opts.MathErrno = !Opts.OpenCL && Args.hasArg(OPT_fmath_errno);
   Opts.InstantiationDepth =
       getLastArgIntValue(Args, OPT_ftemplate_depth, 1024, Diags);

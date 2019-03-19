@@ -1186,6 +1186,28 @@ ExprResult Sema::ParseObjCSelectorExpression(Selector Sel,
       !getSourceManager().isInSystemHeader(Method->getLocation()))
     ReferencedSelectors.insert(std::make_pair(Sel, AtLoc));
 
+  // @mulle-objc@ AAM:  check that family is compatible >
+  // the params are what is used for syntax checks and all the
+  // other good stuff.
+  if( getLangOpts().ObjCAllocsAutoreleasedObjects)
+  {
+     switch( (int) Sel.getMethodFamily())
+     {
+     case OMF_alloc       :
+     case OMF_dealloc     :
+     case OMF_new         :
+     case OMF_copy        :
+     case OMF_mutableCopy :
+     case OMF_autorelease :
+     case OMF_release     :
+     case OMF_retain      :
+     case OMF_retainCount :
+         Diag (AtLoc, diag::err_mulle_aam_unsupported_method_family) <<
+            Sel << SourceRange(LParenLoc, RParenLoc);
+     }
+  }
+  // @mulle-objc@ AAM:  check that family is compatible <
+
   // In ARC, forbid the user from using @selector for
   // retain/release/autorelease/dealloc/retainCount.
   if (getLangOpts().ObjCAutoRefCount) {
@@ -1237,7 +1259,7 @@ ExprResult Sema::ParseObjCProtocolExpression(IdentifierInfo *ProtocolId,
   QualType Ty = Context.getObjCProtoType();
   if (Ty.isNull())
     return true;
-  Ty = Context.getObjCObjectPointerType(Ty);
+
   return new (Context) ObjCProtocolExpr(Ty, PDecl, AtLoc, ProtoIdLoc, RParenLoc);
 }
 
@@ -1804,6 +1826,13 @@ HandleExprPropertyRefExpr(const ObjCObjectPointerType *OPT,
   const ObjCInterfaceType *IFaceT = OPT->getInterfaceType();
   ObjCInterfaceDecl *IFace = IFaceT->getDecl();
 
+  // @mulle-objc@ language: turn off property . calls
+  if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+  {
+    Diag(MemberLoc, diag::err_mulle_objc_no_property_dot_expression);
+    return ExprError();
+  }
+
   if (!MemberName.isIdentifier()) {
     Diag(MemberLoc, diag::err_invalid_property_name)
       << MemberName << QualType(OPT, 0);
@@ -2132,6 +2161,11 @@ Sema::ObjCMessageKind Sema::getObjCMessageKind(Scope *S,
       if (Method->getClassInterface()->lookupInstanceVariable(Name,
                                                               ClassDeclared))
         return ObjCInstanceMessage;
+
+      // @mulle-objc@ MetaABI: Check if receiver is inside _param if yes
+      if( Method->FindParamRecordField( Name))
+        return ObjCInstanceMessage;
+      // @mulle-objc@ MetaABI: Check if receiver is inside _param if yes. Done
     }
 
     // Break out; we'll perform typo correction below.
@@ -2539,6 +2573,13 @@ ExprResult Sema::BuildClassMessage(TypeSourceInfo *ReceiverTypeInfo,
     }
   }
 
+  // @mulle-objc@ AAM:  check class selectors >
+  if( getLangOpts().ObjCAllocsAutoreleasedObjects)
+  {
+     CheckSelectorForAAM( Sel, Method, ReceiverType, SelLoc, ReceiverTypeInfo->getTypeLoc().getSourceRange());
+  }
+  // @mulle-objc@ AAM:  check class selectors <
+
   DiagnoseCStringFormatDirectiveInObjCAPI(*this, Method, Sel, Args, NumArgs);
 
   // Construct the appropriate ObjCMessageExpr.
@@ -2616,6 +2657,88 @@ static bool isMethodDeclaredInRootProtocol(Sema &S, const ObjCMethodDecl *M) {
   }
   return false;
 }
+
+//
+// https://stackoverflow.com/questions/874134/find-if-string-ends-with-another-string-in-c
+//
+static bool  hasEnding (std::string const &fullString, std::string const &ending)
+{
+   if (fullString.length() < ending.length())
+      return false;
+
+   return( 0 == fullString.compare (fullString.length() - ending.length(), ending.length(), ending));
+}
+
+
+// @mulle-objc@ AAM:  check that selectors conform
+int   Sema::CheckSelectorForAAM( Selector Sel,
+                                 ObjCMethodDecl *Method,
+                                 QualType ReceiverType,
+                                 SourceLocation SelLoc,
+                                 SourceRange RecRange)
+{
+   if( Method)
+   {
+      if (Method->hasAttr<NSReturnsRetainedAttr>())
+      {
+         Diag(SelLoc, diag::err_mulle_aam_illegal_retained_message)
+         << Sel << RecRange;
+      }
+
+      // Don't like consumed stuff
+      for (ObjCMethodDecl::param_const_iterator i = Method->param_begin(),
+           e = Method->param_end(); i != e; ++i)
+      {
+         const ParmVarDecl *ParamDecl = (*i);
+         if (ParamDecl->hasAttr<NSConsumedAttr>())
+         {
+            Diag(SelLoc, diag::err_mulle_aam_illegal_consumed_message)
+            << Sel << RecRange;
+            break;
+         }
+      }
+   }
+
+   ObjCMethodFamily family = (Method ? Method->getMethodFamily() : Sel.getMethodFamily());
+   switch (family)
+   {
+      case OMF_init:
+         if (Method)
+            checkInitMethod(Method, ReceiverType);
+         break;
+
+      case OMF_None:
+         if( Sel.getAsString() == "zone")
+            Diag(SelLoc, diag::err_mulle_aam_illegal_explicit_message)
+            << Sel << RecRange;
+         break;
+
+      case OMF_alloc:
+      case OMF_copy:
+      case OMF_mutableCopy:
+         if( hasEnding( Sel.getAsString(), "WithZone:"))
+            Diag(SelLoc, diag::err_mulle_aam_illegal_explicit_message)
+            << Sel << RecRange;
+         break;
+
+      default:
+         break;
+
+      case OMF_new:
+      case OMF_dealloc:
+      case OMF_retain:
+      case OMF_release:
+      case OMF_autorelease:
+         Diag(SelLoc, diag::err_mulle_aam_illegal_explicit_message)
+         << Sel << RecRange;
+         break;
+
+      case OMF_performSelector:
+         return( 1);
+   }
+   return( 0);  // not a perform selector
+}
+
 
 /// Build an Objective-C instance message expression.
 ///
@@ -3095,6 +3218,34 @@ ExprResult Sema::BuildInstanceMessage(Expr *Receiver,
     }
   }
 
+  // @mulle-objc@ AAM:  check that selectors conform
+  // Similiar but just not the same as ARC, since this is an instance method
+  // we shouldn't check the whole range of selectors, but we do anyway...
+
+  if( getLangOpts().ObjCAllocsAutoreleasedObjects)
+  {
+     // if 1, it's a performSelector variant
+     if( CheckSelectorForAAM( Sel, Method, ReceiverType, SelLoc, RecRange))
+     {
+        ObjCSelectorExpr *SelExp;
+
+        if (Method && NumArgs >= 1 && (SelExp = dyn_cast<ObjCSelectorExpr>(Args[0])))
+        {
+           Selector         ArgSel;
+           ObjCMethodDecl   *SelMethod;
+
+           ArgSel    = SelExp->getSelector();
+           SelMethod = LookupInstanceMethodInGlobalPool(ArgSel,
+                                                        SelExp->getSourceRange());
+           if (!SelMethod)
+              SelMethod = LookupFactoryMethodInGlobalPool(ArgSel,
+                                                          SelExp->getSourceRange());
+           if (SelMethod)
+              CheckSelectorForAAM( ArgSel, SelMethod, ReceiverType, SelLoc, RecRange);
+        }
+     }
+  }
+
   DiagnoseCStringFormatDirectiveInObjCAPI(*this, Method, Sel, Args, NumArgs);
 
   // Construct the appropriate ObjCMessageExpr instance.
@@ -3184,6 +3335,31 @@ static void RemoveSelectorFromWarningCache(Sema &S, Expr* Arg) {
   }
 }
 
+
+bool Sema::CheckMulleObjCFunctionDefined( Scope *S, SourceLocation Loc, StringRef Name)
+{
+   DeclarationName   DN;
+   IdentifierInfo    *II;
+
+   // hacked together without a clue
+   II  = &Context.Idents.get( Name);
+   DN  = DeclarationName( II);
+
+   //
+   // create result first, but feed it with partial search parameters
+   // then use LookupName with this object as first parameter passed by reference
+   // TODO: try to make this even more obsure just for C++'s sake
+   //
+   LookupResult   Result( *this, DN, Loc, LookupOrdinaryName);
+   LookupName(Result, S, false);
+
+   if( Result.getResultKind() == LookupResult::Found)
+      return( true);
+
+   Diag( Loc, diag::err_mulle_objc_runtime_function_missing) << DN;
+   return( false);
+}
+
 // ActOnInstanceMessage - used for both unary and keyword messages.
 // ArgExprs is optional - if it is present, the number of expressions
 // is obtained from Sel.getNumArgs().
@@ -3210,6 +3386,16 @@ ExprResult Sema::ActOnInstanceMessage(Scope *S,
   }
   if (Sel == RespondsToSelectorSel)
     RemoveSelectorFromWarningCache(*this, Args[0]);
+
+   // @mulle-objc@ runtime: Check that mulle_objc_object_call is defined
+  // (nat) check now that method dispatcher function is enabled
+  // if we do this during code generation, it's too late. We don't have the
+  // lookup and error facilities easily available
+   if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+   {
+      if( ! CheckMulleObjCFunctionDefined( S, LBracLoc, const_cast< char *>( "mulle_objc_object_call")))
+         return ExprError();
+   }
 
   return BuildInstanceMessage(Receiver, Receiver->getType(),
                               /*SuperLoc=*/SourceLocation(), Sel,

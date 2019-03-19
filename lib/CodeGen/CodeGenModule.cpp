@@ -178,6 +178,7 @@ void CodeGenModule::createObjCRuntime() {
   // This is just isGNUFamily(), but we want to force implementors of
   // new ABIs to decide how best to do this.
   switch (LangOpts.ObjCRuntime.getKind()) {
+  // @mulle-objc@ compiler: disable all other objc runtimes >
   case ObjCRuntime::GNUstep:
   case ObjCRuntime::GCC:
   case ObjCRuntime::ObjFW:
@@ -190,6 +191,13 @@ void CodeGenModule::createObjCRuntime() {
   case ObjCRuntime::WatchOS:
     ObjCRuntime.reset(CreateMacObjCRuntime(*this));
     return;
+  // @mulle-objc@ compiler: disable all other runtimes <
+
+  // @mulle-objc@ compiler: add ObjCRuntime::Mulle to runtimes >
+  case ObjCRuntime::Mulle:
+    ObjCRuntime.reset( CreateMulleObjCRuntime(*this));
+    return;
+  // @mulle-objc@ compiler: add ObjCRuntime::Mulle to runtimes <
   }
   llvm_unreachable("bad runtime kind");
 }
@@ -1672,6 +1680,13 @@ void CodeGenModule::AddDependentLib(StringRef Lib) {
   auto *MDOpts = llvm::MDString::get(getLLVMContext(), Opt);
   LinkerOptionsMetadata.push_back(llvm::MDNode::get(getLLVMContext(), MDOpts));
 }
+
+// @mulle-objc@ patch into parser >
+void CodeGenModule::ParserDidFinish( Parser *P) {
+   if( ObjCRuntime)
+      ObjCRuntime->ParserDidFinish( P);
+}
+// @mulle-objc@ patch into parser <
 
 /// Add link options implied by the given module, including modules
 /// it depends on, using a postorder walk.
@@ -4896,7 +4911,14 @@ void CodeGenModule::EmitTopLevelDecl(Decl *D) {
   // Objective-C Decls
 
   // Forward declarations, no (immediate) code generation.
-  case Decl::ObjCInterface:
+  // @mulle-objc@: forward declarations to runtime
+  case Decl::ObjCInterface: {
+     auto *OID = cast<ObjCInterfaceDecl>(D);
+     ObjCRuntime->GenerateForwardClass(OID);
+     break;
+  }
+  // @mulle-objc@: forward declarations to runtime end
+
   case Decl::ObjCCategory:
     break;
 

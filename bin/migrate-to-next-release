@@ -9,10 +9,21 @@ NEW_MULLE_DEV_BRANCH="mulle_objclang_80"
 
 LLVM_REMOTE="llvm"
 
+BEFOREFILE=.before-markers.txt
+AFTERFILE=.after-markers.txt
+SOURCEDIRS="include/ source/"
+
+
+#
+# this function should be identical in mulle-clang/mulle-lldb
+# If you edit them edit the corresponding file too
+#
+
+####### >-> DONT EDIT >->
 
 migrate()
 {
-   [ ! -e "BUILD_MULLE_CLANG.md" ] && echo "cd to the root of mulle-clang" >&2 && exit 1
+   [ ! -e "MULLE_LLDB_VERSION" ] && echo "cd to the root of mulle-lldb" >&2 && exit 1
 
    if ! git rev-parse --verify "${OLD_MULLE_DEV_BRANCH}" > /dev/null 2>&1
    then
@@ -41,17 +52,14 @@ migrate()
       git tag -d "squashed_${OLD_MULLE_DEV_BRANCH}" || exit 1
    fi
 
-
    #
-   # be in mulle-clang-5.0.0
    # get new version from LLVM (github)
    #
    if ! git ls-remote --exit-code llvm > /dev/null
    then
-      git remote add "${LLVM_REMOTE}" https://github.com/llvm-mirror/clang.git 2> /dev/null
+      git remote add "${LLVM_REMOTE}" https://github.com/llvm-mirror/lldb.git 2> /dev/null
    fi
    git fetch "${LLVM_REMOTE}" || exit 1
-
 
    if ! git rev-parse --verify "${LLVM_REMOTE}/${OLD_LLVM_BRANCH}"  > /dev/null 2>&1
    then
@@ -91,7 +99,7 @@ migrate()
    git tag "squashed_${OLD_MULLE_DEV_BRANCH}" "${OLD_MULLE_DEV_BRANCH}" || exit 1
 
    # count our change marker texts
-   BEFORELIST="`grep -R '@mulle-objc' include/ lib/ `"
+   grep -R '@mulle-' ${SOURCEDIRS} > "${BEFOREFILE}" || exit 1
 
    #
    # Now get the new stuff
@@ -100,45 +108,73 @@ migrate()
 
    git checkout -b "${NEW_MULLE_DEV_BRANCH}" "${LLVM_REMOTE}/${NEW_LLVM_BRANCH}" || exit 1
 
-   echo "### 6: Clean rubbish" >&2
-
-   git clean -d -x -f || exit 1
-
-   echo "### 7: Cherry pick" >&2
+   echo "### 6: Cherry pick" >&2
 
    if ! git cherry-pick "tmp_${NEW_MULLE_DEV_BRANCH}"
    then
-      echo "${BEFORELIST}" > tags-BEFORE.txt
       git status -s
       exit 1
    fi
+}
 
+
+cleanup()
+{
    # count our change marker texts again
-   AFTERLIST="`grep -R '@mulle-objc' include/ lib/`"
+   grep -R '@mulle-' ${SOURCEDIRS} > "${AFTERFILE}" || exit 1
 
-   if [ "${BEFORELIST}" != "${AFTERLIST}" ]
+   local before
+   local after
+
+   before="`cat "${BEFOREFILE}" `"
+   after="`cat "${AFTERFILE}" `"
+
+   if [ "${before}" != "${after}" ]
    then
-      echo "${AFTERLIST}" > tags-AFTER.txt
-
-      echo "Some @mulle-objc tags got lost in the merge" >&2
-      diff  <(echo "$BEFORELIST" ) <(echo "$AFTERLIST") >&2
+      echo "Some @mulle- tags got lost in the merge" >&2
+      echo "before : ${BEFOREFILE}" >&2
+      echo "after  : ${AFTERFILE}" >&2
+      diff "${BEFOREFILE}" "${AFTERFILE}" >&2
       exit 1
    fi
-
 
    #
    # resolve conflicts manually.
    # Check with grep '@mulle-objc' ... | wc -l, that all changes are present
    #
-   echo "### 8: Tmp branch delete" >&2
+   echo "### 7: Tmp branch delete" >&2
 
    git branch -D "tmp_${NEW_MULLE_DEV_BRANCH}" || exit 1
+   rm "${AFTERFILE}" "${BEFOREFILE}"
 }
+
+
+####### <-< DONT EDIT <-<
 
 
 #
 # since an old version of this script gets checked out over the new one
 # try to have bash parsed everything already
 #
-migrate
+#
+# since an old version of this script gets checked out over the new one
+# try to have bash parsed everything already
+#
+[ ! -e "BUILD_MULLE_CLANG.md" ] && echo "cd to the root of mulle-clang" >&2 && exit 1
 
+
+case "$1" in
+   'continue'|'cleanup')
+      cleanup
+   ;;
+
+   *)
+      if [ ! -f "${AFTERFILE}" ]
+      then
+         migrate
+      fi
+      cleanup
+   ;;
+esac
+
+migrate

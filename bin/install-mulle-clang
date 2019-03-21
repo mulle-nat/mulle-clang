@@ -30,7 +30,7 @@ MULLE_LLDB_RC="1"
 
 # required LLVM version
 LLVM_VERSION="8.0.0"
-LLVM_RC="5" # leave empty for releases
+#LLVM_RC="5" # leave empty for releases
 
 #
 # cmake min for 7 is 3.4.2 (so still good), try to keep as low as possible
@@ -88,7 +88,7 @@ EOF
 EOF
       fi
    ) | sort >&2
-   
+
    if [ "${VERBOSE}" != "YES" ]
    then
       echo >&2
@@ -105,7 +105,7 @@ Commands:
    build                : build only
    uninstall            : remove links
 EOF
-      
+
    exit 1
 }
 
@@ -838,7 +838,7 @@ setup_build_environment()
          MAKE_FLAGS="-B -j `get_core_count`"
       else
          MAKE_FLAGS="-B"
-      fi         
+      fi
       MAKE_INSTALL_COMMAND="install"
       MAKE_BUILD_COMMAND=""
    fi
@@ -1509,7 +1509,7 @@ install_mulle_clang_link()
 {
    log_info "Installing mulle-clang links ..."
 
-   local clangexe 
+   local clangexe
 
    clangexe="${MULLE_CLANG_INSTALL_PREFIX}/bin/clang${EXE_EXTENSION}"
    if [ ! -e "${clangexe}" ]

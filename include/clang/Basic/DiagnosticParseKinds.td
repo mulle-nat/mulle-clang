@@ -1178,7 +1178,7 @@ def err_omp_declare_target_unexpected_clause: Error<
 def err_omp_expected_clause: Error<
   "expected at least one clause on '#pragma omp %0' directive">;
 
-// Mulle ObjC support.
+// @mulle-objc@ Mulle ObjC diagnostics >
 def err_mulle_objc_no_nullable : Error<
   "nullable is not supported in Mulle ObjC (everything is nullable by default)">;
 def err_mulle_objc_no_package : Error<
@@ -1188,7 +1188,8 @@ def err_mulle_objc_no_class_extension : Error<
 def err_mulle_objc_no_cpp_generics : Error<
   "C++ like generics are not supported in Mulle ObjC">;
 def err_mulle_objc_no_support_for_property_modifier  : Error<
-  "%0 is not supported in Mulle ObjC">;
+  "%0 is a property attribute that is is not supported in Mulle ObjC">;
+// @mulle-objc@ Mulle ObjC diagnostics <
 // Pragma loop support.
 def err_pragma_loop_missing_argument : Error<
   "missing argument; expected %select{an integer value|"

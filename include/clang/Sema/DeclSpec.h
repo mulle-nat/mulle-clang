@@ -824,6 +824,10 @@ public:
     DQ_PR_nullability = 0x1000,
     DQ_PR_null_resettable = 0x2000,
     DQ_PR_class = 0x4000
+  // @mulle-objc@ new property attributes nonserializable and dynamic >
+    , DQ_PR_dynamic = 0x8000
+    , DQ_PR_nonserializable = 0x10000
+  // @mulle-objc@ new property attributes nonserializable and dynamic <
   };
 
   ObjCDeclSpec()

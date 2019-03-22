@@ -861,7 +861,7 @@ void Parser::ParseObjCPropertyAttribute(ObjCDeclSpec &DS) {
 
     SourceLocation AttrName = ConsumeToken(); // consume last attribute name
 
-    // @mulle-objc@ language: remove strong, weak and friends
+    // @mulle-objc@ language: remove strong, weak and friends >
     if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
     {
       //  check that we know it, could also issue a warning maybe ?
@@ -872,6 +872,8 @@ void Parser::ParseObjCPropertyAttribute(ObjCDeclSpec &DS) {
              II->isStr("copy") ||
              II->isStr("nonnull") ||
              II->isStr("nonatomic") ||
+             II->isStr("dynamic") ||
+             II->isStr("nonserializable") ||
              II->isStr("getter") ||
              II->isStr("setter")))
       {
@@ -881,6 +883,7 @@ void Parser::ParseObjCPropertyAttribute(ObjCDeclSpec &DS) {
         return;
       }
     }
+    // @mulle-objc@ language: remove strong, weak and friends <
 
     if (II->isStr("readonly"))
       DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_readonly);
@@ -902,6 +905,12 @@ void Parser::ParseObjCPropertyAttribute(ObjCDeclSpec &DS) {
       DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_atomic);
     else if (II->isStr("weak"))
       DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_weak);
+  // @mulle-objc@ new property attributes nonserializable and dynamic >
+    else if (II->isStr("dynamic"))
+      DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_dynamic);
+    else if (II->isStr("nonserializable"))
+      DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_nonserializable);
+  // @mulle-objc@ new property attributes nonserializable and dynamic <
     else if (II->isStr("getter") || II->isStr("setter")) {
       bool IsSetter = II->getNameStart()[0] == 's';
 
@@ -1957,14 +1966,14 @@ void Parser::ParseObjCClassInstanceVariables(Decl *interfaceDecl,
 
       switch (Tok.getObjCKeywordID()) {
       case tok::objc_package:
-        // @mulle-objc@ no JAVA package for mulle-objc >      
+        // @mulle-objc@ no JAVA package for mulle-objc >
         if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
         {
           Diag(Tok, diag::err_mulle_objc_no_package);
           continue;
         }
         LLVM_FALLTHROUGH;
-        // @mulle-objc@ no JAVA package for mulle-objc <      
+        // @mulle-objc@ no JAVA package for mulle-objc <
       case tok::objc_private:
       case tok::objc_public:
       case tok::objc_protected:

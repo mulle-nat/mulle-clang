@@ -6181,7 +6181,7 @@ def warn_objc_unsafe_perform_selector : Warning<
 def note_objc_unsafe_perform_selector_method_declared_here :  Note<
   "method %0 that returns %1 declared here">;
 
-// @mulle-objc@ compiler: error message definitions begin
+// @mulle-objc@ compiler: error message definitions begin >
 def error_mulle_aam_ivar_access : Error<"in AAM instance variables such as %0 are not accessible">, AccessControl;
 def err_mulle_aam_unsupported_method_family : Error<
 "in AAM method %0 can not be defined, use a non AAM category">;
@@ -6219,8 +6219,10 @@ def err_mulle_objc_universename_not_a_string: Error<
    "the universename '%0' must be a string (in double quotes)">;
 def err_mulle_objc_universename_not_an_identifier: Error<
    "the universename '%0' must only contain lowercase identifier characters">;
+def err_mulle_dynamic_property_synthesize  : Error<
+  "%0 is a dynamic property, that can not be synthesized">;
 
-// @mulle-objc@ compiler: error message definitions end
+// @mulle-objc@ compiler: error message definitions end <
 
 def warn_setter_getter_impl_required : Warning<
   "property %0 requires method %1 to be defined - "

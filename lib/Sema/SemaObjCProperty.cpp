@@ -240,7 +240,11 @@ Decl *Sema::ActOnProperty(Scope *S, SourceLocation AtLoc,
      if (ObjCInterfaceDecl *CDecl = dyn_cast<ObjCInterfaceDecl>(ClassDecl))
      {
         Ivar = CDecl->lookupInstanceVariableOfProperty( Context, Res->getIdentifier(), ClassDeclared);
-        if( ! Ivar)
+        //
+        // if marked dynamic, do not auto-add an ivar
+        // if there is one already, we could warn, but its OK
+        //
+        if( ! Ivar && (Attributes & ObjCDeclSpec::DQ_PR_dynamic))
         {
            // create an Ivar and add it
            Ivar = ObjCIvarDecl::Create( Context, CDecl,
@@ -350,6 +354,12 @@ makePropertyAttributesAsWritten(unsigned Attributes) {
     attributesAsWritten |= ObjCPropertyDecl::OBJC_PR_atomic;
   if (Attributes & ObjCDeclSpec::DQ_PR_class)
     attributesAsWritten |= ObjCPropertyDecl::OBJC_PR_class;
+  // @mulle-objc@ new property attributes nonserializable and dynamic >
+  if (Attributes & ObjCDeclSpec::DQ_PR_dynamic)
+    attributesAsWritten |= ObjCPropertyDecl::OBJC_PR_dynamic;
+  if (Attributes & ObjCDeclSpec::DQ_PR_nonserializable)
+    attributesAsWritten |= ObjCPropertyDecl::OBJC_PR_nonserializable;
+  // @mulle-objc@ new property attributes nonserializable and dynamic <
 
   return (ObjCPropertyDecl::PropertyAttributeKind)attributesAsWritten;
 }
@@ -742,6 +752,13 @@ ObjCPropertyDecl *Sema::CreatePropertyDecl(Scope *S,
     PDecl->setPropertyImplementation(ObjCPropertyDecl::Required);
   else if (MethodImplKind == tok::objc_optional)
     PDecl->setPropertyImplementation(ObjCPropertyDecl::Optional);
+
+  // @mulle-objc@ new property attributes nonserializable and dynamic >
+  if (Attributes & ObjCDeclSpec::DQ_PR_dynamic)
+    PDecl->setPropertyAttributes(ObjCPropertyDecl::OBJC_PR_dynamic);
+  if (Attributes & ObjCDeclSpec::DQ_PR_nonserializable)
+    PDecl->setPropertyAttributes(ObjCPropertyDecl::OBJC_PR_nonserializable);
+  // @mulle-objc@ new property attributes nonserializable and dynamic <
 
   if (Attributes & ObjCDeclSpec::DQ_PR_nullability)
     PDecl->setPropertyAttributes(ObjCPropertyDecl::OBJC_PR_nullability);
@@ -1225,16 +1242,24 @@ Decl *Sema::ActOnPropertyImplDecl(Scope *S,
     // @mulle-objc@ language: fix lookup of ivar variable for properties,
     if( Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
     {
-      if (!PropertyIvar)
+      if( property->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_dynamic)
       {
-         Ivar = IDecl->lookupInstanceVariableOfProperty( Context, PropertyId, ClassDeclared);
-         if( Ivar)
-            PropertyIvar = Ivar->getIdentifier();
-         else
-            PropertyIvar = PropertyId;
+         Diag(property->getLocation(), diag::err_mulle_dynamic_property_synthesize)
+            << property->getDeclName();
+         CompleteTypeErr = true;
+         return nullptr;
       }
       else
-         Ivar = IDecl->lookupInstanceVariable( PropertyIvar, ClassDeclared);
+         if (!PropertyIvar)
+         {
+            Ivar = IDecl->lookupInstanceVariableOfProperty( Context, PropertyId, ClassDeclared);
+            if( Ivar)
+               PropertyIvar = Ivar->getIdentifier();
+            else
+               PropertyIvar = PropertyId;
+         }
+         else
+            Ivar = IDecl->lookupInstanceVariable( PropertyIvar, ClassDeclared);
     }
     else
     {

@@ -6406,6 +6406,7 @@ ASTContext::getObjCPropertyImplDeclForPropertyDecl(
 /// kPropertyWeak = 'W'              // 'weak' property
 /// kPropertyStrong = 'P'            // property GC'able
 /// kPropertyNonAtomic = 'N'         // property non-atomic
+/// kPropertyNonSerializable = 'E'   // property non-serializable (ephemeral)
 /// };
 /// @endcode
 std::string
@@ -6457,6 +6458,11 @@ ASTContext::getObjCEncodingForPropertyDecl(const ObjCPropertyDecl *PD,
   // are "dynamic by default".
   if (Dynamic)
     S += ",D";
+
+  // @mulle-objc@ new property attributes nonserializable and dynamic >
+  if (PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_nonserializable)
+    S += ",E";
+  // @mulle-objc@ new property attributes nonserializable and dynamic <
 
   if (PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_nonatomic)
     S += ",N";

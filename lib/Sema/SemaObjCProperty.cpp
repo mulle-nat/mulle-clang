@@ -244,7 +244,7 @@ Decl *Sema::ActOnProperty(Scope *S, SourceLocation AtLoc,
         // if marked dynamic, do not auto-add an ivar
         // if there is one already, we could warn, but its OK
         //
-        if( ! Ivar && (Attributes & ObjCDeclSpec::DQ_PR_dynamic))
+        if( ! Ivar && ! (Res->getPropertyAttributesAsWritten() & ObjCDeclSpec::DQ_PR_dynamic))
         {
            // create an Ivar and add it
            Ivar = ObjCIvarDecl::Create( Context, CDecl,

@@ -5035,6 +5035,9 @@ llvm::Constant *CGObjCMulleRuntime::GetMethodConstant(const ObjCMethodDecl *MD) 
    bits  = CGM.getLangOpts().ObjCAllocsAutoreleasedObjects ? 0x4 : 0x0;
    // remember if it is variadic
    bits |= MD->isVariadic() ? 0x8 : 0x0;
+   // remember if it is markes as the designated initializer
+   bits |= MD->hasAttr<ObjCDesignatedInitializerAttr>() ? 0x20 : 0x0;
+
    // also remember method family (nice for checking if it's init or something)
    bits |= MD->getMethodFamily() << 16;
 

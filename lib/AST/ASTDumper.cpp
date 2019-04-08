@@ -1350,12 +1350,12 @@ void ASTDumper::VisitObjCPropertyDecl(const ObjCPropertyDecl *D) {
       OS << " strong";
     if (Attrs & ObjCPropertyDecl::OBJC_PR_unsafe_unretained)
       OS << " unsafe_unretained";
-  // @mulle-objc@ new property attributes nonserializable and dynamic >
+  // @mulle-objc@ new property attributes serializable and dynamic >
     if (Attrs & ObjCPropertyDecl::OBJC_PR_dynamic)
       OS << " dynamic";
-    if (Attrs & ObjCPropertyDecl::OBJC_PR_nonserializable)
-      OS << " nonserializable";
-  // @mulle-objc@ new property attributes nonserializable and dynamic >
+    if (Attrs & ObjCPropertyDecl::OBJC_PR_serializable)
+      OS << " serializable";
+  // @mulle-objc@ new property attributes serializable and dynamic >
 
     if (Attrs & ObjCPropertyDecl::OBJC_PR_class)
       OS << " class";

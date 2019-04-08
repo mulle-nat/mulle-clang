@@ -873,7 +873,7 @@ void Parser::ParseObjCPropertyAttribute(ObjCDeclSpec &DS) {
              II->isStr("nonnull") ||
              II->isStr("nonatomic") ||
              II->isStr("dynamic") ||
-             II->isStr("nonserializable") ||
+             II->isStr("serializable") ||
              II->isStr("getter") ||
              II->isStr("setter")))
       {
@@ -905,12 +905,12 @@ void Parser::ParseObjCPropertyAttribute(ObjCDeclSpec &DS) {
       DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_atomic);
     else if (II->isStr("weak"))
       DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_weak);
-  // @mulle-objc@ new property attributes nonserializable and dynamic >
+  // @mulle-objc@ new property attributes serializable and dynamic >
     else if (II->isStr("dynamic"))
       DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_dynamic);
-    else if (II->isStr("nonserializable"))
-      DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_nonserializable);
-  // @mulle-objc@ new property attributes nonserializable and dynamic <
+    else if (II->isStr("serializable"))
+      DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_serializable);
+  // @mulle-objc@ new property attributes serializable and dynamic <
     else if (II->isStr("getter") || II->isStr("setter")) {
       bool IsSetter = II->getNameStart()[0] == 's';
 

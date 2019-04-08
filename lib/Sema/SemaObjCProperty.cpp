@@ -354,12 +354,12 @@ makePropertyAttributesAsWritten(unsigned Attributes) {
     attributesAsWritten |= ObjCPropertyDecl::OBJC_PR_atomic;
   if (Attributes & ObjCDeclSpec::DQ_PR_class)
     attributesAsWritten |= ObjCPropertyDecl::OBJC_PR_class;
-  // @mulle-objc@ new property attributes nonserializable and dynamic >
+  // @mulle-objc@ new property attributes serializable and dynamic >
   if (Attributes & ObjCDeclSpec::DQ_PR_dynamic)
     attributesAsWritten |= ObjCPropertyDecl::OBJC_PR_dynamic;
-  if (Attributes & ObjCDeclSpec::DQ_PR_nonserializable)
-    attributesAsWritten |= ObjCPropertyDecl::OBJC_PR_nonserializable;
-  // @mulle-objc@ new property attributes nonserializable and dynamic <
+  if (Attributes & ObjCDeclSpec::DQ_PR_serializable)
+    attributesAsWritten |= ObjCPropertyDecl::OBJC_PR_serializable;
+  // @mulle-objc@ new property attributes serializable and dynamic <
 
   return (ObjCPropertyDecl::PropertyAttributeKind)attributesAsWritten;
 }
@@ -753,12 +753,12 @@ ObjCPropertyDecl *Sema::CreatePropertyDecl(Scope *S,
   else if (MethodImplKind == tok::objc_optional)
     PDecl->setPropertyImplementation(ObjCPropertyDecl::Optional);
 
-  // @mulle-objc@ new property attributes nonserializable and dynamic >
+  // @mulle-objc@ new property attributes serializable and dynamic >
   if (Attributes & ObjCDeclSpec::DQ_PR_dynamic)
     PDecl->setPropertyAttributes(ObjCPropertyDecl::OBJC_PR_dynamic);
-  if (Attributes & ObjCDeclSpec::DQ_PR_nonserializable)
-    PDecl->setPropertyAttributes(ObjCPropertyDecl::OBJC_PR_nonserializable);
-  // @mulle-objc@ new property attributes nonserializable and dynamic <
+  if (Attributes & ObjCDeclSpec::DQ_PR_serializable)
+    PDecl->setPropertyAttributes(ObjCPropertyDecl::OBJC_PR_serializable);
+  // @mulle-objc@ new property attributes serializable and dynamic <
 
   if (Attributes & ObjCDeclSpec::DQ_PR_nullability)
     PDecl->setPropertyAttributes(ObjCPropertyDecl::OBJC_PR_nullability);

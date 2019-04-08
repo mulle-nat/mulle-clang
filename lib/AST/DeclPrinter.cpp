@@ -1455,7 +1455,7 @@ void DeclPrinter::VisitObjCPropertyDecl(ObjCPropertyDecl *PDecl) {
       first = false;
     }
 
-    // @mulle-objc@ new property attributes nonserializable and dynamic >
+    // @mulle-objc@ new property attributes serializable and dynamic >
     if (PDecl->getPropertyAttributes() &
         ObjCPropertyDecl::OBJC_PR_dynamic) {
       Out << (first ? ' ' : ',') << "dynamic";
@@ -1463,11 +1463,11 @@ void DeclPrinter::VisitObjCPropertyDecl(ObjCPropertyDecl *PDecl) {
     }
 
     if (PDecl->getPropertyAttributes() &
-        ObjCPropertyDecl::OBJC_PR_nonserializable) {
-      Out << (first ? ' ' : ',') << "nonserializable";
+        ObjCPropertyDecl::OBJC_PR_serializable) {
+      Out << (first ? ' ' : ',') << "serializable";
       first = false;
     }
-    // @mulle-objc@ new property attributes nonserializable and dynamic <
+    // @mulle-objc@ new property attributes serializable and dynamic <
 
     if (PDecl->getPropertyAttributes() &
         ObjCPropertyDecl::OBJC_PR_nullability) {

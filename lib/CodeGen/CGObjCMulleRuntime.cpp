@@ -166,7 +166,7 @@ namespace {
          return CGM.CreateRuntimeFunction(llvm::FunctionType::get( ObjectPtrTy,
                                                                   params, false),
                                           "_mulle_objc_infraclass_allocwithzone_instance");
-      }      
+      }
 
       llvm::Constant *getMessageSendRetainFn() const {
          llvm::Type *params[] = { ObjectPtrTy };
@@ -937,6 +937,7 @@ namespace {
 
       void  SetPropertyInfoToEmit( const ObjCPropertyDecl *PD,
                                    const Decl *Container,
+                                   const ObjCCommonTypesHelper &ObjCTypes,
                                    llvm::Constant *Prop[ 7]);
 
       /// EmitPropertyList - Emit the given property list. The return
@@ -4495,7 +4496,7 @@ PushProtocolProperties(llvm::SmallPtrSet<const IdentifierInfo*,16> &PropertySet,
 
       llvm::Constant *Prop[7];
 
-      SetPropertyInfoToEmit( PD, Container, Prop);
+      SetPropertyInfoToEmit( PD, Container, ObjCTypes, Prop);
 
       Properties.push_back(llvm::ConstantStruct::get(ObjCTypes.PropertyTy, Prop));
    }
@@ -4504,33 +4505,67 @@ PushProtocolProperties(llvm::SmallPtrSet<const IdentifierInfo*,16> &PropertySet,
 
 void  CGObjCCommonMulleRuntime::SetPropertyInfoToEmit( const ObjCPropertyDecl *PD,
                                                        const Decl *Container,
+                                                       const ObjCCommonTypesHelper &ObjCTypes,
                                                        llvm::Constant *Prop[ 7])
 {
-   Selector   getter = PD->getGetterName();
-   Selector   setter = PD->getSetterName();
-   QualType   type;
-   int        is_nonnull;
-   int        i;
+   Selector    getter = PD->getGetterName();
+   Selector    setter = PD->getSetterName();
+   QualType    type;
+   int         i;
+   unsigned int    bits;
    llvm::Constant  *getterSel;
    llvm::Constant  *setterSel;
-   llvm::Constant  *clearerSel;
    llvm::Constant  *zeroSel;
    llvm::Constant  *propertyid;
    llvm::Constant  *ivarid;
+   llvm::Constant  *bitValue;
 
    const llvm::APInt zero(32, 0);
 
    zeroSel   = llvm::Constant::getIntegerValue(CGM.Int32Ty, zero);
-
    getterSel = ! getter.isNull() ? _HashConstantForString( getter.getAsString())
-   : zeroSel;
-   setterSel = (! setter.isNull() && ! PD->isReadOnly())
-   ? _HashConstantForString( setter.getAsString())
-   : zeroSel;
+                                 : zeroSel;
+   setterSel = (! setter.isNull() && ! PD->isReadOnly())  ? _HashConstantForString( setter.getAsString())
+                                                          : zeroSel;
 
    type       = PD->getType();
-   is_nonnull = PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_nullability;
-   clearerSel = type->hasPointerRepresentation() && ! is_nonnull ? setterSel : zeroSel;
+
+/*
+    OBJC_PR_readonly  = 0x01,
+    OBJC_PR_assign    = 0x04,
+    OBJC_PR_readwrite = 0x08,
+    OBJC_PR_retain    = 0x10,
+    OBJC_PR_copy      = 0x20,
+    OBJC_PR_nullability = 0x1000,
+    OBJC_PR_class = 0x4000
+    , OBJC_PR_dynamic = 0x8000
+    , OBJC_PR_serializable = 0x10000
+*/
+   auto nullability = type->getNullability( CGM.getContext());
+
+   bits       = (PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_readonly)        ? 0x00001 : 0x0;
+//   bits      |= (PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_assign)          ? 0x00002 : 0x0;
+//   bits      |= (PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_readwrite)       ? 0x00004 : 0x0;
+   bits      |= (PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_retain)          ? 0x00008 : 0x0;
+   bits      |= (PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_copy)            ? 0x00010 : 0x0;
+//   bits      |= (PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_nullability)     ? 0x00020 : 0x0;
+//   bits      |= (PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_null_resettable) ? 0x00040 : 0x0;
+   bits      |= (nullability == NullabilityKind::NonNull)                                 ? 0x00080 : 0x0;
+//   bits      |= (nullability == NullabilityKind::Nullable)                                ? 0x00100 : 0x0;
+   bits      |= (PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_class)           ? 0x00200 : 0x0;
+   bits      |= (PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_dynamic)         ? 0x00400 : 0x0;
+   bits      |= (PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_serializable)    ? 0x00800 : 0x0;
+
+   if( type->hasPointerRepresentation())
+   {
+      if( setterSel != zeroSel && (nullability != NullabilityKind::NonNull))
+         bits |= 0x10000;      // release via setter possible
+
+      if( type->hasObjCPointerRepresentation())
+         if( PD->isRetaining())
+            bits |= 0x20000;  // release via -autorelease possible
+   }
+   bitValue   = llvm::ConstantInt::get(ObjCTypes.IntTy, bits);
 
    propertyid = _HashConstantForString( PD->getIdentifier()->getNameStart());
    ivarid     = llvm::Constant::getIntegerValue(CGM.Int32Ty, zero);
@@ -4545,7 +4580,7 @@ void  CGObjCCommonMulleRuntime::SetPropertyInfoToEmit( const ObjCPropertyDecl *P
 //      char                       *signature;  // hmmm...
 //      mulle_objc_methodid_t      getter;
 //      mulle_objc_methodid_t      setter;
-//      mulle_objc_methodid_t      clearer;     // for pointers/objects
+//      unsigned int               bits;     // for pointers/objects
 //   };
 
    i = 0;
@@ -4557,7 +4592,7 @@ void  CGObjCCommonMulleRuntime::SetPropertyInfoToEmit( const ObjCPropertyDecl *P
 
    Prop[ i++] = getterSel;
    Prop[ i++] = setterSel;
-   Prop[ i++] = clearerSel;
+   Prop[ i++] = bitValue;
 
    assert( i == 7);
 //   fprintf( stderr, "%s %s has %s clearer\n",  type->hasPointerRepresentation() ? "pointer" : "nonpointer", PD->getIdentifier()->getNameStart(),  Prop[ 5] == zeroSel  ? "no" : "a");
@@ -4576,7 +4611,7 @@ llvm::Constant *CGObjCCommonMulleRuntime::EmitPropertyList(Twine Name,
 
       PropertySet.insert(PD->getIdentifier());
 
-      SetPropertyInfoToEmit( PD, Container, Prop);
+      SetPropertyInfoToEmit( PD, Container, ObjCTypes, Prop);
       Properties.push_back(llvm::ConstantStruct::get(ObjCTypes.PropertyTy,
                                                      Prop));
    }
@@ -6830,7 +6865,7 @@ ObjCCommonTypesHelper::ObjCCommonTypesHelper(CodeGen::CodeGenModule &cgm)
    //      char                       *signature;  // hmmm...
    //      mulle_objc_methodid_t      getter;
    //      mulle_objc_methodid_t      setter;
-   //      mulle_objc_methodid_t      clearer;
+   //      int                        bits;
    //   };
 
    PropertyTy = llvm::StructType::create("struct._mulle_objc_property",
@@ -6840,7 +6875,7 @@ ObjCCommonTypesHelper::ObjCCommonTypesHelper(CodeGen::CodeGenModule &cgm)
                                          Int8PtrTy,
                                          SelectorIDTy,
                                          SelectorIDTy,
-                                         SelectorIDTy);
+                                         IntTy);
 
    // struct _mulle_objc_propertylist
    // {

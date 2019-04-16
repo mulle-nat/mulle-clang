@@ -4456,6 +4456,7 @@ typedef enum {
   // @mulle-objc@ new property attributes serializable and dynamic >
   , CXObjCPropertyAttr_dynamic = 0x8000
   , CXObjCPropertyAttr_serializable = 0x10000
+  , CXObjCPropertyAttr_nonserializable = 0x20000
   // @mulle-objc@ new property attributes serializable and dynamic <
 } CXObjCPropertyAttrKind;
 

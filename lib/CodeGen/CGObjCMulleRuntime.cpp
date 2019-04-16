@@ -63,7 +63,7 @@
 #include "llvm/Support/Compiler.h"
 
 
-#define COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION  14
+#define COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION  15
 
 
 using namespace clang;
@@ -4554,7 +4554,7 @@ void  CGObjCCommonMulleRuntime::SetPropertyInfoToEmit( const ObjCPropertyDecl *P
 //   bits      |= (nullability == NullabilityKind::Nullable)                                ? 0x00100 : 0x0;
    bits      |= (PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_class)           ? 0x00200 : 0x0;
    bits      |= (PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_dynamic)         ? 0x00400 : 0x0;
-   bits      |= (PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_serializable)    ? 0x00800 : 0x0;
+   bits      |= (PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_nonserializable) ? 0x00800 : 0x0;
 
    if( type->hasPointerRepresentation())
    {

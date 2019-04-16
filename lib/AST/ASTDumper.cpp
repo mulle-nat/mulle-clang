@@ -1355,6 +1355,8 @@ void ASTDumper::VisitObjCPropertyDecl(const ObjCPropertyDecl *D) {
       OS << " dynamic";
     if (Attrs & ObjCPropertyDecl::OBJC_PR_serializable)
       OS << " serializable";
+    if (Attrs & ObjCPropertyDecl::OBJC_PR_nonserializable)
+      OS << " nonserializable";
   // @mulle-objc@ new property attributes serializable and dynamic >
 
     if (Attrs & ObjCPropertyDecl::OBJC_PR_class)

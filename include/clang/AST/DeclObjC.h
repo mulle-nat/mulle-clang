@@ -783,15 +783,17 @@ public:
     OBJC_PR_null_resettable = 0x2000,
     OBJC_PR_class = 0x4000
     // @mulle-objc@ new property attributes serializable and dynamic >
-    , OBJC_PR_dynamic = 0x8000
-    , OBJC_PR_serializable = 0x10000
+    , OBJC_PR_dynamic         = 0x08000
+    , OBJC_PR_serializable    = 0x10000
+    , OBJC_PR_nonserializable = 0x20000
+    // MEMO: change NumPropertyAttrsBits below when adding 
     // @mulle-objc@ new property attributes serializable and dynamic <
     // Adding a property should change NumPropertyAttrsBits
   };
 
   enum {
     /// Number of bits fitting all the property attributes.
-    NumPropertyAttrsBits = 17
+    NumPropertyAttrsBits = 18
   };
 
   enum SetterKind { Assign, Retain, Copy, Weak };

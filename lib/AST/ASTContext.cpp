@@ -6460,7 +6460,9 @@ ASTContext::getObjCEncodingForPropertyDecl(const ObjCPropertyDecl *PD,
     S += ",D";
 
   // @mulle-objc@ new property attributes serializable and dynamic >
-  if (PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_serializable)
+  // will only be emitted if non-implicitly declared as seriazable,
+  // because we want to do E= in the future
+  if ( PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_serializable)
     S += ",E";
   // @mulle-objc@ new property attributes serializable and dynamic <
 

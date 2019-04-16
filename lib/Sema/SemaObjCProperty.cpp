@@ -359,6 +359,8 @@ makePropertyAttributesAsWritten(unsigned Attributes) {
     attributesAsWritten |= ObjCPropertyDecl::OBJC_PR_dynamic;
   if (Attributes & ObjCDeclSpec::DQ_PR_serializable)
     attributesAsWritten |= ObjCPropertyDecl::OBJC_PR_serializable;
+  if (Attributes & ObjCDeclSpec::DQ_PR_nonserializable)
+    attributesAsWritten |= ObjCPropertyDecl::OBJC_PR_nonserializable;
   // @mulle-objc@ new property attributes serializable and dynamic <
 
   return (ObjCPropertyDecl::PropertyAttributeKind)attributesAsWritten;
@@ -758,7 +760,9 @@ ObjCPropertyDecl *Sema::CreatePropertyDecl(Scope *S,
     PDecl->setPropertyAttributes(ObjCPropertyDecl::OBJC_PR_dynamic);
   if (Attributes & ObjCDeclSpec::DQ_PR_serializable)
     PDecl->setPropertyAttributes(ObjCPropertyDecl::OBJC_PR_serializable);
-  // @mulle-objc@ new property attributes serializable and dynamic <
+  if (Attributes & ObjCDeclSpec::DQ_PR_nonserializable)
+    PDecl->setPropertyAttributes(ObjCPropertyDecl::OBJC_PR_nonserializable);
+  // @mulle-objc@ new property attributes nonserializable and dynamic <
 
   if (Attributes & ObjCDeclSpec::DQ_PR_nullability)
     PDecl->setPropertyAttributes(ObjCPropertyDecl::OBJC_PR_nullability);

@@ -512,6 +512,11 @@ ObjCMethodFamily Selector::getMethodFamilyImpl(Selector sel) {
   while (!name.empty() && name.front() == '_')
     name = name.substr(1);
 
+  // @mulle-objc@ remove "mulle" prefix for method familiy detection >
+  if (startsWithWord(name, "mulle"))
+     name = name.substr(5);
+  // @mulle-objc@ remove "mulle" prefix for method familiy detection <
+
   if (name.empty()) return OMF_None;
   switch (name.front()) {
   case 'a':

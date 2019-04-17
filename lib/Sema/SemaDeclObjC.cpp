@@ -2788,6 +2788,16 @@ static void CheckProtocolMethodDefs(Sema &S,
                                       false /* followSuper */))
               if (C || MethodInClass->isPropertyAccessor())
                 continue;
+            // @mulle-objc@ allow protocol methods to be redeclared as optional >
+            if (ObjCMethodDecl *NearestMethod =
+                  IDecl->lookupMethod(method->getSelector(),
+                                      true /* instance */,
+                                      false /* shallowCategoryLookup */,
+                                      true /* followSuper */))
+              if ( NearestMethod->getImplementationControl() == ObjCMethodDecl::Optional)
+                continue;   
+            // @mulle-objc@ allow protocol methods to be redeclared as optional <
+
             unsigned DIAG = diag::warn_unimplemented_protocol_method;
             if (!S.Diags.isIgnored(DIAG, ImpLoc)) {
               WarnUndefinedMethod(S, ImpLoc, method, IncompleteImpl, DIAG,
@@ -2810,7 +2820,15 @@ static void CheckProtocolMethodDefs(Sema &S,
                                    true /* shallowCategoryLookup */,
                                    false /* followSuper */))
         continue;
-
+      // @mulle-objc@ allow protocol methods to be redeclared as optional >
+      if (ObjCMethodDecl *NearestMethod =
+         IDecl->lookupMethod(method->getSelector(),
+                             true /* instance */,
+                             false /* shallowCategoryLookup */,
+                             true /* followSuper */))
+         if ( NearestMethod->getImplementationControl() == ObjCMethodDecl::Optional)
+            continue;      
+      // @mulle-objc@ allow protocol methods to be redeclared as optional <
       unsigned DIAG = diag::warn_unimplemented_protocol_method;
       if (!S.Diags.isIgnored(DIAG, ImpLoc)) {
         WarnUndefinedMethod(S, ImpLoc, method, IncompleteImpl, DIAG, PDecl);

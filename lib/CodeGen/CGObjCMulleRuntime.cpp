@@ -5396,29 +5396,29 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
       LoadStrings.push_back( expr);
    }
 
-   if( CGM.getCodeGenOpts().getDebugInfo() >= clang::codegenoptions::LimitedDebugInfo)
+   //
+   // emit these always, we need them for forwarding selectors
+   //
+   for (llvm::StringMap<llvm::ConstantInt *>::const_iterator
+         I = DefinedHashes.begin(), E = DefinedHashes.end();
+         I != E; ++I)
    {
-      for (llvm::StringMap<llvm::ConstantInt *>::const_iterator
-           I = DefinedHashes.begin(), E = DefinedHashes.end();
-           I != E; ++I)
-      {
-         llvm::Constant         *Values[2];
-         llvm::GlobalVariable   *String;
+      llvm::Constant         *Values[2];
+      llvm::GlobalVariable   *String;
 
-         String  = CreateMetadataVar( "OBJC_HASHNAME_" + I->getKey(),
-                                      llvm::ConstantDataArray::getString( VMContext, I->getKey()),
-                                      "__DATA,__module_info,regular,no_dead_strip",
-                                      4);
-         Values[0] = llvm::ConstantExpr::getBitCast( I->getValue(), ObjCTypes.ClassIDTy);
-         Values[1] = llvm::ConstantExpr::getBitCast( String, CGM.VoidPtrTy);
+      String  = CreateMetadataVar( "OBJC_HASHNAME_" + I->getKey(),
+                                    llvm::ConstantDataArray::getString( VMContext, I->getKey()),
+                                    "__DATA,__module_info,regular,no_dead_strip",
+                                    4);
+      Values[0] = llvm::ConstantExpr::getBitCast( I->getValue(), ObjCTypes.ClassIDTy);
+      Values[1] = llvm::ConstantExpr::getBitCast( String, CGM.VoidPtrTy);
 
-         llvm::Constant *expr = llvm::ConstantStruct::get( ObjCTypes.HashNameTy, Values);
+      llvm::Constant *expr = llvm::ConstantStruct::get( ObjCTypes.HashNameTy, Values);
 
-         EmitHashes.push_back( expr);
-      }
-      llvm::array_pod_sort( EmitHashes.begin(), EmitHashes.end(),
-                            uniqueid_comparator);
+      EmitHashes.push_back( expr);
    }
+   llvm::array_pod_sort( EmitHashes.begin(), EmitHashes.end(),
+                           uniqueid_comparator);
 
 
    // if we are called from CreateLLVMCodeGen and friends, the ParserDidFinish

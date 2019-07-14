@@ -8,26 +8,41 @@ Executable          | Description
 
 ## Prerequisites
 
+### Filespace / Cores
+
 You need a fairly current Unix, like Linux, OS X or FreeBSD or you can use
 Windows.
 
-Locate a place on your filesystem, where you have at least 8 GB disk space free
+Locate a place on your filesystem, where you have at least 4 GB disk space free
 after installing all pre-requisites. You probably need not bother to try, if
-you have less than 6 GB of RAM. Or you risk seeing
+you have less than 2 GB of RAM. Or you risk seeing
 `virtual memory exhausted: Cannot allocate memory`, especially when building
 debug binaries.
 
 A docker container usually only has 10 GB of space. That may not be enough to
-build the compiler!
+build the compiler with debug symbols!
 
 If you are configuring a virtual machine, give it some more cores!
 
 
+### Compiler
+
+Generally speaking clang and it's constituent libraries compile better with `clang` than
+with `gcc`. For example on the Raspberry Pi, `gcc` will not be able to compile the
+C++ library for some reason.
+
+
 ## Installing on Linux or FreeBSD
 
-You need the **bash** shell and **curl** (or **wget** )and you may want to get **sudo** happening to
-install packages (or run the script as **root**). bash is usually already present.
+You need the **bash** shell and **curl** (or **wget**) and you may want to get **sudo** happening to
+install packages (or run the script as **root**). bash is usually already present. Having
+[ninja](https://ninja-build.org/) installed, should speed up the build somewhat:
 
+On Debian/Linux:
+
+```
+apt-get install apt-transport-https lsb-release sudo wget curl
+```
 
 <a name="common-generic"></a>
 ### Common generic instructions
@@ -44,7 +59,7 @@ as this project is huge.
 ```
 mkdir mulle-clang
 cd mulle-clang
-curl -L -O "https://raw.githubusercontent.com/Codeon-GmbH/mulle-clang/mulle_objclang_70/bin/install-mulle-clang"
+curl -L -O "https://raw.githubusercontent.com/Codeon-GmbH/mulle-clang/mulle_objclang_80/bin/install-mulle-clang"
 ```
 
 2. Build the compiler. Here is an example, where the compiler is installed into
@@ -56,8 +71,7 @@ chmod 755 install-mulle-clang
 ./install-mulle-clang install --symlink-prefix /usr/local
 ```
 
-Depending on your platform, the script will ask you to install some more
-prerequisites.
+Depending on your platform, the script will ask you to install some more prerequisites.
 
 
 ## Windows: Installing further prerequisites

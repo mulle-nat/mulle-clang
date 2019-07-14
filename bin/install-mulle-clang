@@ -69,7 +69,8 @@ EOF
    --lldb-debug         : build lldb with debug
    --separate           : place mulle-clang outside of src/llvm (implied -no-lldb)
    -n                   : dry run
-   -v                   : be verbose
+   -v                   : be verbose (show more options)
+   -y                   : answer YES to apt-get install questions
 EOF
       if [ "${VERBOSE}" = "YES" ]
       then
@@ -104,6 +105,11 @@ Commands:
    download             : download only
    build                : build only
    uninstall            : remove links
+
+Environment:
+   CC  : c compiler
+   CXX : c++ compiler
+   LD  : linker
 EOF
 
    exit 1
@@ -437,7 +443,7 @@ install_library_if_missing()
                if ! dpkg -s "$1" > /dev/null 2>&1
                then
                   log_info "You may get asked for your password to install $1"
-                  sudo_if_needed apt-get install "$1" || exit 1
+                  sudo_if_needed apt-get ${APT_GET_INSTALL_FLAGS} install "$1" || exit 1
                fi
             else
                if command -v "yum" > /dev/null 2>&1
@@ -503,7 +509,7 @@ install_binary_if_missing()
             if command -v "apt-get" > /dev/null 2>&1
             then
                log_info "You may get asked for your password to install $1"
-               sudo_if_needed apt-get install "$1" || exit 1
+               sudo_if_needed apt-get ${APT_GET_INSTALL_FLAGS} install "$1" || exit 1
             else
                if command -v "yum" > /dev/null 2>&1
                then
@@ -1198,7 +1204,8 @@ r_generic_llvm_options()
   fi
 
   RVAL="${RVAL} \
--DLLVM_TARGETS_TO_BUILD='${OPTION_TARGETS}'"
+-DLLVM_TARGETS_TO_BUILD='${OPTION_TARGETS}' \
+-${OPTION_LLVM_AUX}"
 }
 
 
@@ -1688,6 +1695,11 @@ main()
             MULLE_FLAG_LOG_EXECUTOR="YES"
          ;;
 
+         -y)
+            APT_GET_INSTALL_FLAGS='-y'
+            export DEBIAN_FRONTEND=noninteractive
+         ;;
+
          --all-in-one)
             BY_THE_BOOK="STRICT"
          ;;
@@ -1906,9 +1918,17 @@ main()
    # just very experimental and rudimentary for now
    # We assume that PREFIX is set to an existing clang, and we then
    # just posfix the architecture onto it
+   #
    case "${TARGET_ARCH}" in
       "")
          HOST_PATH="$PATH"
+         case "`uname -m`" in
+            [Aa][Rr][Mm]*)
+               OPTION_TARGETS="ARM;X86;AArch64"  # X86 required for Compiler-RT tests
+               # OPTION_LLVM_AUX="-DLIBCXXABI_USE_LLVM_UNWINDER:BOOL=ON" # m
+               CC="${CC:-clang}"       # no luck with gcc on ARM (Raspberry/Raspian)
+            ;;
+         esac
       ;;
 
       "ARM"|"AArch64")
@@ -1920,7 +1940,7 @@ main()
          BUILD_DIR="${BUILD_DIR}.${TARGET_ARCH}"
          if [ "${OPTION_TARGETS}" = "DEFAULT" ]
          then
-            OPTION_TARGETS="ARM;AArch64"
+            OPTION_TARGETS="ARM;X86;AArch64"  # X86 required for Compiler-RT tests
          fi
       ;;
 
@@ -1929,6 +1949,7 @@ main()
 ${C_INFO}See: https://www.llvm.org/docs/HowToCrossCompileLLVM.html"
       ;;
    esac
+
 
    # modify this so clang build separate picks up llvm_config
    PATH="${PREFIX}/bin:${HOST_PATH}"; export PATH

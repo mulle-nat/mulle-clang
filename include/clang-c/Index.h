@@ -3243,8 +3243,9 @@ enum CXTypeKind {
   CXType_UShortAccum = 36,
   CXType_UAccum = 37,
   CXType_ULongAccum = 38,
+  CXType_ObjCProtocol = 39,
   CXType_FirstBuiltin = CXType_Void,
-  CXType_LastBuiltin = CXType_ULongAccum,
+  CXType_LastBuiltin  = CXType_ObjCProtocol,
 
   CXType_Complex = 100,
   CXType_Pointer = 101,
@@ -4493,6 +4494,11 @@ typedef enum {
   CXObjCPropertyAttr_strong    = 0x400,
   CXObjCPropertyAttr_unsafe_unretained = 0x800,
   CXObjCPropertyAttr_class = 0x1000
+  // @mulle-objc@ new property attributes serializable and dynamic >
+  , CXObjCPropertyAttr_dynamic = 0x8000
+  , CXObjCPropertyAttr_serializable = 0x10000
+  , CXObjCPropertyAttr_nonserializable = 0x20000
+  // @mulle-objc@ new property attributes serializable and dynamic <
 } CXObjCPropertyAttrKind;
 
 /**

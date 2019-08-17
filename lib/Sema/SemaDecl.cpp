@@ -880,7 +880,8 @@ Sema::ClassifyName(Scope *S, CXXScopeSpec &SS, IdentifierInfo *&Name,
   // FIXME: This lookup really, really needs to be folded in to the normal
   // unqualified lookup mechanism.
   if (!SS.isSet() && CurMethod && !isResultTypeOrTemplate(Result, NextToken)) {
-    ExprResult E = LookupInObjCMethod(Result, S, Name, true);
+   // @mulle-objc@ compiler: added CXXScopeSpec to LookupInObjCMethod arguments
+    ExprResult E = LookupInObjCMethod(Result, S, SS, Name, true);
     if (E.get() || E.isInvalid())
       return E;
   }
@@ -991,7 +992,8 @@ Corrected:
         // FIXME: This is a gross hack.
         if (ObjCIvarDecl *Ivar = Result.getAsSingle<ObjCIvarDecl>()) {
           Result.clear();
-          ExprResult E(LookupInObjCMethod(Result, S, Ivar->getIdentifier()));
+          // @mulle-objc@ compiler: added CXXScopeSpec to LookupInObjCMethod arguments
+          ExprResult E(LookupInObjCMethod(Result, S, SS, Ivar->getIdentifier()));
           return E;
         }
 
@@ -1827,7 +1829,8 @@ static void CheckPoppedLabel(LabelDecl *L, Sema &S) {
 }
 
 void Sema::ActOnPopScope(SourceLocation Loc, Scope *S) {
-  S->mergeNRVOIntoParent();
+  if( getLangOpts().CPlusPlus)
+     S->mergeNRVOIntoParent();
 
   if (S->decl_empty()) return;
   assert((S->getFlags() & (Scope::DeclScope | Scope::TemplateParamScope)) &&
@@ -2188,6 +2191,15 @@ void Sema::MergeTypedefNameDecl(Scope *S, TypedefNameDecl *New,
       // Install the built-in type for 'Class', ignoring the current definition.
       New->setTypeForDecl(Context.getObjCClassType().getTypePtr());
       return;
+    /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+    case 8:
+      if (!TypeID->isStr("PROTOCOL"))
+        break;
+      Context.setObjCPROTOCOLRedefinitionType(New->getUnderlyingType());
+      // Install the built-in type for 'PROTOCOL', ignoring the current definition.
+      New->setTypeForDecl(Context.getObjCPROTOCOLType().getTypePtr());
+      return;
+    /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
     case 3:
       if (!TypeID->isStr("SEL"))
         break;

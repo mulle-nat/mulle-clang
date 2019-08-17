@@ -1203,6 +1203,18 @@ def err_omp_mapper_illegal_identifier : Error<
 def err_omp_mapper_expected_declarator : Error<
   "expected declarator on 'omp declare mapper' directive">;
 
+// @mulle-objc@ Mulle ObjC diagnostics >
+def err_mulle_objc_no_nullable : Error<
+  "nullable is not supported in Mulle ObjC (everything is nullable by default)">;
+def err_mulle_objc_no_package : Error<
+  "@package is not supported in Mulle ObjC">;
+def err_mulle_objc_no_class_extension : Error<
+  "Class extensions are not really supported in Mulle ObjC">;
+def err_mulle_objc_no_cpp_generics : Error<
+  "C++ like generics are not supported in Mulle ObjC">;
+def err_mulle_objc_no_support_for_property_modifier  : Error<
+  "%0 is a property attribute that is is not supported in Mulle ObjC">;
+// @mulle-objc@ Mulle ObjC diagnostics <
 // Pragma loop support.
 def err_pragma_loop_missing_argument : Error<
   "missing argument; expected %select{an integer value|"

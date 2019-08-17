@@ -288,7 +288,14 @@ Decl *Parser::ParseObjCAtInterfaceDeclaration(SourceLocation AtLoc,
         EndProtoLoc, attrs);
 
     if (Tok.is(tok::l_brace))
-      ParseObjCClassInstanceVariables(CategoryType, tok::objc_private, AtLoc);
+    // @mulle-objc@ language: no class extensions
+    {
+       if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+          Diag(Tok, diag::err_mulle_objc_no_class_extension);
+       else
+       ParseObjCClassInstanceVariables(CategoryType, tok::objc_private, AtLoc);
+    }
+    // @mulle-objc@ language: no class extensions <
 
     ParseObjCInterfaceDeclList(tok::objc_not_keyword, CategoryType);
 
@@ -431,6 +438,11 @@ ObjCTypeParamList *Parser::parseObjCTypeParamListOrProtocolRefs(
   SmallVector<Decl *, 4> typeParams;
   auto makeProtocolIdentsIntoTypeParameters = [&]() {
     unsigned index = 0;
+
+    // @mulle-objc@ language: turn off generics
+    if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+      Diag(Tok, diag::err_mulle_objc_no_cpp_generics);
+    else
     for (const auto &pair : protocolIdents) {
       DeclResult typeParam = Actions.actOnObjCTypeParam(
           getCurScope(), ObjCTypeParamVariance::Invariant, SourceLocation(),
@@ -862,6 +874,31 @@ void Parser::ParseObjCPropertyAttribute(ObjCDeclSpec &DS) {
 
     SourceLocation AttrName = ConsumeToken(); // consume last attribute name
 
+    // @mulle-objc@ language: remove strong, weak and friends >
+    if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+    {
+      //  check that we know it, could also issue a warning maybe ?
+      if( ! (II->isStr("readonly") ||
+             II->isStr("assign") ||
+             II->isStr("retain") ||
+             II->isStr("readwrite") ||
+             II->isStr("copy") ||
+             II->isStr("nonnull") ||
+             II->isStr("nonatomic") ||
+             II->isStr("dynamic") ||
+             II->isStr("serializable") ||
+             II->isStr("nonserializable") ||
+             II->isStr("getter") ||
+             II->isStr("setter")))
+      {
+        Diag(Tok, diag::err_mulle_objc_no_support_for_property_modifier)
+          << II->getNameStart();
+        SkipUntil(tok::r_paren, StopAtSemi);
+        return;
+      }
+    }
+    // @mulle-objc@ language: remove strong, weak and friends <
+
     if (II->isStr("readonly"))
       DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_readonly);
     else if (II->isStr("assign"))
@@ -882,6 +919,14 @@ void Parser::ParseObjCPropertyAttribute(ObjCDeclSpec &DS) {
       DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_atomic);
     else if (II->isStr("weak"))
       DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_weak);
+  // @mulle-objc@ new property attributes serializable and dynamic >
+    else if (II->isStr("dynamic"))
+      DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_dynamic);
+    else if (II->isStr("serializable"))
+      DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_serializable);
+    else if (II->isStr("nonserializable"))
+      DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_nonserializable);
+  // @mulle-objc@ new property attributes serializable and dynamic <
     else if (II->isStr("getter") || II->isStr("setter")) {
       bool IsSetter = II->getNameStart()[0] == 's';
 
@@ -1178,9 +1223,16 @@ void Parser::ParseObjCTypeQualifierList(ObjCDeclSpec &DS,
         break;
 
       case objc_nullable:
-        Qual = ObjCDeclSpec::DQ_CSNullability;
-        Nullability = NullabilityKind::Nullable;
-        break;
+        // @mulle-objc@ language: remove nullable which is the wrong philosophy
+        if( ! getLangOpts().ObjCRuntime.hasMulleMetaABI())
+        {
+           Qual = ObjCDeclSpec::DQ_CSNullability;
+           Nullability = NullabilityKind::Nullable;
+           break;
+        }
+        Diag(Tok, diag::err_mulle_objc_no_nullable);
+        LLVM_FALLTHROUGH;
+        // fallthru to unspecified
 
       case objc_null_unspecified:
         Qual = ObjCDeclSpec::DQ_CSNullability;
@@ -1930,10 +1982,18 @@ void Parser::ParseObjCClassInstanceVariables(Decl *interfaceDecl,
       }
 
       switch (Tok.getObjCKeywordID()) {
+      case tok::objc_package:
+        // @mulle-objc@ no JAVA package for mulle-objc >
+        if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+        {
+          Diag(Tok, diag::err_mulle_objc_no_package);
+          continue;
+        }
+        LLVM_FALLTHROUGH;
+        // @mulle-objc@ no JAVA package for mulle-objc <
       case tok::objc_private:
       case tok::objc_public:
       case tok::objc_protected:
-      case tok::objc_package:
         visibility = Tok.getObjCKeywordID();
         ConsumeToken();
         continue;
@@ -3297,6 +3357,22 @@ Parser::ParseObjCMessageExpressionBody(SourceLocation LBracLoc,
 
   unsigned nKeys = KeyIdents.size();
   if (nKeys == 0) {
+    // @mulle-objc@ AAM:  replace alloc/copy/mutableCopy with instantiate & Co >
+    if( getLangOpts().ObjCAllocsAutoreleasedObjects && selIdent)
+    {
+       StringRef   s;
+
+       s = selIdent->getName();
+       if( s.equals( "alloc"))
+          selIdent = &PP.getIdentifierTable().get( "instantiate");
+       else if( s.equals( "new"))
+          selIdent = &PP.getIdentifierTable().get( "instantiatedObject");
+       else if( s.equals( "copy"))
+          selIdent = &PP.getIdentifierTable().get( "immutableInstance");
+       else if( s.equals( "mutableCopy"))
+          selIdent = &PP.getIdentifierTable().get( "mutableInstance");
+    }
+    // @mulle-objc@ AAM:  replace alloc/copy/mutableCopy with instantiate & Co <
     KeyIdents.push_back(selIdent);
     KeyLocs.push_back(Loc);
   }

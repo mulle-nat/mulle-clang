@@ -154,6 +154,12 @@ private:
   void *ParamsAndSelLocs = nullptr;
   unsigned NumParams = 0;
 
+  // @mulle-objc@ MetaABI: ivars ParamRecord
+  RecordDecl    *ParamRecord;
+
+  // return value record (if needed)
+  RecordDecl    *RvalRecord;
+
   /// List of attributes for this method declaration.
   SourceLocation DeclEndLoc; // the location of the ';' or '{'.
 
@@ -167,6 +173,13 @@ private:
   /// CmdDecl - Decl for the implicit _cmd parameter. This is lazily
   /// constructed by createImplicitParams.
   ImplicitParamDecl *CmdDecl = nullptr;
+
+   /// @mulle-objc@ MetaABI: ParamDecl storage of declaration >>>
+   /// Para,Decl - Decl for the implicit _param parameter. This is lazily
+   /// constructed by ActOnMethodDeclaration.
+  ImplicitParamDecl *ParamDecl;
+  bool              _isMetaABIVoidPointerParam;
+   /// @mulle-objc@ MetaABI: ParamDecl storage of declaration <<<
 
   ObjCMethodDecl(SourceLocation beginLoc, SourceLocation endLoc,
                  Selector SelInfo, QualType T, TypeSourceInfo *ReturnTInfo,
@@ -398,6 +411,26 @@ public:
   param_type_iterator param_type_end() const {
     return llvm::map_iterator(param_end(), GetTypeFn());
   }
+
+  // @mulle-objc@ MetaABI: paramRecord, paramDecl accessors
+  // struct {}
+  RecordDecl   *getParamRecord() const { return ParamRecord; }
+  void setParamRecord( RecordDecl  *RD) { ParamRecord = RD; }
+
+  // struct {}  *param
+  ImplicitParamDecl * getParamDecl() const { return ParamDecl; }
+  void setParamDecl(ImplicitParamDecl *PD) { ParamDecl = PD; }
+
+  bool isMetaABIVoidPointerParam() const { return _isMetaABIVoidPointerParam; }
+  void setMetaABIVoidPointerParam(bool Flag) { _isMetaABIVoidPointerParam = Flag; }
+
+  // struct {} rval;
+  RecordDecl   *getRvalRecord() const { return RvalRecord; }
+  void setRvalRecord( RecordDecl  *RD) { RvalRecord = RD; }
+
+
+  // @mulle-objc@ MetaABI:  method FindParamRecordField for parameters
+  FieldDecl  *FindParamRecordField( IdentifierInfo *II);
 
   /// createImplicitParams - Used to lazily create the self and cmd
   /// implict parameters. This must be called prior to using getSelfDecl()
@@ -748,12 +781,18 @@ public:
     OBJC_PR_nullability = 0x1000,
     OBJC_PR_null_resettable = 0x2000,
     OBJC_PR_class = 0x4000
+    // @mulle-objc@ new property attributes serializable and dynamic >
+    , OBJC_PR_dynamic         = 0x08000
+    , OBJC_PR_serializable    = 0x10000
+    , OBJC_PR_nonserializable = 0x20000
+    // MEMO: change NumPropertyAttrsBits below when adding 
+    // @mulle-objc@ new property attributes serializable and dynamic <
     // Adding a property should change NumPropertyAttrsBits
   };
 
   enum {
     /// Number of bits fitting all the property attributes.
-    NumPropertyAttrsBits = 15
+    NumPropertyAttrsBits = 18
   };
 
   enum SetterKind { Assign, Retain, Copy, Weak };
@@ -1503,6 +1542,9 @@ public:
   /// objc_runtime_name attribute or class name.
   StringRef getObjCRuntimeNameAsString() const;
 
+// @mulle-objc@ codegen: make an ivar hash string for fragility fix
+  std::string  getIvarHashString( ASTContext &C) const;
+
   /// Returns the designated initializers for the interface.
   ///
   /// If this declaration does not have methods marked as designated
@@ -1832,6 +1874,15 @@ public:
     ObjCInterfaceDecl *ClassDeclared;
     return lookupInstanceVariable(IVarName, ClassDeclared);
   }
+
+// @mulle-objc@ language: compatible lookup of instance variable for property
+  ObjCIvarDecl *lookupInstanceVariableOfProperty( ASTContext &C, IdentifierInfo *PropertyName,
+                                       ObjCInterfaceDecl *&ClassDeclared);
+  ObjCIvarDecl *lookupInstanceVariableOfProperty( ASTContext &C, IdentifierInfo *PropertyName) {
+    ObjCInterfaceDecl *ClassDeclared;
+    return lookupInstanceVariableOfProperty( C, PropertyName, ClassDeclared);
+  }
+
 
   ObjCProtocolDecl *lookupNestedProtocol(IdentifierInfo *Name);
 
@@ -2680,6 +2731,9 @@ public:
   std::string getNameAsString() const {
     return getName();
   }
+
+  // @mulle-objc@ codegen: make an ivar hash string for fragility fix
+  std::string getIvarHashString() const;
 
   /// Produce a name to be used for class's metadata. It comes either via
   /// class's objc_runtime_name attribute or class name.

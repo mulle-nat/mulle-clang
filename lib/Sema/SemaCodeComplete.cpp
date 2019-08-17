@@ -825,6 +825,9 @@ SimplifiedTypeClass clang::getSimplifiedTypeClass(CanQualType T) {
     case BuiltinType::ObjCId:
     case BuiltinType::ObjCClass:
     case BuiltinType::ObjCSel:
+    /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+    case BuiltinType::ObjCProtocol:
+    /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
       return STC_ObjectiveC;
 
     default:
@@ -1507,6 +1510,9 @@ static bool isObjCReceiverType(ASTContext &C, QualType T) {
     case BuiltinType::ObjCId:
     case BuiltinType::ObjCClass:
     case BuiltinType::ObjCSel:
+    /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL >
+    case BuiltinType::ObjCProtocol:
+    /// @mulle-objc@ uniqueid: add builtin type for PROTOCOL <
       return true;
 
     default:
@@ -5986,8 +5992,10 @@ static void AddObjCVisibilityResults(const LangOptions &LangOpts,
   Results.AddResult(Result(OBJC_AT_KEYWORD_NAME(NeedAt, "private")));
   Results.AddResult(Result(OBJC_AT_KEYWORD_NAME(NeedAt, "protected")));
   Results.AddResult(Result(OBJC_AT_KEYWORD_NAME(NeedAt, "public")));
-  if (LangOpts.ObjC)
+  // @mulle-objc@ no support for Java :) package >
+  if (LangOpts.ObjC && ! LangOpts.ObjCRuntime.hasMulleMetaABI())
     Results.AddResult(Result(OBJC_AT_KEYWORD_NAME(NeedAt, "package")));
+  // @mulle-objc@ no support for Java :) package <
 }
 
 void Sema::CodeCompleteObjCAtVisibility(Scope *S) {
@@ -6084,6 +6092,14 @@ void Sema::CodeCompleteObjCPropertyFlags(Scope *S, ObjCDeclSpec &ODS) {
     Results.AddResult(CodeCompletionResult("nonatomic"));
   if (!ObjCPropertyFlagConflicts(Attributes, ObjCDeclSpec::DQ_PR_atomic))
     Results.AddResult(CodeCompletionResult("atomic"));
+  // @mulle-objc@ new property attributes serializable and dynamic <
+  if (!ObjCPropertyFlagConflicts(Attributes, ObjCDeclSpec::DQ_PR_dynamic))
+    Results.AddResult(CodeCompletionResult("dynamic"));
+  if (!ObjCPropertyFlagConflicts(Attributes, ObjCDeclSpec::DQ_PR_serializable))
+    Results.AddResult(CodeCompletionResult("serializable"));
+  if (!ObjCPropertyFlagConflicts(Attributes, ObjCDeclSpec::DQ_PR_nonserializable))
+    Results.AddResult(CodeCompletionResult("nonserializable"));
+  // @mulle-objc@ new property attributes serializable and dynamic <
 
   // Only suggest "weak" if we're compiling for ARC-with-weak-references or GC.
   if (getLangOpts().ObjCWeak || getLangOpts().getGC() != LangOptions::NonGC)

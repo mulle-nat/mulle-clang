@@ -834,6 +834,12 @@ public:
     DQ_PR_nullability = 0x1000,
     DQ_PR_null_resettable = 0x2000,
     DQ_PR_class = 0x4000
+  // @mulle-objc@ new property attributes serializable and dynamic >
+    , DQ_PR_dynamic = 0x8000
+    , DQ_PR_serializable = 0x10000
+    , DQ_PR_nonserializable = 0x20000
+  // MEMO: add to property bits below if you add something
+  // @mulle-objc@ new property attributes serializable and dynamic <
   };
 
   ObjCDeclSpec()
@@ -903,7 +909,9 @@ private:
   unsigned objcDeclQualifier : 7;
 
   // NOTE: VC++ treats enums as signed, avoid using ObjCPropertyAttributeKind
-  unsigned PropertyAttributes : 15;
+  // @mulle-objc@ new property attributes serializable and dynamic >
+  unsigned PropertyAttributes : 18;  // added 3 bits
+  // @mulle-objc@ new property attributes serializable and dynamic <
 
   unsigned Nullability : 2;
 

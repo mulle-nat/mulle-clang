@@ -33,7 +33,11 @@ namespace {
     DiagnosticsEngine &Diags;
     ASTContext *Ctx;
     const HeaderSearchOptions &HeaderSearchOpts; // Only used for debug info.
+// @mulle-objc@ need PreprocessorOptions public >
+  public:
     const PreprocessorOptions &PreprocessorOpts; // Only used for debug info.
+// @mulle-objc@ need PreprocessorOptions public <
+  private:
     const CodeGenOptions CodeGenOpts;  // Intentionally copied in.
 
     unsigned HandlingTopLevelDecls;
@@ -279,12 +283,18 @@ namespace {
       Builder->EmitTentativeDefinition(D);
     }
 
+    /// @mulle-objc@ compiler: pass through Parser to ObjCRuntime when finished
+    void ParserDidFinish( Parser *P) override {
+       CGM().ParserDidFinish( P);
+    }
+     
     void HandleVTable(CXXRecordDecl *RD) override {
       if (Diags.hasErrorOccurred())
         return;
 
       Builder->EmitVTable(RD);
     }
+
   };
 }
 

@@ -255,6 +255,14 @@ public:
   /// Return the runtime function for setting properties.
   virtual llvm::FunctionCallee GetPropertySetFunction() = 0;
 
+  // @mulle-objc@ new property attributes container >
+  /// Return the runtime function for adding to container properties.
+  virtual llvm::FunctionCallee GetPropertyContainerAddFunction();
+
+  /// Return the runtime function for removing from container properties.
+  virtual llvm::FunctionCallee GetPropertyContainerRemoveFunction();
+  // @mulle-objc@ new property attributes container <
+
   /// Return the runtime function for optimized setting properties.
   virtual llvm::FunctionCallee GetOptimizedPropertySetFunction(bool atomic,
                                                                bool copy) = 0;

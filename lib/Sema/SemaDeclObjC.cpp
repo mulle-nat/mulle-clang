@@ -2809,7 +2809,7 @@ static void CheckProtocolMethodDefs(Sema &S,
                                       false /* shallowCategoryLookup */,
                                       true /* followSuper */))
               if ( NearestMethod->getImplementationControl() == ObjCMethodDecl::Optional)
-                continue;   
+                continue;
             // @mulle-objc@ allow protocol methods to be redeclared as optional <
 
             unsigned DIAG = diag::warn_unimplemented_protocol_method;
@@ -2841,7 +2841,7 @@ static void CheckProtocolMethodDefs(Sema &S,
                              false /* shallowCategoryLookup */,
                              true /* followSuper */))
          if ( NearestMethod->getImplementationControl() == ObjCMethodDecl::Optional)
-            continue;      
+            continue;
       // @mulle-objc@ allow protocol methods to be redeclared as optional <
       unsigned DIAG = diag::warn_unimplemented_protocol_method;
       if (!S.Diags.isIgnored(DIAG, ImpLoc)) {
@@ -3053,6 +3053,13 @@ void Sema::ImplMethodsVsClassMethods(Scope *S, ObjCImplDecl* IMPDecl,
     InsMap.insert(P->getGetterName());
     if (!P->getSetterName().isNull())
       InsMap.insert(P->getSetterName());
+
+    // @mulle-objc@ new property attribute container >
+    if (!P->getAdderName().isNull())
+      InsMap.insert(P->getAdderName());
+    if (!P->getRemoverName().isNull())
+      InsMap.insert(P->getRemoverName());
+    // @mulle-objc@ new property attribute container <
   }
 
   // Check and see if properties declared in the interface have either 1)
@@ -4093,6 +4100,14 @@ Decl *Sema::ActOnAtEnd(Scope *S, SourceRange AtEnd, ArrayRef<Decl *> allMethods,
               if (ObjCMethodDecl *SetterMethod
                     = Ext->getInstanceMethod(Property->getSetterName()))
                 SetterMethod->setPropertyAccessor(true);
+              // @mulle-objc@ new property attribute container >
+              if (ObjCMethodDecl *AdderMethod
+                    = Ext->getInstanceMethod(Property->getAdderName()))
+                AdderMethod->setPropertyAccessor(true);
+              if (ObjCMethodDecl *RemoverMethod
+                    = Ext->getInstanceMethod(Property->getRemoverName()))
+                RemoverMethod->setPropertyAccessor(true);
+              // @mulle-objc@ new property attribute container <
           }
         }
       }

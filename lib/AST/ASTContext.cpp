@@ -6461,6 +6461,9 @@ ASTContext::getObjCPropertyImplDeclForPropertyDecl(
 /// kPropertyStrong = 'P'            // property GC'able
 /// kPropertyNonAtomic = 'N'         // property non-atomic
 /// kPropertySerializable = 'E'      // property serializable (encodable)
+/// kPropertyContainer = 'K'         // property container (array)
+/// kPropertyGetter = '+',           // followed by adder selector name
+/// kPropertySetter = '-',           // followed by remover selector name
 /// };
 /// @endcode
 std::string
@@ -6513,12 +6516,14 @@ ASTContext::getObjCEncodingForPropertyDecl(const ObjCPropertyDecl *PD,
   if (Dynamic)
     S += ",D";
 
-  // @mulle-objc@ new property attributes serializable and dynamic >
+  // @mulle-objc@ new property attributes serializable, container, dynamic >
   // will only be emitted if non-implicitly declared as seriazable,
   // because we want to do E= in the future
+  if ( PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_container)
+    S += ",K";
   if ( PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_serializable)
     S += ",E";
-  // @mulle-objc@ new property attributes serializable and dynamic <
+  // @mulle-objc@ new property attributes serializable, container, dynamic <
 
   if (PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_nonatomic)
     S += ",N";
@@ -6532,6 +6537,17 @@ ASTContext::getObjCEncodingForPropertyDecl(const ObjCPropertyDecl *PD,
     S += ",S";
     S += PD->getSetterName().getAsString();
   }
+
+  // @mulle-objc@ new property attributes container >
+  if (PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_adder) {
+    S += ",+";
+    S += PD->getAdderName().getAsString();
+  }
+  if (PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_remover) {
+    S += ",-";
+    S += PD->getRemoverName().getAsString();
+  }
+  // @mulle-objc@ new property attributes container <
 
   if (SynthesizePID) {
     const ObjCIvarDecl *OID = SynthesizePID->getPropertyIvarDecl();

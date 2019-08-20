@@ -432,6 +432,14 @@ def err_objc_expected_equal_for_setter : Error<
   "expected '=' for Objective-C setter">;
 def err_objc_expected_selector_for_getter_setter : Error<
   "expected selector for Objective-C %select{setter|getter}0">;
+
+// @mulle-objc@ new property attributes container >
+def err_objc_expected_equal_for_method : Error<
+  "expected '=' for Objective-C %0">;
+def err_objc_expected_selector_for_method : Error<
+  "expected selector for Objective-C %0">;
+// @mulle-objc@ new property attributes container <
+
 def err_objc_property_requires_field_name : Error<
   "property requires fields to be named">;
 def err_objc_property_bitfield : Error<"property name cannot be a bit-field">;

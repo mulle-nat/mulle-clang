@@ -180,6 +180,10 @@ Decl *Sema::ActOnProperty(Scope *S, SourceLocation AtLoc,
                           ObjCDeclSpec &ODS,
                           Selector GetterSel,
                           Selector SetterSel,
+// @mulle-objc@ new property attribute container >
+                          Selector AdderSel,
+                          Selector RemoverSel,
+// @mulle-objc@ new property attribute container <
                           tok::ObjCKeywordKind MethodImplKind,
                           DeclContext *lexicalDC) {
   unsigned Attributes = ODS.getPropertyAttributes();
@@ -209,6 +213,8 @@ Decl *Sema::ActOnProperty(Scope *S, SourceLocation AtLoc,
                                            FD,
                                            GetterSel, ODS.getGetterNameLoc(),
                                            SetterSel, ODS.getSetterNameLoc(),
+                                           AdderSel, ODS.getAdderNameLoc(),
+                                           RemoverSel, ODS.getRemoverNameLoc(),
                                            isReadWrite, Attributes,
                                            ODS.getPropertyAttributes(),
                                            T, TSI, MethodImplKind);
@@ -220,7 +226,10 @@ Decl *Sema::ActOnProperty(Scope *S, SourceLocation AtLoc,
   if (!Res) {
     Res = CreatePropertyDecl(S, ClassDecl, AtLoc, LParenLoc, FD,
                              GetterSel, ODS.getGetterNameLoc(), SetterSel,
-                             ODS.getSetterNameLoc(), isReadWrite, Attributes,
+                             ODS.getSetterNameLoc(),
+                             AdderSel, ODS.getAdderNameLoc(),
+                             RemoverSel, ODS.getRemoverNameLoc(),
+                             isReadWrite, Attributes,
                              ODS.getPropertyAttributes(), T, TSI,
                              MethodImplKind);
     if (lexicalDC)
@@ -353,14 +362,20 @@ makePropertyAttributesAsWritten(unsigned Attributes) {
     attributesAsWritten |= ObjCPropertyDecl::OBJC_PR_atomic;
   if (Attributes & ObjCDeclSpec::DQ_PR_class)
     attributesAsWritten |= ObjCPropertyDecl::OBJC_PR_class;
-  // @mulle-objc@ new property attributes serializable and dynamic >
+  // @mulle-objc@ new property attributes serializable, container, dynamic >
   if (Attributes & ObjCDeclSpec::DQ_PR_dynamic)
     attributesAsWritten |= ObjCPropertyDecl::OBJC_PR_dynamic;
   if (Attributes & ObjCDeclSpec::DQ_PR_serializable)
     attributesAsWritten |= ObjCPropertyDecl::OBJC_PR_serializable;
   if (Attributes & ObjCDeclSpec::DQ_PR_nonserializable)
     attributesAsWritten |= ObjCPropertyDecl::OBJC_PR_nonserializable;
-  // @mulle-objc@ new property attributes serializable and dynamic <
+  if (Attributes & ObjCDeclSpec::DQ_PR_nonserializable)
+    attributesAsWritten |= ObjCPropertyDecl::OBJC_PR_container;
+  if (Attributes & ObjCDeclSpec::DQ_PR_adder)
+    attributesAsWritten |= ObjCPropertyDecl::OBJC_PR_adder;
+  if (Attributes & ObjCDeclSpec::DQ_PR_remover)
+    attributesAsWritten |= ObjCPropertyDecl::OBJC_PR_remover;
+  // @mulle-objc@ new property attributes serializable, container, dynamic <
 
   return (ObjCPropertyDecl::PropertyAttributeKind)attributesAsWritten;
 }
@@ -472,6 +487,12 @@ Sema::HandlePropertyInClassExtension(Scope *S,
                                      SourceLocation GetterNameLoc,
                                      Selector SetterSel,
                                      SourceLocation SetterNameLoc,
+// @mulle-objc@ new property attributes container >
+                                     Selector AdderSel,
+                                     SourceLocation AdderNameLoc,
+                                     Selector RemoverSel,
+                                     SourceLocation RemoverNameLoc,
+// @mulle-objc@ new property attributes container <
                                      const bool isReadWrite,
                                      unsigned &Attributes,
                                      const unsigned AttributesAsWritten,
@@ -542,6 +563,10 @@ Sema::HandlePropertyInClassExtension(Scope *S,
       Attributes |= ObjCDeclSpec::DQ_PR_getter;
     }
 
+    // @mulle-objc@ new property attributes serializable, container, dynamic >
+    // TODO: add consistency checks, but so far its unclear what they should be
+    // @mulle-objc@ new property attributes serializable, container, dynamic <
+
     // Check consistency of ownership.
     unsigned ExistingOwnership
       = getOwnershipRule(PIDecl->getPropertyAttributes());
@@ -573,6 +598,10 @@ Sema::HandlePropertyInClassExtension(Scope *S,
   ObjCPropertyDecl *PDecl = CreatePropertyDecl(S, CDecl, AtLoc, LParenLoc,
                                                FD, GetterSel, GetterNameLoc,
                                                SetterSel, SetterNameLoc,
+// @mulle-objc@ new property attributes container >
+                                               AdderSel, AdderNameLoc,
+                                               RemoverSel, RemoverNameLoc,
+// @mulle-objc@ new property attributes container <
                                                isReadWrite,
                                                Attributes, AttributesAsWritten,
                                                T, TSI, MethodImplKind, DC);
@@ -625,6 +654,12 @@ ObjCPropertyDecl *Sema::CreatePropertyDecl(Scope *S,
                                            SourceLocation GetterNameLoc,
                                            Selector SetterSel,
                                            SourceLocation SetterNameLoc,
+// @mulle-objc@ new property attributes container >
+                                           Selector AdderSel,
+                                           SourceLocation AdderNameLoc,
+                                           Selector RemoverSel,
+                                           SourceLocation RemoverNameLoc,
+// @mulle-objc@ new property attributes container <
                                            const bool isReadWrite,
                                            const unsigned Attributes,
                                            const unsigned AttributesAsWritten,
@@ -704,6 +739,10 @@ ObjCPropertyDecl *Sema::CreatePropertyDecl(Scope *S,
   // selector names in anticipation of declaration of setter/getter methods.
   PDecl->setGetterName(GetterSel, GetterNameLoc);
   PDecl->setSetterName(SetterSel, SetterNameLoc);
+// @mulle-objc@ new property attributes container >
+  PDecl->setAdderName(AdderSel, AdderNameLoc);
+  PDecl->setRemoverName(RemoverSel, RemoverNameLoc);
+// @mulle-objc@ new property attributes container <
   PDecl->setPropertyAttributesAsWritten(
                           makePropertyAttributesAsWritten(AttributesAsWritten));
 
@@ -754,14 +793,20 @@ ObjCPropertyDecl *Sema::CreatePropertyDecl(Scope *S,
   else if (MethodImplKind == tok::objc_optional)
     PDecl->setPropertyImplementation(ObjCPropertyDecl::Optional);
 
-  // @mulle-objc@ new property attributes serializable and dynamic >
+  // @mulle-objc@ new property attributes serializable, container, dynamic >
   if (Attributes & ObjCDeclSpec::DQ_PR_dynamic)
     PDecl->setPropertyAttributes(ObjCPropertyDecl::OBJC_PR_dynamic);
   if (Attributes & ObjCDeclSpec::DQ_PR_serializable)
     PDecl->setPropertyAttributes(ObjCPropertyDecl::OBJC_PR_serializable);
   if (Attributes & ObjCDeclSpec::DQ_PR_nonserializable)
     PDecl->setPropertyAttributes(ObjCPropertyDecl::OBJC_PR_nonserializable);
-  // @mulle-objc@ new property attributes nonserializable and dynamic <
+  if (Attributes & ObjCDeclSpec::DQ_PR_container)
+    PDecl->setPropertyAttributes(ObjCPropertyDecl::OBJC_PR_container);
+  if (Attributes & ObjCDeclSpec::DQ_PR_adder)
+    PDecl->setPropertyAttributes(ObjCPropertyDecl::OBJC_PR_adder);
+  if (Attributes & ObjCDeclSpec::DQ_PR_remover)
+    PDecl->setPropertyAttributes(ObjCPropertyDecl::OBJC_PR_remover);
+  // @mulle-objc@ new property attributes serializable, container, dynamic <
 
   if (Attributes & ObjCDeclSpec::DQ_PR_nullability)
     PDecl->setPropertyAttributes(ObjCPropertyDecl::OBJC_PR_nullability);
@@ -940,6 +985,10 @@ SelectPropertyForSynthesisFromProtocols(Sema &S, SourceLocation AtLoc,
     IncompatibleType = 0,
     HasNoExpectedAttribute,
     HasUnexpectedAttribute,
+// @mulle-objc@ new property attribute container >
+    DifferentAdder,
+    DifferentRemover,
+// @mulle-objc@ new property attribute container <
     DifferentGetter,
     DifferentSetter
   };
@@ -998,6 +1047,20 @@ SelectPropertyForSynthesisFromProtocols(Sema &S, SourceLocation AtLoc,
       Mismatches.push_back({Prop, DifferentSetter, ""});
       continue;
     }
+
+    // @mulle-objc@ new property attribute container >
+    if (!Property->isReadOnly() && !Prop->isReadOnly() &&
+        Property->getAdderName() != Prop->getAdderName()) {
+      Mismatches.push_back({Prop, DifferentAdder, ""});
+      continue;
+    }
+    if (!Property->isReadOnly() && !Prop->isReadOnly() &&
+        Property->getRemoverName() != Prop->getRemoverName()) {
+      Mismatches.push_back({Prop, DifferentRemover, ""});
+      continue;
+    }
+    // @mulle-objc@ new property attribute container <
+
     QualType LHSType = S.Context.getCanonicalType(Prop->getType());
     if (!S.Context.propertyTypesAreCompatible(LHSType, RHSType)) {
       bool IncompatibleObjC = false;
@@ -1034,6 +1097,14 @@ SelectPropertyForSynthesisFromProtocols(Sema &S, SourceLocation AtLoc,
     case HasUnexpectedAttribute:
       Diag << Mismatches[0].AttributeName;
       break;
+    // @mulle-objc@ new property attribute container >
+    case DifferentAdder:
+      Diag << Property->getAdderName();
+      break;
+    case DifferentRemover:
+      Diag << Property->getRemoverName();
+      break;
+    // @mulle-objc@ new property attribute container <
     case DifferentGetter:
       Diag << Property->getGetterName();
       break;
@@ -1054,6 +1125,14 @@ SelectPropertyForSynthesisFromProtocols(Sema &S, SourceLocation AtLoc,
     case HasUnexpectedAttribute:
       Diag << Note.AttributeName;
       break;
+    // @mulle-objc@ new property attribute container >
+    case DifferentAdder:
+      Diag << Note.Prop->getAdderName();
+      break;
+    case DifferentRemover:
+      Diag << Note.Prop->getRemoverName();
+      break;
+    // @mulle-objc@ new property attribute container <
     case DifferentGetter:
       Diag << Note.Prop->getGetterName();
       break;
@@ -1615,6 +1694,17 @@ Decl *Sema::ActOnPropertyImplDecl(Scope *S,
     }
   }
 
+  // @mulle-objc@ new property attribute container >>>
+  // Unsuccessfully Coping with the Natural Beauty of C++ copy/paste coding
+  // --- simplified, because we don't do C++ support --
+  if (ObjCMethodDecl *adderMethod = property->getAdderMethodDecl()) {
+    adderMethod->createImplicitParams(Context, IDecl);
+  }
+  if (ObjCMethodDecl *removerMethod = property->getRemoverMethodDecl()) {
+    removerMethod->createImplicitParams(Context, IDecl);
+  }
+  // @mulle-objc@ new property attribute container <<<
+
   if (IC) {
     if (Synthesize)
       if (ObjCPropertyImplDecl *PPIDecl =
@@ -1738,6 +1828,23 @@ Sema::DiagnosePropertyMismatch(ObjCPropertyDecl *Property,
       << Property->getDeclName() << "setter" << inheritedName;
     Diag(SuperProperty->getLocation(), diag::note_property_declare);
   }
+  // @mulle-objc@ new property attribute container >
+  if (Property->getAdderName() != SuperProperty->getAdderName() &&
+      !(SuperProperty->isReadOnly() &&
+        isa<ObjCProtocolDecl>(SuperProperty->getDeclContext()))) {
+    Diag(Property->getLocation(), diag::warn_property_attribute)
+      << Property->getDeclName() << "adder" << inheritedName;
+    Diag(SuperProperty->getLocation(), diag::note_property_declare);
+  }
+  if (Property->getRemoverName() != SuperProperty->getRemoverName() &&
+      !(SuperProperty->isReadOnly() &&
+        isa<ObjCProtocolDecl>(SuperProperty->getDeclContext()))) {
+    Diag(Property->getLocation(), diag::warn_property_attribute)
+      << Property->getDeclName() << "remover" << inheritedName;
+    Diag(SuperProperty->getLocation(), diag::note_property_declare);
+  }
+  // @mulle-objc@ new property attribute container <
+
   if (Property->getGetterName() != SuperProperty->getGetterName()) {
     Diag(Property->getLocation(), diag::warn_property_attribute)
       << Property->getDeclName() << "getter" << inheritedName;
@@ -1905,6 +2012,10 @@ Sema::IvarBacksCurrentMethodAccessor(ObjCInterfaceDecl *IFace,
   // by this method.
   for (const auto *Property : IFace->instance_properties()) {
     if ((Property->getGetterName() == IMD->getSelector() ||
+         // @mulle-objc@ new property attribute container >
+         Property->getAdderName() == IMD->getSelector() ||
+         Property->getRemoverName() == IMD->getSelector() ||
+         // @mulle-objc@ new property attribute container <
          Property->getSetterName() == IMD->getSelector()) &&
         (Property->getPropertyIvarDecl() == IV))
       return true;
@@ -1914,6 +2025,10 @@ Sema::IvarBacksCurrentMethodAccessor(ObjCInterfaceDecl *IFace,
   for (const auto *Ext : IFace->known_extensions())
     for (const auto *Property : Ext->instance_properties())
       if ((Property->getGetterName() == IMD->getSelector() ||
+           // @mulle-objc@ new property attribute container >
+           Property->getAdderName() == IMD->getSelector() ||
+           Property->getRemoverName() == IMD->getSelector() ||
+           // @mulle-objc@ new property attribute container <
            Property->getSetterName() == IMD->getSelector()) &&
           (Property->getPropertyIvarDecl() == IV))
         return true;
@@ -1934,6 +2049,14 @@ static bool SuperClassImplementsProperty(ObjCInterfaceDecl *IDecl,
 
     if (!SuperClassImplementsSetter && SDecl->getInstanceMethod(Prop->getSetterName()))
       SuperClassImplementsSetter = true;
+
+    // @mulle-objc@ new property attribute container >
+    if (!SuperClassImplementsSetter && SDecl->getInstanceMethod(Prop->getAdderName()))
+      SuperClassImplementsSetter = true;
+    if (!SuperClassImplementsSetter && SDecl->getInstanceMethod(Prop->getRemoverName()))
+      SuperClassImplementsSetter = true;
+    // @mulle-objc@ new property attribute container <
+
     if (SuperClassImplementsGetter && SuperClassImplementsSetter)
       return true;
     IDecl = IDecl->getSuperClass();
@@ -2200,6 +2323,10 @@ void Sema::diagnoseNullResettableSynthesizedSetters(const ObjCImplDecl *impDecl)
   for (const auto *propertyImpl : impDecl->property_impls()) {
     const auto *property = propertyImpl->getPropertyDecl();
 
+    // @mulle-objc@ new property attribute container <
+    // MEMO: nothing to do here, since we don't support OBJC_PR_null_resettable
+    // @mulle-objc@ new property attribute container <
+
     // Warn about null_resettable properties with synthesized setters,
     // because the setter won't properly handle nil.
     if (propertyImpl->getPropertyImplementation()
@@ -2431,12 +2558,127 @@ static void AddPropertyAttrs(Sema &S, ObjCMethodDecl *PropertyMethod,
   }
 }
 
+
+// @mulle-objc@ new property attribute container >>>
+
+void  Sema::VerifyPropertyNonGetterMethod( ObjCPropertyDecl *property,
+                                           ObjCMethodDecl *method,
+                                           std::string name)
+{
+  if (!property->isReadOnly() && method) {
+    if (Context.getCanonicalType(method->getReturnType()) !=
+        Context.VoidTy)
+      Diag(method->getLocation(),  diag::err_property_method_type_void) << name;
+    if (method->param_size() != 1 ||
+        !Context.hasSameUnqualifiedType(
+          (*method->param_begin())->getType().getNonReferenceType(),
+          property->getType().getNonReferenceType())) {
+      Diag(property->getLocation(),
+           diag::warn_accessor_property_type_mismatch)
+        << property->getDeclName()
+        << method->getSelector();
+      Diag(method->getLocation(), diag::note_declared_at);
+    }
+  }
+}
+
+
+ObjCMethodDecl  *Sema::CreatePropertyNonGetterMethod( ObjCContainerDecl *CD,
+                                                      ObjCPropertyDecl *property,
+                                                      Selector Selector)
+{
+   ObjCMethodDecl  *Method;
+
+   // No instance/class method of same name as property setter name was
+   // found.
+   // Declare a setter method and add it to the list of methods
+   // for this class.
+   SourceLocation Loc = property->getLocation();
+
+   Method =
+      ObjCMethodDecl::Create(Context, Loc, Loc,
+                              Selector, Context.VoidTy,
+                              nullptr, CD, !property->isClassProperty(),
+                              /*isVariadic=*/false,
+                              /*isPropertyAccessor=*/true,
+                              /*isImplicitlyDeclared=*/true,
+                              /*isDefined=*/false,
+                              (property->getPropertyImplementation() ==
+                              ObjCPropertyDecl::Optional) ?
+                              ObjCMethodDecl::Optional :
+                              ObjCMethodDecl::Required);
+
+   // Remove all qualifiers from the setter's parameter type.
+   QualType paramTy =
+         property->getType().getUnqualifiedType().getAtomicUnqualifiedType();
+
+   // If the property is null_resettable, the setter accepts a
+   // nullable value.
+   if (property->getPropertyAttributes() &
+         ObjCPropertyDecl::OBJC_PR_null_resettable) {
+      QualType modifiedTy = paramTy;
+      if (auto nullability = AttributedType::stripOuterNullability(modifiedTy)){
+         if (*nullability == NullabilityKind::Unspecified)
+         paramTy = Context.getAttributedType(attr::TypeNullable,
+                                             modifiedTy, modifiedTy);
+      }
+   }
+
+   // Invent the arguments for the setter. We don't bother making a
+   // nice name for the argument.
+   ParmVarDecl *Argument = ParmVarDecl::Create(Context, Method,
+                                                Loc, Loc,
+                                                property->getIdentifier(),
+                                                paramTy,
+                                                /*TInfo=*/nullptr,
+                                                SC_None,
+                                                nullptr);
+   Method->setMethodParams(Context, Argument, None);
+
+   //
+   // @mulle-objc@ MetaABI: fix up setter parameter if needed
+   //
+   if( Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
+   {
+      if( Context.typeNeedsMetaABIAlloca( property->getType()))
+      {
+         SmallVector<ParmVarDecl*, 16> Params;
+         Params.push_back(Argument);
+
+         SetMulleObjCParam( Method, Selector, &Params, property->getType(), MetaABIParamAsStruct, Loc);
+      }
+      else
+      {
+         Method->setMetaABIVoidPointerParam( true);
+      }
+   }
+
+   AddPropertyAttrs(*this, Method, property);
+
+   CD->addDecl(Method);
+   if (const SectionAttr *SA = property->getAttr<SectionAttr>())
+      Method->addAttr(
+         SectionAttr::CreateImplicit(Context, SectionAttr::GNU_section,
+                                       SA->getName(), Loc));
+   // It's possible for the user to have set a very odd custom
+   // setter selector that causes it to have a method family.
+   if (getLangOpts().ObjCAutoRefCount)
+      CheckARCMethodDecl(Method);
+
+   return( Method);
+}
+
+// @mulle-objc@ new property attribute container <<<
+
 /// ProcessPropertyDecl - Make sure that any user-defined setter/getter methods
 /// have the property type and issue diagnostics if they don't.
 /// Also synthesize a getter/setter method if none exist (and update the
 /// appropriate lookup tables.
 void Sema::ProcessPropertyDecl(ObjCPropertyDecl *property) {
   ObjCMethodDecl *GetterMethod, *SetterMethod;
+  // @mulle-objc@ new property attribute container >
+  ObjCMethodDecl *AdderMethod, *RemoverMethod;
+  // @mulle-objc@ new property attribute container <
   ObjCContainerDecl *CD = cast<ObjCContainerDecl>(property->getDeclContext());
   if (CD->isInvalidDecl())
     return;
@@ -2469,21 +2711,39 @@ void Sema::ProcessPropertyDecl(ObjCPropertyDecl *property) {
   DiagnosePropertyAccessorMismatch(property, GetterMethod,
                                    property->getLocation());
 
-  if (!property->isReadOnly() && SetterMethod) {
-    if (Context.getCanonicalType(SetterMethod->getReturnType()) !=
-        Context.VoidTy)
-      Diag(SetterMethod->getLocation(), diag::err_setter_type_void);
-    if (SetterMethod->param_size() != 1 ||
-        !Context.hasSameUnqualifiedType(
-          (*SetterMethod->param_begin())->getType().getNonReferenceType(),
-          property->getType().getNonReferenceType())) {
-      Diag(property->getLocation(),
-           diag::warn_accessor_property_type_mismatch)
-        << property->getDeclName()
-        << SetterMethod->getSelector();
-      Diag(SetterMethod->getLocation(), diag::note_declared_at);
-    }
-  }
+  // @mulle-objc@ new property attribute container >>>
+  VerifyPropertyNonGetterMethod( property, SetterMethod, "setter");
+
+  // terrible copy/paste duplication
+  AdderMethod = IsClassProperty ?
+                 CD->getClassMethod(property->getAdderName()) :
+                 CD->getInstanceMethod(property->getAdderName());
+  if (!AdderMethod)
+    if (const ObjCCategoryDecl *CatDecl = dyn_cast<ObjCCategoryDecl>(CD))
+      if (CatDecl->IsClassExtension())
+        AdderMethod = IsClassProperty ? CatDecl->getClassInterface()->
+                          getClassMethod(property->getAdderName()) :
+                       CatDecl->getClassInterface()->
+                          getInstanceMethod(property->getAdderName());
+  DiagnosePropertyAccessorMismatch(property, GetterMethod,
+                                   property->getLocation());
+  VerifyPropertyNonGetterMethod( property, AdderMethod, "adder");
+
+  RemoverMethod = IsClassProperty ?
+                 CD->getClassMethod(property->getRemoverName()) :
+                 CD->getInstanceMethod(property->getRemoverName());
+  if (!RemoverMethod)
+    if (const ObjCCategoryDecl *CatDecl = dyn_cast<ObjCCategoryDecl>(CD))
+      if (CatDecl->IsClassExtension())
+        RemoverMethod = IsClassProperty ? CatDecl->getClassInterface()->
+                          getClassMethod(property->getRemoverName()) :
+                       CatDecl->getClassInterface()->
+                          getInstanceMethod(property->getRemoverName());
+  DiagnosePropertyAccessorMismatch(property, GetterMethod,
+                                   property->getLocation());
+  VerifyPropertyNonGetterMethod( property, RemoverMethod, "remover");
+
+  // @mulle-objc@ new property attribute container <<<
 
   // Synthesize getter/setter methods if none exist.
   // Find the default getter and if one not found, add one.
@@ -2563,87 +2823,31 @@ void Sema::ProcessPropertyDecl(ObjCPropertyDecl *property) {
   if (!property->isReadOnly()) {
     // Find the default setter and if one not found, add one.
     if (!SetterMethod) {
-      // No instance/class method of same name as property setter name was
-      // found.
-      // Declare a setter method and add it to the list of methods
-      // for this class.
-      SourceLocation Loc = property->getLocation();
-
-      SetterMethod =
-        ObjCMethodDecl::Create(Context, Loc, Loc,
-                               property->getSetterName(), Context.VoidTy,
-                               nullptr, CD, !IsClassProperty,
-                               /*isVariadic=*/false,
-                               /*isPropertyAccessor=*/true,
-                               /*isImplicitlyDeclared=*/true,
-                               /*isDefined=*/false,
-                               (property->getPropertyImplementation() ==
-                                ObjCPropertyDecl::Optional) ?
-                                ObjCMethodDecl::Optional :
-                                ObjCMethodDecl::Required);
-
-      // Remove all qualifiers from the setter's parameter type.
-      QualType paramTy =
-          property->getType().getUnqualifiedType().getAtomicUnqualifiedType();
-
-      // If the property is null_resettable, the setter accepts a
-      // nullable value.
-      if (property->getPropertyAttributes() &
-          ObjCPropertyDecl::OBJC_PR_null_resettable) {
-        QualType modifiedTy = paramTy;
-        if (auto nullability = AttributedType::stripOuterNullability(modifiedTy)){
-          if (*nullability == NullabilityKind::Unspecified)
-            paramTy = Context.getAttributedType(attr::TypeNullable,
-                                                modifiedTy, modifiedTy);
-        }
-      }
-
-      // Invent the arguments for the setter. We don't bother making a
-      // nice name for the argument.
-      ParmVarDecl *Argument = ParmVarDecl::Create(Context, SetterMethod,
-                                                  Loc, Loc,
-                                                  property->getIdentifier(),
-                                                  paramTy,
-                                                  /*TInfo=*/nullptr,
-                                                  SC_None,
-                                                  nullptr);
-      SetterMethod->setMethodParams(Context, Argument, None);
-
-      //
-      // @mulle-objc@ MetaABI: fix up setter parameter
-      //
-      if( Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
-      {
-         if( Context.typeNeedsMetaABIAlloca( property->getType()))
-         {
-            SmallVector<ParmVarDecl*, 16> Params;
-            Params.push_back(Argument);
-
-            SetMulleObjCParam( SetterMethod, property->getSetterName(), &Params, property->getType(), MetaABIParamAsStruct, Loc);
-         }
-         else
-         {
-            SetterMethod->setMetaABIVoidPointerParam( true);
-         }
-      }
-
-      AddPropertyAttrs(*this, SetterMethod, property);
-
-      CD->addDecl(SetterMethod);
-      if (const SectionAttr *SA = property->getAttr<SectionAttr>())
-        SetterMethod->addAttr(
-            SectionAttr::CreateImplicit(Context, SectionAttr::GNU_section,
-                                        SA->getName(), Loc));
-      // It's possible for the user to have set a very odd custom
-      // setter selector that causes it to have a method family.
-      if (getLangOpts().ObjCAutoRefCount)
-        CheckARCMethodDecl(SetterMethod);
+      SetterMethod = CreatePropertyNonGetterMethod( CD, property, property->getSetterName());
     } else
       // A user declared setter will be synthesize when @synthesize of
       // the property with the same name is seen in the @implementation
       SetterMethod->setPropertyAccessor(true);
     property->setSetterMethodDecl(SetterMethod);
-  }
+
+    // @mulle-objc@ new property attribute container >>>
+    if (!AdderMethod) {
+      AdderMethod = CreatePropertyNonGetterMethod( CD, property, property->getAdderName());
+    } else
+      // A user declared setter will be synthesize when @synthesize of
+      // the property with the same name is seen in the @implementation
+      AdderMethod->setPropertyAccessor(true);
+    property->setAdderMethodDecl(AdderMethod);
+
+    if (!RemoverMethod) {
+      RemoverMethod = CreatePropertyNonGetterMethod( CD, property, property->getRemoverName());
+    } else
+      // A user declared setter will be synthesize when @synthesize of
+      // the property with the same name is seen in the @implementation
+      RemoverMethod->setPropertyAccessor(true);
+    property->setRemoverMethodDecl(RemoverMethod);
+    // @mulle-objc@ new property attribute container <<<
+ }
   // Add any synthesized methods to the global pool. This allows us to
   // handle the following, which is supported by GCC (and part of the design).
   //
@@ -2661,11 +2865,23 @@ void Sema::ProcessPropertyDecl(ObjCPropertyDecl *property) {
       AddInstanceMethodToGlobalPool(GetterMethod);
     if (SetterMethod)
       AddInstanceMethodToGlobalPool(SetterMethod);
+    // @mulle-objc@ new property attribute container >
+    if (AdderMethod)
+      AddInstanceMethodToGlobalPool(AdderMethod);
+    if (RemoverMethod)
+      AddInstanceMethodToGlobalPool(RemoverMethod);
+    // @mulle-objc@ new property attribute container <
   } else {
     if (GetterMethod)
       AddFactoryMethodToGlobalPool(GetterMethod);
     if (SetterMethod)
       AddFactoryMethodToGlobalPool(SetterMethod);
+    // @mulle-objc@ new property attribute container >
+    if (AdderMethod)
+      AddFactoryMethodToGlobalPool(AdderMethod);
+    if (RemoverMethod)
+      AddFactoryMethodToGlobalPool(RemoverMethod);
+    // @mulle-objc@ new property attribute container <
   }
 
   ObjCInterfaceDecl *CurrentClass = dyn_cast<ObjCInterfaceDecl>(CD);
@@ -2679,6 +2895,12 @@ void Sema::ProcessPropertyDecl(ObjCPropertyDecl *property) {
     CheckObjCMethodOverrides(GetterMethod, CurrentClass, Sema::RTC_Unknown);
   if (SetterMethod)
     CheckObjCMethodOverrides(SetterMethod, CurrentClass, Sema::RTC_Unknown);
+  // @mulle-objc@ new property attribute container >
+  if (AdderMethod)
+    CheckObjCMethodOverrides(AdderMethod, CurrentClass, Sema::RTC_Unknown);
+  if (RemoverMethod)
+    CheckObjCMethodOverrides(RemoverMethod, CurrentClass, Sema::RTC_Unknown);
+  // @mulle-objc@ new property attribute container >
 }
 
 void Sema::CheckObjCPropertyAttributes(Decl *PDecl,

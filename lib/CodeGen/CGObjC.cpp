@@ -1900,6 +1900,102 @@ void CodeGenFunction::GenerateObjCSetter(ObjCImplementationDecl *IMP,
   FinishFunction();
 }
 
+// @mulle-objc@ new property attribute container >>>
+void
+CodeGenFunction::generateObjCContainerMethodBody(const ObjCImplementationDecl *classImpl,
+                                        const ObjCPropertyImplDecl *propImpl,
+                                        ObjCMethodDecl *method,
+                                        llvm::FunctionCallee propertyFn) {
+  ObjCIvarDecl *ivar = propImpl->getPropertyIvarDecl();
+
+  //
+  // Emit either:
+  // void   mulle_eo_object_add_to_container( id self, ptrdiff_t offset, id value)
+  // void   mulle_eo_object_remove_from_container( id self, ptrdiff_t offset, id value)
+  //
+  llvm::Value *self =
+    Builder.CreateBitCast(LoadObjCSelf(), VoidPtrTy);
+  llvm::Value *ivarOffset =
+    EmitIvarOffset(classImpl->getClassInterface(), ivar);
+  Address argAddr = GetAddrOfLocalVar(*method->param_begin());
+  llvm::Value *arg = Builder.CreateLoad(argAddr, "arg");
+  arg = Builder.CreateBitCast(arg, VoidPtrTy);
+  CallArgList args;
+  args.add(RValue::get(self), getContext().getObjCIdType());
+  args.add(RValue::get(ivarOffset), getContext().getPointerDiffType());
+  args.add(RValue::get(arg), getContext().getObjCIdType());
+    // FIXME: We shouldn't need to get the function info here, the runtime
+    // already should have computed it to build the function.
+  CGCallee callee = CGCallee::forDirect( propertyFn);
+  EmitCall(getTypes().arrangeBuiltinFunctionCall(getContext().VoidTy, args),
+            callee, ReturnValueSlot(), args);
+}
+
+
+void
+CodeGenFunction::generateObjCAdderBody(const ObjCImplementationDecl *classImpl,
+                                        const ObjCPropertyImplDecl *propImpl,
+                                        ObjCMethodDecl *method) {
+  llvm::FunctionCallee propertyFn;
+  propertyFn = CGM.getObjCRuntime().GetPropertyContainerAddFunction();
+  if (!propertyFn) {
+    CGM.ErrorUnsupported(propImpl, "Obj-C container adder required"); // ????
+    return;
+  }
+  generateObjCContainerMethodBody( classImpl, propImpl, method, propertyFn);
+}
+
+
+void
+CodeGenFunction::generateObjCRemoverBody(const ObjCImplementationDecl *classImpl,
+                                        const ObjCPropertyImplDecl *propImpl,
+                                        ObjCMethodDecl *method) {
+  llvm::FunctionCallee propertyFn;
+  propertyFn = CGM.getObjCRuntime().GetPropertyContainerRemoveFunction();
+  if (!propertyFn) {
+    CGM.ErrorUnsupported(propImpl, "Obj-C container remover required"); // ????
+    return;
+  }
+  generateObjCContainerMethodBody( classImpl, propImpl, method, propertyFn);
+}
+
+
+///
+/// The given Decl must be an ObjCImplementationDecl. \@synthesize
+/// is illegal within a category.
+/// What gets generated here is:
+/// - (void) addToXXX:(id) value
+/// {
+///   mulle_eo_object_add_to_container( self, 0x10, value);
+/// }
+void CodeGenFunction::GenerateObjCAdder(ObjCImplementationDecl *IMP,
+                                         const ObjCPropertyImplDecl *PID) {
+  const ObjCPropertyDecl *PD = PID->getPropertyDecl();
+  ObjCMethodDecl *OMD = PD->getAdderMethodDecl();
+  assert(OMD && "Invalid call to generate container adder (empty method)");
+  StartObjCMethod(OMD, IMP->getClassInterface());
+
+  generateObjCAdderBody(IMP, PID, OMD);
+
+  FinishFunction();
+}
+
+///
+/// The given Decl must be an ObjCImplementationDecl. \@synthesize
+/// is illegal within a category.
+void CodeGenFunction::GenerateObjCRemover(ObjCImplementationDecl *IMP,
+                                         const ObjCPropertyImplDecl *PID) {
+  const ObjCPropertyDecl *PD = PID->getPropertyDecl();
+  ObjCMethodDecl *OMD = PD->getRemoverMethodDecl();
+  assert(OMD && "Invalid call to generate container remover (empty method)");
+  StartObjCMethod(OMD, IMP->getClassInterface());
+
+  generateObjCRemoverBody(IMP, PID, OMD);
+
+  FinishFunction();
+}
+// @mulle-objc@ new property attributes container <<<
+
 namespace {
   struct DestroyIvar final : EHScopeStack::Cleanup {
   private:

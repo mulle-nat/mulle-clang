@@ -781,18 +781,23 @@ public:
     OBJC_PR_nullability = 0x1000,
     OBJC_PR_null_resettable = 0x2000,
     OBJC_PR_class = 0x4000
-    // @mulle-objc@ new property attributes serializable and dynamic >
+    // @mulle-objc@ new property attributes serializable, container, dynamic >
     , OBJC_PR_dynamic         = 0x08000
     , OBJC_PR_serializable    = 0x10000
     , OBJC_PR_nonserializable = 0x20000
-    // MEMO: change NumPropertyAttrsBits below when adding 
-    // @mulle-objc@ new property attributes serializable and dynamic <
+    , OBJC_PR_container       = 0x40000
+    , OBJC_PR_adder           = 0x80000
+    , OBJC_PR_remover         = 0x100000
+    // MEMO: change NumPropertyAttrsBits below when adding
+    // @mulle-objc@ new property attributes serializable, container, dynamic <
     // Adding a property should change NumPropertyAttrsBits
   };
 
   enum {
     /// Number of bits fitting all the property attributes.
-    NumPropertyAttrsBits = 18
+    // @mulle-objc@ new property attributes serializable, container, dynamic >
+    NumPropertyAttrsBits = 21
+    // @mulle-objc@ new property attributes serializable, container, dynamic <
   };
 
   enum SetterKind { Assign, Retain, Copy, Weak };
@@ -830,6 +835,28 @@ private:
 
   // Declaration of setter instance method
   ObjCMethodDecl *SetterMethodDecl = nullptr;
+
+  // @mulle-objc@ new property attribute container >
+  // Declaration of container add instance method
+  // adder name or NULL if no adder
+  Selector AdderName;
+
+  // remover name or NULL if no setter
+  Selector RemoverName;
+
+  // location of the getter attribute's value
+  SourceLocation AdderNameLoc;
+
+  // location of the setter attribute's value
+  SourceLocation RemoverNameLoc;
+
+  // Declaration of adder instance method
+  ObjCMethodDecl *AdderMethodDecl = nullptr;
+
+  // Declaration of remove instance method
+  ObjCMethodDecl *RemoverMethodDecl = nullptr;
+  // @mulle-objc@ new property attribute container <
+
 
   // Synthesize ivar for this property
   ObjCIvarDecl *PropertyIvarDecl = nullptr;
@@ -913,6 +940,12 @@ public:
             (OBJC_PR_retain | OBJC_PR_strong | OBJC_PR_copy));
   }
 
+  // @mulle-objc@ new property attribute container >
+  bool isContainer() const {
+    return (PropertyAttributes & OBJC_PR_container);
+  }
+  // @mulle-objc@ new property attribute container <
+
   bool isInstanceProperty() const { return !isClassProperty(); }
   bool isClassProperty() const { return PropertyAttributes & OBJC_PR_class; }
 
@@ -962,6 +995,30 @@ public:
 
   ObjCMethodDecl *getSetterMethodDecl() const { return SetterMethodDecl; }
   void setSetterMethodDecl(ObjCMethodDecl *gDecl) { SetterMethodDecl = gDecl; }
+
+  // @mulle-objc@ new property attributes container >
+  Selector getAdderName() const { return AdderName; }
+  SourceLocation getAdderNameLoc() const { return AdderNameLoc; }
+
+  void setAdderName(Selector Sel, SourceLocation Loc = SourceLocation()) {
+    AdderName = Sel;
+    AdderNameLoc = Loc;
+  }
+
+  Selector getRemoverName() const { return RemoverName; }
+  SourceLocation getRemoverNameLoc() const { return RemoverNameLoc; }
+
+  void setRemoverName(Selector Sel, SourceLocation Loc = SourceLocation()) {
+    RemoverName = Sel;
+    RemoverNameLoc = Loc;
+  }
+
+  ObjCMethodDecl *getAdderMethodDecl() const { return AdderMethodDecl; }
+  void setAdderMethodDecl(ObjCMethodDecl *gDecl) { AdderMethodDecl = gDecl; }
+
+  ObjCMethodDecl *getRemoverMethodDecl() const { return RemoverMethodDecl; }
+  void setRemoverMethodDecl(ObjCMethodDecl *gDecl) { RemoverMethodDecl = gDecl; }
+  // @mulle-objc@ new property attributes container <
 
   // Related to \@optional/\@required declared in \@protocol
   void setPropertyImplementation(PropertyControl pc) {

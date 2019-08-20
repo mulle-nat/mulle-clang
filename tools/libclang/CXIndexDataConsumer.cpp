@@ -560,7 +560,7 @@ bool CXIndexDataConsumer::handleDecl(const NamedDecl *D,
 
   if (shouldSuppressRefs())
     markEntityOccurrenceInFile(D, Loc);
-  
+
   DInfo.entityInfo = &DInfo.EntInfo;
   DInfo.cursor = Cursor;
   DInfo.loc = getIndexLoc(Loc);
@@ -672,7 +672,7 @@ bool CXIndexDataConsumer::handleObjCInterface(const ObjCInterfaceDecl *D) {
                                     /*isImplementation=*/false);
     return handleObjCContainer(D, D->getLocation(),
                                MakeCursorObjCClassRef(D, D->getLocation(),
-                                                      CXTU), 
+                                                      CXTU),
                                ContDInfo);
   }
 
@@ -691,13 +691,13 @@ bool CXIndexDataConsumer::handleObjCInterface(const ObjCInterfaceDecl *D) {
     if (shouldSuppressRefs())
       markEntityOccurrenceInFile(SuperD, SuperLoc);
   }
-  
+
   ObjCProtocolList EmptyProtoList;
-  ObjCProtocolListInfo ProtInfo(D->isThisDeclarationADefinition() 
+  ObjCProtocolListInfo ProtInfo(D->isThisDeclarationADefinition()
                                   ? D->getReferencedProtocols()
-                                  : EmptyProtoList, 
+                                  : EmptyProtoList,
                                 *this, SA);
-  
+
   ObjCInterfaceDeclInfo InterInfo(D);
   InterInfo.ObjCProtoListInfo = ProtInfo.getListInfo();
   InterInfo.ObjCInterDeclInfo.containerInfo = &InterInfo.ObjCContDeclInfo;
@@ -720,25 +720,25 @@ bool CXIndexDataConsumer::handleObjCProtocol(const ObjCProtocolDecl *D) {
   if (!D->isThisDeclarationADefinition()) {
     if (shouldSuppressRefs() && markEntityOccurrenceInFile(D, D->getLocation()))
       return false; // already occurred.
-    
+
     // FIXME: This seems like the wrong definition for redeclaration.
     bool isRedeclaration = D->hasDefinition() || D->getPreviousDecl();
     ObjCContainerDeclInfo ContDInfo(/*isForwardRef=*/true,
                                     isRedeclaration,
                                     /*isImplementation=*/false);
-    return handleObjCContainer(D, D->getLocation(), 
+    return handleObjCContainer(D, D->getLocation(),
                                MakeCursorObjCProtocolRef(D, D->getLocation(),
                                                          CXTU),
-                               ContDInfo);    
+                               ContDInfo);
   }
-  
+
   ScratchAlloc SA(*this);
   ObjCProtocolList EmptyProtoList;
   ObjCProtocolListInfo ProtListInfo(D->isThisDeclarationADefinition()
                                       ? D->getReferencedProtocols()
                                       : EmptyProtoList,
                                     *this, SA);
-  
+
   ObjCProtocolDeclInfo ProtInfo(D);
   ProtInfo.ObjCProtoRefListInfo = ProtListInfo.getListInfo();
 
@@ -760,7 +760,7 @@ bool CXIndexDataConsumer::handleObjCCategory(const ObjCCategoryDecl *D) {
     markEntityOccurrenceInFile(IFaceD, ClassLoc);
 
   ObjCProtocolListInfo ProtInfo(D->getReferencedProtocols(), *this, SA);
-  
+
   CatDInfo.ObjCCatDeclInfo.containerInfo = &CatDInfo.ObjCContDeclInfo;
   if (IFaceD) {
     CatDInfo.ObjCCatDeclInfo.objcClass = &ClassEntity;
@@ -845,6 +845,10 @@ bool CXIndexDataConsumer::handleObjCProperty(const ObjCPropertyDecl *D) {
   ObjCPropertyDeclInfo DInfo;
   EntityInfo GetterEntity;
   EntityInfo SetterEntity;
+  // @mulle-objc@ new property attribute container >
+  EntityInfo AdderEntity;
+  EntityInfo RemoverEntity;
+  // @mulle-objc@ new property attribute container <
 
   DInfo.ObjCPropDeclInfo.declInfo = &DInfo;
 
@@ -860,6 +864,20 @@ bool CXIndexDataConsumer::handleObjCProperty(const ObjCPropertyDecl *D) {
   } else {
     DInfo.ObjCPropDeclInfo.setter = nullptr;
   }
+  // @mulle-objc@ new property attribute container >
+  if (ObjCMethodDecl *Adder= D->getAdderMethodDecl()) {
+    getEntityInfo(Adder, AdderEntity, SA);
+    DInfo.ObjCPropDeclInfo.adder = &AdderEntity;
+  } else {
+    DInfo.ObjCPropDeclInfo.adder = nullptr;
+  }
+  if (ObjCMethodDecl *Remover = D->getRemoverMethodDecl()) {
+    getEntityInfo(Remover, RemoverEntity, SA);
+    DInfo.ObjCPropDeclInfo.remover = &RemoverEntity;
+  } else {
+    DInfo.ObjCPropDeclInfo.remover = nullptr;
+  }
+  // @mulle-objc@ new property attribute container <
 
   return handleDecl(D, D->getLocation(), getCursor(D), DInfo);
 }
@@ -1033,12 +1051,12 @@ bool CXIndexDataConsumer::markEntityOccurrenceInFile(const NamedDecl *D,
 
   SourceManager &SM = Ctx->getSourceManager();
   D = getEntityDecl(D);
-  
+
   std::pair<FileID, unsigned> LocInfo = SM.getDecomposedLoc(SM.getFileLoc(Loc));
   FileID FID = LocInfo.first;
   if (FID.isInvalid())
     return true;
-  
+
   const FileEntry *FE = SM.getFileEntryForID(FID);
   if (!FE)
     return true;
@@ -1135,7 +1153,7 @@ void CXIndexDataConsumer::translateLoc(SourceLocation Loc,
 
   if (FID.isInvalid())
     return;
-  
+
   const FileEntry *FE = SM.getFileEntryForID(FID);
   if (indexFile)
     *indexFile = getIndexFile(FE);
@@ -1229,7 +1247,7 @@ CXCursor CXIndexDataConsumer::getRefCursor(const NamedDecl *D, SourceLocation Lo
     return MakeCursorMemberRef(Field, Loc, CXTU);
   if (const VarDecl *Var = dyn_cast<VarDecl>(D))
     return MakeCursorVariableRef(Var, Loc, CXTU);
-  
+
   return clang_getNullCursor();
 }
 

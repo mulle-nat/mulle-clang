@@ -774,8 +774,26 @@ void Parser::ParseObjCInterfaceDeclList(tok::ObjCKeywordKind contextKey,
           SetterSel = SelectorTable::constructSetterSelector(
               PP.getIdentifierTable(), PP.getSelectorTable(),
               FD.D.getIdentifier());
+
+        IdentifierInfo *AdderName = OCDS.getAdderName();
+        Selector AdderSel;
+        if (AdderName)
+          AdderSel = PP.getSelectorTable().getSelector(1, &AdderName);
+        else
+          AdderSel = SelectorTable::constructAdderSelector(
+              PP.getIdentifierTable(), PP.getSelectorTable(),
+              FD.D.getIdentifier());
+        IdentifierInfo *RemoverName = OCDS.getRemoverName();
+        Selector RemoverSel;
+        if (RemoverName)
+          RemoverSel = PP.getSelectorTable().getSelector(1, &RemoverName);
+        else
+          RemoverSel = SelectorTable::constructRemoverSelector(
+              PP.getIdentifierTable(), PP.getSelectorTable(),
+              FD.D.getIdentifier());
+
         Decl *Property = Actions.ActOnProperty(
-            getCurScope(), AtLoc, LParenLoc, FD, OCDS, GetterSel, SetterSel,
+            getCurScope(), AtLoc, LParenLoc, FD, OCDS, GetterSel, SetterSel, AdderSel, RemoverSel,
             MethodImplKind);
 
         FD.complete(Property);
@@ -888,6 +906,9 @@ void Parser::ParseObjCPropertyAttribute(ObjCDeclSpec &DS) {
              II->isStr("dynamic") ||
              II->isStr("serializable") ||
              II->isStr("nonserializable") ||
+             II->isStr("container") ||
+             II->isStr("adder") ||
+             II->isStr("remover") ||
              II->isStr("getter") ||
              II->isStr("setter")))
       {
@@ -919,31 +940,31 @@ void Parser::ParseObjCPropertyAttribute(ObjCDeclSpec &DS) {
       DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_atomic);
     else if (II->isStr("weak"))
       DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_weak);
-  // @mulle-objc@ new property attributes serializable and dynamic >
+    // @mulle-objc@ new property attributes serializable, container, dynamic >
     else if (II->isStr("dynamic"))
       DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_dynamic);
     else if (II->isStr("serializable"))
       DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_serializable);
     else if (II->isStr("nonserializable"))
       DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_nonserializable);
-  // @mulle-objc@ new property attributes serializable and dynamic <
-    else if (II->isStr("getter") || II->isStr("setter")) {
-      bool IsSetter = II->getNameStart()[0] == 's';
+    else if (II->isStr("container"))
+      DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_container);
+    else if (II->isStr("getter") || II->isStr("setter")  || II->isStr("adder")  || II->isStr("remover")) {
+      char methodType = II->getNameStart()[0];
 
-      // getter/setter require extra treatment.
-      unsigned DiagID = IsSetter ? diag::err_objc_expected_equal_for_setter :
-                                   diag::err_objc_expected_equal_for_getter;
-
-      if (ExpectAndConsume(tok::equal, DiagID)) {
+      if (ExpectAndConsume(tok::equal, diag::err_objc_expected_equal_for_method, II->getNameStart())) {
         SkipUntil(tok::r_paren, StopAtSemi);
         return;
       }
 
       if (Tok.is(tok::code_completion)) {
-        if (IsSetter)
-          Actions.CodeCompleteObjCPropertySetter(getCurScope());
-        else
-          Actions.CodeCompleteObjCPropertyGetter(getCurScope());
+        switch( methodType)
+        {
+           default  : Actions.CodeCompleteObjCPropertyGetter(getCurScope()); break;
+           case 's' : Actions.CodeCompleteObjCPropertySetter(getCurScope()); break;
+           case 'a' : Actions.CodeCompleteObjCPropertyAdder(getCurScope()); break;
+           case 'r' : Actions.CodeCompleteObjCPropertyRemover(getCurScope()); break;
+        }
         return cutOffParsing();
       }
 
@@ -951,25 +972,40 @@ void Parser::ParseObjCPropertyAttribute(ObjCDeclSpec &DS) {
       IdentifierInfo *SelIdent = ParseObjCSelectorPiece(SelLoc);
 
       if (!SelIdent) {
-        Diag(Tok, diag::err_objc_expected_selector_for_getter_setter)
-          << IsSetter;
+        Diag(Tok, diag::err_objc_expected_selector_for_method) << II->getNameStart();
         SkipUntil(tok::r_paren, StopAtSemi);
         return;
       }
 
-      if (IsSetter) {
-        DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_setter);
-        DS.setSetterName(SelIdent, SelLoc);
-
-        if (ExpectAndConsume(tok::colon,
-                             diag::err_expected_colon_after_setter_name)) {
-          SkipUntil(tok::r_paren, StopAtSemi);
-          return;
-        }
-      } else {
-        DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_getter);
-        DS.setGetterName(SelIdent, SelLoc);
+      switch( methodType)
+      {
+         default  :
+           DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_getter);
+           DS.setGetterName(SelIdent, SelLoc);
+           break;
+         ;;
+         case 's' :
+           DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_setter);
+           DS.setSetterName(SelIdent, SelLoc);
+           break;
+         case 'a' :
+           DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_adder);
+           DS.setAdderName(SelIdent, SelLoc);
+           break;
+         case 'r' :
+           DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_remover);
+           DS.setRemoverName(SelIdent, SelLoc);
+           break;
       }
+
+      if( methodType != 'g')
+      {
+         if (ExpectAndConsume(tok::colon, diag::err_expected_colon_after_method_name, II->getNameStart())) {
+            SkipUntil(tok::r_paren, StopAtSemi);
+            return;
+         }
+      }
+    // @mulle-objc@ new property attributes serializable, container, dynamic <
     } else if (II->isStr("nonnull")) {
       if (DS.getPropertyAttributes() & ObjCDeclSpec::DQ_PR_nullability)
         diagnoseRedundantPropertyNullability(*this, DS,

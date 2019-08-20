@@ -1370,6 +1370,17 @@ ObjCMethodDecl::findPropertyDecl(bool CheckOverrides) const {
                                       : I->getSetterName();
           if (NextSel == Sel)
             return I;
+
+          // @mulle-objc@ new property attribute container >
+          if( ! IsGetter)
+          {
+            if (I->getAdderName() == Sel)
+               return I;
+            if (I->getRemoverName() == Sel)
+               return I;
+          }
+          // @mulle-objc@ new property attribute container <
+
         }
       } else {
         for (const auto *I : Container->class_properties()) {
@@ -1377,6 +1388,16 @@ ObjCMethodDecl::findPropertyDecl(bool CheckOverrides) const {
                                       : I->getSetterName();
           if (NextSel == Sel)
             return I;
+
+          // @mulle-objc@ new property attribute container >
+          if( ! IsGetter)
+          {
+            if (I->getAdderName() == Sel)
+               return I;
+            if (I->getRemoverName() == Sel)
+               return I;
+          }
+          // @mulle-objc@ new property attribute container <
         }
       }
 

@@ -4494,11 +4494,12 @@ typedef enum {
   CXObjCPropertyAttr_strong    = 0x400,
   CXObjCPropertyAttr_unsafe_unretained = 0x800,
   CXObjCPropertyAttr_class = 0x1000
-  // @mulle-objc@ new property attributes serializable and dynamic >
+  // @mulle-objc@ new property attributes serializable, container, dynamic >
   , CXObjCPropertyAttr_dynamic = 0x8000
   , CXObjCPropertyAttr_serializable = 0x10000
   , CXObjCPropertyAttr_nonserializable = 0x20000
-  // @mulle-objc@ new property attributes serializable and dynamic <
+  , CXObjCPropertyAttr_container = 0x40000
+  // @mulle-objc@ new property attributes serializable, container, dynamic <
 } CXObjCPropertyAttrKind;
 
 /**
@@ -4511,6 +4512,20 @@ typedef enum {
 CINDEX_LINKAGE unsigned clang_Cursor_getObjCPropertyAttributes(CXCursor C,
                                                              unsigned reserved);
 
+// @mulle-objc@ new property attribute container >
+/**
+ * Given a cursor that represents a property declaration, return the
+ * name of the method that implements the getter.
+ */
+CINDEX_LINKAGE CXString clang_Cursor_getObjCPropertyAdderName(CXCursor C);
+
+/**
+ * Given a cursor that represents a property declaration, return the
+ * name of the method that implements the setter, if any.
+ */
+CINDEX_LINKAGE CXString clang_Cursor_getObjCPropertyRemoverName(CXCursor C);
+// @mulle-objc@ new property attribute container <
+
 /**
  * Given a cursor that represents a property declaration, return the
  * name of the method that implements the getter.
@@ -4522,6 +4537,7 @@ CINDEX_LINKAGE CXString clang_Cursor_getObjCPropertyGetterName(CXCursor C);
  * name of the method that implements the setter, if any.
  */
 CINDEX_LINKAGE CXString clang_Cursor_getObjCPropertySetterName(CXCursor C);
+
 
 /**
  * 'Qualifiers' written next to the return and parameter types in
@@ -6375,6 +6391,10 @@ typedef struct {
   const CXIdxDeclInfo *declInfo;
   const CXIdxEntityInfo *getter;
   const CXIdxEntityInfo *setter;
+  // @mulle-objc@ new property attributes container >
+  const CXIdxEntityInfo *adder;
+  const CXIdxEntityInfo *remover;
+  // @mulle-objc@ new property attributes container <
 } CXIdxObjCPropertyDeclInfo;
 
 typedef struct {

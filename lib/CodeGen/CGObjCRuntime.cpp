@@ -453,3 +453,14 @@ CodeGen::RValue  CGObjCRuntime::EmitFastEnumeratorCall( CodeGen::CodeGenFunction
    return( RValue::get( Receiver));  // bogus, this code is never used
 }
 
+/// Return the runtime function for adding to container properties.
+llvm::FunctionCallee  CGObjCRuntime::GetPropertyContainerAddFunction()
+{
+   abort();
+}
+
+/// Return the runtime function for removing from container properties.
+llvm::FunctionCallee  CGObjCRuntime::GetPropertyContainerRemoveFunction()
+{
+   abort();
+}

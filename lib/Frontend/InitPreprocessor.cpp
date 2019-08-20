@@ -661,6 +661,7 @@ static void InitializePredefinedMacros(const TargetInfo &TI,
        Builder.defineMacro( LangOpts.ObjCAllocsAutoreleasedObjects ? "__MULLE_OBJC_AAM__" : "__MULLE_OBJC_NO_AAM__");
        Builder.defineMacro( LangOpts.ObjCDisableFastCalls ? "__MULLE_OBJC_NO_FCS__" : "__MULLE_OBJC_FCS__");
        Builder.defineMacro( LangOpts.ObjCDisableTaggedPointers ? "__MULLE_OBJC_NO_TPS__" : "__MULLE_OBJC_TPS__");
+
        if( LangOpts.ObjCUniverseName.length())
        {
            std::string   quotedname;

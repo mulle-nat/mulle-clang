@@ -7288,6 +7288,12 @@ void RewriteModernObjC::RewriteObjCCategoryImplDecl(ObjCCategoryImplDecl *IDecl,
       continue;
     if (ObjCMethodDecl *Setter = PD->getSetterMethodDecl())
       InstanceMethods.push_back(Setter);
+    // @mulle-objc@ new property attribute container >
+    if (ObjCMethodDecl *Adder = PD->getAdderMethodDecl())
+      InstanceMethods.push_back(Adder);
+    if (ObjCMethodDecl *Remover = PD->getRemoverMethodDecl())
+      InstanceMethods.push_back(Remover);
+    // @mulle-objc@ new property attribute container <
   }
 
   Write_method_list_t_initializer(*this, Context, Result, InstanceMethods,

@@ -63,7 +63,7 @@
 #include "llvm/Support/Compiler.h"
 
 
-#define COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION  15
+#define COMPATIBLE_MULLE_OBJC_RUNTIME_LOAD_VERSION  16
 
 
 using namespace clang;
@@ -363,6 +363,38 @@ namespace {
                                                              Ctx.VoidTy, false, false, Params, FunctionType::ExtInfo(), {},
                                                              RequiredArgs::All));
          return CGM.CreateRuntimeFunction(FTy, "mulle_objc_object_set_property_value");
+      }
+
+      llvm::FunctionCallee getContainerAddPropertyFn() {
+         CodeGen::CodeGenTypes &Types = CGM.getTypes();
+         ASTContext &Ctx = CGM.getContext();
+         // void mulle_eo_object_add_to_container(id, ptrdiff_t, id)
+         SmallVector<CanQualType,3> Params;
+         CanQualType IdType = Ctx.getCanonicalParamType(Ctx.getObjCIdType());
+         Params.push_back(IdType);
+         Params.push_back(Ctx.getPointerDiffType()->getCanonicalTypeUnqualified());
+         Params.push_back(IdType);
+         llvm::FunctionType *FTy =
+         Types.GetFunctionType(Types.arrangeLLVMFunctionInfo(
+                                                             Ctx.VoidTy, false, false, Params, FunctionType::ExtInfo(), {},
+                                                             RequiredArgs::All));
+         return CGM.CreateRuntimeFunction(FTy, "mulle_eo_object_add_to_container");
+      }
+
+      llvm::FunctionCallee getContainerRemovePropertyFn() {
+         CodeGen::CodeGenTypes &Types = CGM.getTypes();
+         ASTContext &Ctx = CGM.getContext();
+         // void mulle_eo_object_add_to_container(id, ptrdiff_t, id)
+         SmallVector<CanQualType,3> Params;
+         CanQualType IdType = Ctx.getCanonicalParamType(Ctx.getObjCIdType());
+         Params.push_back(IdType);
+         Params.push_back(Ctx.getPointerDiffType()->getCanonicalTypeUnqualified());
+         Params.push_back(IdType);
+         llvm::FunctionType *FTy =
+         Types.GetFunctionType(Types.arrangeLLVMFunctionInfo(
+                                                             Ctx.VoidTy, false, false, Params, FunctionType::ExtInfo(), {},
+                                                             RequiredArgs::All));
+         return CGM.CreateRuntimeFunction(FTy, "mulle_eo_object_remove_from_container");
       }
 
       // this is not really used
@@ -938,7 +970,7 @@ namespace {
       void  SetPropertyInfoToEmit( const ObjCPropertyDecl *PD,
                                    const Decl *Container,
                                    const ObjCCommonTypesHelper &ObjCTypes,
-                                   llvm::Constant *Prop[ 7]);
+                                   llvm::Constant *Prop[ 9]);
 
       /// EmitPropertyList - Emit the given property list. The return
       /// value has type PropertyListPtrTy.
@@ -1342,6 +1374,8 @@ namespace {
                                             bool hasRvalTy);
       llvm::FunctionCallee GetPropertyGetFunction() override;
       llvm::FunctionCallee GetPropertySetFunction() override;
+      llvm::FunctionCallee GetPropertyContainerAddFunction() override;
+      llvm::FunctionCallee GetPropertyContainerRemoveFunction() override;
       llvm::FunctionCallee GetOptimizedPropertySetFunction(bool atomic,
                                                       bool copy) override;
 
@@ -4510,7 +4544,7 @@ PushProtocolProperties(llvm::SmallPtrSet<const IdentifierInfo*,16> &PropertySet,
       if (!PropertySet.insert(PD->getIdentifier()).second)
          continue;
 
-      llvm::Constant *Prop[7];
+      llvm::Constant *Prop[9];
 
       SetPropertyInfoToEmit( PD, Container, ObjCTypes, Prop);
 
@@ -4522,15 +4556,19 @@ PushProtocolProperties(llvm::SmallPtrSet<const IdentifierInfo*,16> &PropertySet,
 void  CGObjCCommonMulleRuntime::SetPropertyInfoToEmit( const ObjCPropertyDecl *PD,
                                                        const Decl *Container,
                                                        const ObjCCommonTypesHelper &ObjCTypes,
-                                                       llvm::Constant *Prop[ 7])
+                                                       llvm::Constant *Prop[ 9])
 {
-   Selector    getter = PD->getGetterName();
-   Selector    setter = PD->getSetterName();
+   Selector    getter  = PD->getGetterName();
+   Selector    setter  = PD->getSetterName();
+   Selector    adder   = PD->getAdderName();
+   Selector    remover = PD->getRemoverName();
    QualType    type;
    int         i;
    unsigned int    bits;
    llvm::Constant  *getterSel;
    llvm::Constant  *setterSel;
+   llvm::Constant  *adderSel;
+   llvm::Constant  *removerSel;
    llvm::Constant  *zeroSel;
    llvm::Constant  *propertyid;
    llvm::Constant  *ivarid;
@@ -4543,22 +4581,19 @@ void  CGObjCCommonMulleRuntime::SetPropertyInfoToEmit( const ObjCPropertyDecl *P
                                  : zeroSel;
    setterSel = (! setter.isNull() && ! PD->isReadOnly())  ? _HashConstantForString( setter.getAsString())
                                                           : zeroSel;
+   adderSel  = (! adder.isNull() && ! PD->isReadOnly())  ? _HashConstantForString( adder.getAsString())
+                                                         : zeroSel;
+   removerSel= (! remover.isNull() && ! PD->isReadOnly())  ? _HashConstantForString( remover.getAsString())
+                                                           : zeroSel;
 
-   type       = PD->getType();
+   type      = PD->getType();
 
-/*
-    OBJC_PR_readonly  = 0x01,
-    OBJC_PR_assign    = 0x04,
-    OBJC_PR_readwrite = 0x08,
-    OBJC_PR_retain    = 0x10,
-    OBJC_PR_copy      = 0x20,
-    OBJC_PR_nullability = 0x1000,
-    OBJC_PR_class = 0x4000
-    , OBJC_PR_dynamic = 0x8000
-    , OBJC_PR_serializable = 0x10000
-*/
    auto nullability = type->getNullability( CGM.getContext());
 
+   //
+   // see: https://github.com/mulle-objc/mulle-objc-runtime/blob/release/src/mulle-objc-property.h#L47
+   //      for bit values
+   //
    bits       = (PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_readonly)        ? 0x00001 : 0x0;
 //   bits      |= (PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_assign)          ? 0x00002 : 0x0;
 //   bits      |= (PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_readwrite)       ? 0x00004 : 0x0;
@@ -4571,6 +4606,7 @@ void  CGObjCCommonMulleRuntime::SetPropertyInfoToEmit( const ObjCPropertyDecl *P
    bits      |= (PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_class)           ? 0x00200 : 0x0;
    bits      |= (PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_dynamic)         ? 0x00400 : 0x0;
    bits      |= (PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_nonserializable) ? 0x00800 : 0x0;
+   bits      |= (PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_container)       ? 0x01000 : 0x0;
 
    if( type->hasPointerRepresentation())
    {
@@ -4596,6 +4632,8 @@ void  CGObjCCommonMulleRuntime::SetPropertyInfoToEmit( const ObjCPropertyDecl *P
 //      char                       *signature;  // hmmm...
 //      mulle_objc_methodid_t      getter;
 //      mulle_objc_methodid_t      setter;
+//      mulle_objc_methodid_t      adder;
+//      mulle_objc_methodid_t      remover;
 //      unsigned int               bits;     // for pointers/objects
 //   };
 
@@ -4608,9 +4646,11 @@ void  CGObjCCommonMulleRuntime::SetPropertyInfoToEmit( const ObjCPropertyDecl *P
 
    Prop[ i++] = getterSel;
    Prop[ i++] = setterSel;
+   Prop[ i++] = adderSel;
+   Prop[ i++] = removerSel;
    Prop[ i++] = bitValue;
 
-   assert( i == 7);
+   assert( i == 9);
 //   fprintf( stderr, "%s %s has %s clearer\n",  type->hasPointerRepresentation() ? "pointer" : "nonpointer", PD->getIdentifier()->getNameStart(),  Prop[ 5] == zeroSel  ? "no" : "a");
 }
 
@@ -4623,7 +4663,7 @@ llvm::Constant *CGObjCCommonMulleRuntime::EmitPropertyList(Twine Name,
    llvm::SmallPtrSet<const IdentifierInfo*, 16> PropertySet;
    for (const auto *PD : OCD->properties())
    {
-      llvm::Constant *Prop[7];
+      llvm::Constant *Prop[9];
 
       PropertySet.insert(PD->getIdentifier());
 
@@ -4841,6 +4881,13 @@ void CGObjCMulleRuntime::GenerateClass(const ObjCImplementationDecl *ID) {
             if (llvm::Constant *C = GetMethodConstant(MD))
                InstanceMethods.push_back(C);
          if (ObjCMethodDecl *MD = PD->getSetterMethodDecl())
+            if (llvm::Constant *C = GetMethodConstant(MD))
+               InstanceMethods.push_back(C);
+         // so far we don't have these overridable, so this has no effect
+         if (ObjCMethodDecl *MD = PD->getAdderMethodDecl())
+            if (llvm::Constant *C = GetMethodConstant(MD))
+               InstanceMethods.push_back(C);
+         if (ObjCMethodDecl *MD = PD->getRemoverMethodDecl())
             if (llvm::Constant *C = GetMethodConstant(MD))
                InstanceMethods.push_back(C);
       }
@@ -5528,6 +5575,16 @@ llvm::FunctionCallee CGObjCMulleRuntime::GetPropertyGetFunction() {
 llvm::FunctionCallee CGObjCMulleRuntime::GetPropertySetFunction() {
    return ObjCTypes.getSetPropertyFn();
 }
+
+llvm::FunctionCallee CGObjCMulleRuntime::GetPropertyContainerAddFunction() {
+   return ObjCTypes.getContainerAddPropertyFn();
+}
+
+llvm::FunctionCallee CGObjCMulleRuntime::GetPropertyContainerRemoveFunction() {
+   return ObjCTypes.getContainerRemovePropertyFn();
+}
+
+
 
 llvm::FunctionCallee CGObjCMulleRuntime::GetOptimizedPropertySetFunction(bool atomic,
                                                            bool copy) {
@@ -6888,6 +6945,8 @@ ObjCCommonTypesHelper::ObjCCommonTypesHelper(CodeGen::CodeGenModule &cgm)
                                          IvarIDTy,
                                          Int8PtrTy,
                                          Int8PtrTy,
+                                         SelectorIDTy,
+                                         SelectorIDTy,
                                          SelectorIDTy,
                                          SelectorIDTy,
                                          IntTy);

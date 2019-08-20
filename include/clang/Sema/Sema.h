@@ -3664,6 +3664,10 @@ public:
                       SourceLocation GetterNameLoc,
                       Selector SetterSel,
                       SourceLocation SetterNameLoc,
+                      Selector AdderSel,
+                      SourceLocation AdderNameLoc,
+                      Selector RemoverSel,
+                      SourceLocation RemoverNameLoc,
                       const bool isReadWrite,
                       unsigned &Attributes,
                       const unsigned AttributesAsWritten,
@@ -3682,6 +3686,10 @@ public:
                                        SourceLocation GetterNameLoc,
                                        Selector SetterSel,
                                        SourceLocation SetterNameLoc,
+                                       Selector AdderSel,
+                                       SourceLocation AdderNameLoc,
+                                       Selector RemoverSel,
+                                       SourceLocation RemoverNameLoc,
                                        const bool isReadWrite,
                                        const unsigned Attributes,
                                        const unsigned AttributesAsWritten,
@@ -8433,6 +8441,16 @@ public:
   /// \param property The property declaration being processed
   void ProcessPropertyDecl(ObjCPropertyDecl *property);
 
+// @mulle-objc@ new property attribute container >
+  void VerifyPropertyNonGetterMethod( ObjCPropertyDecl *property,
+                                      ObjCMethodDecl *method,
+                                      std::string name);
+
+  ObjCMethodDecl  *CreatePropertyNonGetterMethod( ObjCContainerDecl *CD,
+                                                  ObjCPropertyDecl *property,
+                                                  Selector Selector);
+// @mulle-objc@ new property attribute container <
+
 
   void DiagnosePropertyMismatch(ObjCPropertyDecl *Property,
                                 ObjCPropertyDecl *SuperProperty,
@@ -8450,6 +8468,9 @@ public:
                       SourceLocation LParenLoc,
                       FieldDeclarator &FD, ObjCDeclSpec &ODS,
                       Selector GetterSel, Selector SetterSel,
+// @mulle-objc@ new property attribute container >
+                      Selector AdderSel, Selector RemoverSel,
+// @mulle-objc@ new property attribute container <
                       tok::ObjCKeywordKind MethodImplKind,
                       DeclContext *lexicalDC = nullptr);
 
@@ -8506,7 +8527,7 @@ public:
                             SourceLocation   Loc);
   bool  isMetaABIAllocaMethod( ObjCMethodDecl *ObjCMethod,
                                           QualType resultType);
-       
+
   enum MetaABIDescription
   {
     MetaABIVoidPtrRval   = 0x0,
@@ -8514,7 +8535,7 @@ public:
     MetaABIRvalAsStruct  = 0x2,
     MetaABIParamAsStruct = 0x4
   };
-       
+
   unsigned int    metaABIDescription( SmallVector<ParmVarDecl*, 16> &Params,
                                      QualType resultType);
   // @mulle-objc@ MetaABI: additional method SetMulleObjCParam <
@@ -8626,7 +8647,7 @@ public:
                              QualType ReceiverType,
                              SourceLocation SelLoc,
                              SourceRange RecRange);
-       
+
   ExprResult ActOnInstanceMessage(Scope *S,
                                   Expr *Receiver,
                                   Selector Sel,
@@ -10835,6 +10856,10 @@ public:
   void CodeCompleteObjCPropertyFlags(Scope *S, ObjCDeclSpec &ODS);
   void CodeCompleteObjCPropertyGetter(Scope *S);
   void CodeCompleteObjCPropertySetter(Scope *S);
+  // @mulle-objc@ new property attributes container >
+  void CodeCompleteObjCPropertyAdder(Scope *S);
+  void CodeCompleteObjCPropertyRemover(Scope *S);
+  // @mulle-objc@ new property attributes container <
   void CodeCompleteObjCPassingType(Scope *S, ObjCDeclSpec &DS,
                                    bool IsParameter);
   void CodeCompleteObjCMessageReceiver(Scope *S);

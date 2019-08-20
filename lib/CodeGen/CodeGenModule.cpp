@@ -5025,6 +5025,17 @@ void CodeGenModule::EmitObjCPropertyImplementations(const
           !D->getInstanceMethod(PD->getSetterName()))
         CodeGenFunction(*this).GenerateObjCSetter(
                                  const_cast<ObjCImplementationDecl *>(D), PID);
+
+      // @mulle-objc@ new property attribute container >
+      if( ! PD->isReadOnly() && PD->isContainer())
+      {
+        CodeGenFunction(*this).GenerateObjCAdder(
+                                 const_cast<ObjCImplementationDecl *>(D), PID);
+
+        CodeGenFunction(*this).GenerateObjCRemover(
+                                 const_cast<ObjCImplementationDecl *>(D), PID);
+      }
+      // @mulle-objc@ new property attribute container <
     }
   }
 }

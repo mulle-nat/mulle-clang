@@ -6092,14 +6092,16 @@ void Sema::CodeCompleteObjCPropertyFlags(Scope *S, ObjCDeclSpec &ODS) {
     Results.AddResult(CodeCompletionResult("nonatomic"));
   if (!ObjCPropertyFlagConflicts(Attributes, ObjCDeclSpec::DQ_PR_atomic))
     Results.AddResult(CodeCompletionResult("atomic"));
-  // @mulle-objc@ new property attributes serializable and dynamic <
+  // @mulle-objc@ new property attributes serializable, container, dynamic >
   if (!ObjCPropertyFlagConflicts(Attributes, ObjCDeclSpec::DQ_PR_dynamic))
     Results.AddResult(CodeCompletionResult("dynamic"));
   if (!ObjCPropertyFlagConflicts(Attributes, ObjCDeclSpec::DQ_PR_serializable))
     Results.AddResult(CodeCompletionResult("serializable"));
   if (!ObjCPropertyFlagConflicts(Attributes, ObjCDeclSpec::DQ_PR_nonserializable))
     Results.AddResult(CodeCompletionResult("nonserializable"));
-  // @mulle-objc@ new property attributes serializable and dynamic <
+  if (!ObjCPropertyFlagConflicts(Attributes, ObjCDeclSpec::DQ_PR_container))
+    Results.AddResult(CodeCompletionResult("container"));
+  // @mulle-objc@ new property attributes serializable, container, dynamic <
 
   // Only suggest "weak" if we're compiling for ARC-with-weak-references or GC.
   if (getLangOpts().ObjCWeak || getLangOpts().getGC() != LangOptions::NonGC)
@@ -6341,6 +6343,15 @@ void Sema::CodeCompleteObjCPropertySetter(Scope *S) {
   HandleCodeCompleteResults(this, CodeCompleter, Results.getCompletionContext(),
                             Results.data(), Results.size());
 }
+
+// @mulle-objc@ new property attributes container >
+void Sema::CodeCompleteObjCPropertyAdder(Scope *S) {
+   return( CodeCompleteObjCPropertySetter( S));
+}
+void Sema::CodeCompleteObjCPropertyRemover(Scope *S) {
+   return( CodeCompleteObjCPropertySetter( S));
+}
+// @mulle-objc@ new property attributes container >
 
 void Sema::CodeCompleteObjCPassingType(Scope *S, ObjCDeclSpec &DS,
                                        bool IsParameter) {
@@ -7656,6 +7667,12 @@ static void AddObjCKeyValueCompletions(ObjCPropertyDecl *Property,
                                CXCursor_ObjCInstanceMethodDecl));
     }
   }
+
+  //
+  // @mulle-objc@ new property attribute container >
+  // TODO: code completion for adder and remover
+  // @mulle-objc@ new property attribute container <
+  //
 
   // Indexed and unordered accessors
   unsigned IndexedGetterPriority = CCP_CodePattern;

@@ -1051,6 +1051,9 @@ def note_method_declared_at : Note<"method %0 declared here">;
 def note_property_attribute : Note<"property %0 is declared "
   "%select{deprecated|unavailable|partial}1 here">;
 def err_setter_type_void : Error<"type of setter must be void">;
+// @mulle-objc@ new property attribute container >
+def err_property_method_type_void : Error<"type of %0 must be void">;
+// @mulle-objc@ new property attribute container <
 def err_duplicate_method_decl : Error<"duplicate declaration of method %0">;
 def warn_duplicate_method_decl :
   Warning<"multiple declarations of method %0 found and ignored">,

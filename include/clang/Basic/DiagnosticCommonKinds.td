@@ -39,6 +39,12 @@ def note_also_found : Note<"also found">;
 
 let CategoryName = "Lexical or Preprocessor Issue" in {
 
+// @mulle-objc@ new property attributes container >
+def err_expected_colon_after_method_name : Error<
+  "method name referenced in property %0 attribute "
+  "must end with ':'">;
+// @mulle-objc@ new property attributes container <
+
 def err_expected_colon_after_setter_name : Error<
   "method name referenced in property setter attribute "
   "must end with ':'">;

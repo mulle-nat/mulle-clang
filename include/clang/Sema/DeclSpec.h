@@ -838,13 +838,19 @@ public:
     , DQ_PR_dynamic = 0x8000
     , DQ_PR_serializable = 0x10000
     , DQ_PR_nonserializable = 0x20000
+    , DQ_PR_container = 0x40000
+    , DQ_PR_adder = 0x80000
+    , DQ_PR_remover = 0x100000
   // MEMO: add to property bits below if you add something
   // @mulle-objc@ new property attributes serializable and dynamic <
   };
 
   ObjCDeclSpec()
     : objcDeclQualifier(DQ_None), PropertyAttributes(DQ_PR_noattr),
-      Nullability(0), GetterName(nullptr), SetterName(nullptr) { }
+      Nullability(0), GetterName(nullptr), SetterName(nullptr),
+  // @mulle-objc@ new property attributes container >
+      AdderName(nullptr), RemoverName(nullptr) { }
+  // @mulle-objc@ new property attributes container <
 
   ObjCDeclQualifier getObjCDeclQualifier() const {
     return (ObjCDeclQualifier)objcDeclQualifier;
@@ -902,6 +908,24 @@ public:
     SetterNameLoc = loc;
   }
 
+  // @mulle-objc@ new property attribute container >
+  const IdentifierInfo *getAdderName() const { return AdderName; }
+  IdentifierInfo *getAdderName() { return AdderName; }
+  SourceLocation getAdderNameLoc() const { return AdderNameLoc; }
+  void setAdderName(IdentifierInfo *name, SourceLocation loc) {
+    AdderName = name;
+    AdderNameLoc = loc;
+  }
+
+  const IdentifierInfo *getRemoverName() const { return RemoverName; }
+  IdentifierInfo *getRemoverName() { return RemoverName; }
+  SourceLocation getRemoverNameLoc() const { return RemoverNameLoc; }
+  void setRemoverName(IdentifierInfo *name, SourceLocation loc) {
+    RemoverName = name;
+    RemoverNameLoc = loc;
+  }
+  // @mulle-objc@ new property attribute container <
+
 private:
   // FIXME: These two are unrelated and mutually exclusive. So perhaps
   // we can put them in a union to reflect their mutual exclusivity
@@ -909,9 +933,9 @@ private:
   unsigned objcDeclQualifier : 7;
 
   // NOTE: VC++ treats enums as signed, avoid using ObjCPropertyAttributeKind
-  // @mulle-objc@ new property attributes serializable and dynamic >
-  unsigned PropertyAttributes : 18;  // added 3 bits
-  // @mulle-objc@ new property attributes serializable and dynamic <
+  // @mulle-objc@ new property attributes serializable, container, dynamic >
+  unsigned PropertyAttributes : 21;  // added 6 bits
+  // @mulle-objc@ new property attributes serializable, container, dynamic <
 
   unsigned Nullability : 2;
 
@@ -922,6 +946,12 @@ private:
   SourceLocation GetterNameLoc; // location of the getter attribute's value
   SourceLocation SetterNameLoc; // location of the setter attribute's value
 
+  // @mulle-objc@ new property attribute container >
+  IdentifierInfo *AdderName;    // getter name or NULL if no getter
+  IdentifierInfo *RemoverName;    // setter name or NULL if no setter
+  SourceLocation AdderNameLoc; // location of the getter attribute's value
+  SourceLocation RemoverNameLoc; // location of the setter attribute's value
+  // @mulle-objc@ new property attribute container <
 };
 
 /// Describes the kind of unqualified-id parsed.

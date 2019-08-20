@@ -211,7 +211,7 @@ void CGObjCRuntime::EmitTryCatchStmt(CodeGenFunction &CGF,
         CGF.pushSEHCleanup(NormalAndEHCleanup, FinallyFunc);
     }
 
-  
+
   // Emit the try body.
   CGF.EmitStmt(S.getTryBody());
 
@@ -271,7 +271,7 @@ void CGObjCRuntime::EmitTryCatchStmt(CodeGenFunction &CGF,
     cleanups.ForceCleanup();
 
     CGF.EmitBranchThroughCleanup(Cont);
-  }  
+  }
 
   // Go back to the try-statement fallthrough.
   CGF.Builder.restoreIP(SavedIP);
@@ -359,11 +359,12 @@ void CGObjCRuntime::EmitAtSynchronizedStmt(CodeGenFunction &CGF,
 CGObjCRuntime::MessageSendInfo
 CGObjCRuntime::getMessageSendInfo(const ObjCMethodDecl *method,
                                   QualType resultType,
-                                  CallArgList &callArgs) {
+                                  CallArgList &callArgs,
+                                  bool isSuper) {
   // If there's a method, use information from that.
   if (method) {
     const CGFunctionInfo &signature =
-      CGM.getTypes().arrangeObjCMessageSendSignature(method, callArgs[0].Ty);
+      CGM.getTypes().arrangeObjCMessageSendSignature(method, callArgs[0].Ty, isSuper);
 
     const CGFunctionInfo &signatureForCall =
       CGM.getTypes().arrangeCall(signature, callArgs);

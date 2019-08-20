@@ -471,12 +471,14 @@ CodeGenTypes::arrangeObjCMethodDeclaration(const ObjCMethodDecl *MD) {
 ///
 const CGFunctionInfo &
 CodeGenTypes::arrangeObjCMessageSendSignature(const ObjCMethodDecl *MD,
-                                              QualType receiverType) {
+                                              QualType receiverType,
+                                              bool isSuper) {
   SmallVector<CanQualType, 16> argTys;
   SmallVector<FunctionProtoType::ExtParameterInfo, 4> extParamInfos(2);
   CallingConv                  callConv;
   CanQualType                  returnType;
 
+  // 2 empty extParamInfosAlready are already present
   argTys.push_back(Context.getCanonicalParamType(receiverType));
   argTys.push_back(Context.getCanonicalParamType(Context.getObjCSelType()));
 
@@ -490,17 +492,27 @@ CodeGenTypes::arrangeObjCMessageSendSignature(const ObjCMethodDecl *MD,
          QualType PtrTy = Context.getPointerType( RecTy);
 
          argTys.push_back( Context.getCanonicalParamType( PtrTy));
-
-         // push an empty one
          extParamInfos.push_back( FunctionProtoType::ExtParameterInfo());
       }
       else
          if( MD->isMetaABIVoidPointerParam())
          {
             argTys.push_back( Context.getCanonicalParamType( Context.VoidPtrTy));
-            // push an empty one
             extParamInfos.push_back( FunctionProtoType::ExtParameterInfo());
          }
+
+      if( isSuper)
+      {
+         if( argTys.size() == 2)
+         {
+            argTys.push_back( Context.getCanonicalParamType( Context.VoidPtrTy));
+            extParamInfos.push_back( FunctionProtoType::ExtParameterInfo());
+         }
+         argTys.push_back( Context.getCanonicalParamType( Context.getIntTypeForBitwidth( 32, false)));
+         extParamInfos.push_back( FunctionProtoType::ExtParameterInfo());
+      }
+
+      // push an empty one
 
       // fix up calling convention for MD, to be like mulle_objc_object_inline_call
       // it would be nice to not just use the default, but use the actual one
@@ -557,7 +569,7 @@ CodeGenTypes::arrangeUnprototypedObjCMessageSend(QualType returnType,
   auto argTypes = getArgTypesForCall(Context, args);
   FunctionType::ExtInfo einfo;
 
-  // @mulle-objc@ MetaABI: check that unprototyped send is compatible
+  // @mulle-objc@ MetaABI: check that unprototyped send is compatible >>>
   // with arguments, else output an error
   //
   if( Context.getLangOpts().ObjCRuntime.hasMulleMetaABI())
@@ -585,21 +597,23 @@ CodeGenTypes::arrangeUnprototypedObjCMessageSend(QualType returnType,
      case 2 :
          break;
      case 3 :
-        if( ! Context.typeNeedsMetaABIAlloca( argTypes[ 2]))
-        {
-           argTys.push_back( Context.getCanonicalParamType( Context.getCanonicalParamType( Context.VoidPtrTy)));
-           break;
-        }
-        LLVM_FALLTHROUGH;
+     case 4 :
+        if( Context.typeNeedsMetaABIAlloca( argTypes[ 2]))
+           llvm_unreachable( "called a non-metaABI compatible method w/o a prototype");
+        argTys.push_back( Context.getCanonicalParamType( Context.VoidPtrTy));
+        if( argTypes.size() == 4)  // superid
+           argTys.push_back( Context.getCanonicalParamType( Context.IntTy));
+        break;
+
      default:
         llvm_unreachable( "called a non-metaABI compatible method w/o a prototype");
         break;
      }
 
-
      return arrangeLLVMFunctionInfo( GetReturnType(returnType), /*instanceMethod=*/false,
                                      /*chainCall=*/false, argTys, einfo, {}, RequiredArgs::All);
   }
+  // @mulle-objc@ MetaABI: check that unprototyped send is compatible <<<
 
   return arrangeLLVMFunctionInfo(
       GetReturnType(returnType), /*instanceMethod=*/false,
@@ -2591,7 +2605,7 @@ void CodeGenFunction::EmitFunctionProlog(const CGFunctionInfo &FI,
 
             RD = methodDecl->getParamRecord();
 
-            const ASTRecordLayout &ASTLayout = CGM.getContext().getASTRecordLayout(RD);
+//            const ASTRecordLayout &ASTLayout = CGM.getContext().getASTRecordLayout(RD);
             const CGRecordLayout &CGLayout = CGM.getTypes().getCGRecordLayout(RD);
 //                  const llvm::StructLayout *llvmStructLayout = CGM.getDataLayout().getStructLayout(
 //                                           CGM.getContext().getTagDeclType( RD));

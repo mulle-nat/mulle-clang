@@ -223,7 +223,8 @@ public:
   /// Objective-C methods are C functions with some implicit parameters.
   const CGFunctionInfo &arrangeObjCMethodDeclaration(const ObjCMethodDecl *MD);
   const CGFunctionInfo &arrangeObjCMessageSendSignature(const ObjCMethodDecl *MD,
-                                                        QualType receiverType);
+                                                        QualType receiverType,
+                                                        bool isSuper = false);
   const CGFunctionInfo &arrangeUnprototypedObjCMessageSend(
                                                      QualType returnType,
                                                      const CallArgList &args);

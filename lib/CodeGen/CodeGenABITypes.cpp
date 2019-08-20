@@ -28,8 +28,9 @@ using namespace CodeGen;
 const CGFunctionInfo &
 CodeGen::arrangeObjCMessageSendSignature(CodeGenModule &CGM,
                                          const ObjCMethodDecl *MD,
-                                         QualType receiverType) {
-  return CGM.getTypes().arrangeObjCMessageSendSignature(MD, receiverType);
+                                         QualType receiverType,
+                                         bool isSuper) {
+  return CGM.getTypes().arrangeObjCMessageSendSignature(MD, receiverType, isSuper);
 }
 
 const CGFunctionInfo &

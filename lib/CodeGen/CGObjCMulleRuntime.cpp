@@ -1192,14 +1192,11 @@ namespace {
 #pragma mark - Method Call Declarations
       const CGFunctionInfo   &GenerateFunctionInfo( QualType arg0Ty,
                                                     QualType rvalTy);
-
       CodeGen::RValue CommonFunctionCall(CodeGen::CodeGenFunction &CGF,
-                                         llvm::FunctionCallee Fn,
+                                         llvm::Constant *Fn,
+                                         const CGFunctionInfo &FI,
                                          ReturnValueSlot Return,
                                          QualType ResultType,
-                                         QualType FnResultType,
-                                         const CGFunctionInfo &FI,
-                                         llvm::Value *Receiver,
                                          const CallArgList &CallArgs,
                                          CallArgList   &ActualArgs,
                                          llvm::Value   *Arg0,
@@ -2590,14 +2587,42 @@ ConstantAddress CGObjCCommonMulleRuntime::GenerateConstantString( const StringLi
 
 #pragma mark - message sending
 
+
+const CGFunctionInfo   &CGObjCMulleRuntime::GenerateFunctionInfo( QualType arg0Ty,
+                                                                  QualType rvalTy)
+{
+   FunctionType::ExtInfo   einfo;
+   CallingConv             callConv;
+
+   callConv = CGM.getContext().getDefaultCallingConvention( false, false);
+  // @mulle-objc@ MetaABI: message signature: fix call convention
+   einfo = einfo.withCallingConv( callConv);
+
+  RequiredArgs required = RequiredArgs::All;
+  SmallVector<CanQualType, 16> argTys;
+
+  argTys.push_back( CGM.getContext().getCanonicalParamType( arg0Ty));
+
+  // @mulle-objc@ MetaABI: fix returnType to void * (Part II)
+   CodeGen::CodeGenTypes &Types = CGM.getTypes();
+
+   const CGFunctionInfo &CallInfo = Types.arrangeLLVMFunctionInfo(
+      rvalTy->getCanonicalTypeUnqualified().getUnqualifiedType(),
+      /*instanceMethod=*/false,
+      /*chainCall=*/false, argTys, einfo, {}, required);   /* if the method -release hasn't been declared yet, then
+      we emit a void function call, but the compiler expects id
+      back. (and crashes) Fake it up with a bogus NULL return.
+   */
+   return( CallInfo);
+}
+
+
 // @mulle-objc@ MetaABI: CommonFunctionCall, send message to self and super
 CodeGen::RValue   CGObjCMulleRuntime::CommonFunctionCall(CodeGen::CodeGenFunction &CGF,
-                                                         llvm::FunctionCallee Fn,
+                                                         llvm::Constant *Fn,
+                                                         const CGFunctionInfo &FI,
                                                          ReturnValueSlot Return,
                                                          QualType ResultType,
-                                                         QualType FnResultType,
-                                                         const CGFunctionInfo &FI,
-                                                         llvm::Value *Receiver,
                                                          const CallArgList &CallArgs,
                                                          CallArgList   &ActualArgs,
                                                          llvm::Value   *Arg0,
@@ -2614,6 +2639,7 @@ CodeGen::RValue   CGObjCMulleRuntime::CommonFunctionCall(CodeGen::CodeGenFunctio
    RValue param = ActualArgs.size() >= 3 ? ActualArgs[ 2].getKnownRValue() : rvalue; // rvalue is just bogus, wont be used then
 
    rvalue = CGF.EmitMetaABIReadReturnValue( Method, rvalue, param, Return, ResultType);
+
    // it would be a good time to end the lifetime of the arg[2] alloca now
    // but this is done elsewhere, as not to disturb the method signatures
    // too much
@@ -2683,46 +2709,19 @@ CodeGen::RValue CGObjCMulleRuntime::CommonMessageSend(CodeGen::CodeGenFunction &
 
    MessageSendInfo MSI = getMessageSendInfo( Method, ResultType, ActualArgs);
 
+   // Cast function to proper signature
+   llvm::Constant *BitcastFn = cast<llvm::Constant>(
+      CGF.Builder.CreateBitCast(Fn.getCallee(), MSI.MessengerType));
+
    return( CommonFunctionCall( CGF,
-                               Fn,
+                               BitcastFn,
+                               MSI.CallInfo,
                                Return,
                                ResultType,
-                               CGF.getContext().VoidPtrTy,
-                               MSI.CallInfo,
-                               Receiver,
                                CallArgs,
                                ActualArgs,
                                Arg0,
                                Method));
-}
-
-
-const CGFunctionInfo   &CGObjCMulleRuntime::GenerateFunctionInfo( QualType arg0Ty,
-                                                                  QualType rvalTy)
-{
-   FunctionType::ExtInfo   einfo;
-   CallingConv             callConv;
-
-   callConv = CGM.getContext().getDefaultCallingConvention( false, false);
-  // @mulle-objc@ MetaABI: message signature: fix call convention
-   einfo = einfo.withCallingConv( callConv);
-
-  RequiredArgs required = RequiredArgs::All;
-  SmallVector<CanQualType, 16> argTys;
-
-  argTys.push_back( CGM.getContext().getCanonicalParamType( arg0Ty));
-
-  // @mulle-objc@ MetaABI: fix returnType to void * (Part II)
-   CodeGen::CodeGenTypes &Types = CGM.getTypes();
-
-   const CGFunctionInfo &CallInfo = Types.arrangeLLVMFunctionInfo(
-      rvalTy->getCanonicalTypeUnqualified().getUnqualifiedType(),
-      /*instanceMethod=*/false,
-      /*chainCall=*/false, argTys, einfo, {}, required);   /* if the method -release hasn't been declared yet, then
-      we emit a void function call, but the compiler expects id
-      back. (and crashes) Fake it up with a bogus NULL return.
-   */
-   return( CallInfo);
 }
 
 
@@ -2736,13 +2735,13 @@ CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction
                                                         const ObjCInterfaceDecl *Class,
                                                         const ObjCMethodDecl *Method)
 {
-   CallArgList     ActualArgs;
-   QualType        TmpResultType;
-   int             nArgs;
+   CallArgList           ActualArgs;
+   QualType              TmpResultType;
+   int                   nArgs;
    llvm::FunctionCallee  Fn;
-   llvm::Value     *Arg0;
-   llvm::Value     *selID;
-   std::string     selName;
+   llvm::Value           *Arg0;
+   llvm::Value           *selID;
+   std::string           selName;
 
    Arg0 = CGF.Builder.CreateBitCast(Receiver, ObjCTypes.ObjectPtrTy);
    ActualArgs.add(RValue::get(Arg0), CGF.getContext().getObjCInstanceType());
@@ -2814,13 +2813,15 @@ CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction
    const CGFunctionInfo &CallInfo = GenerateFunctionInfo( ActualArgs[0].Ty, TmpResultType);
    const CGFunctionInfo &SignatureForCall = CGM.getTypes().arrangeCall( CallInfo, ActualArgs);
 
+  // Cast function to proper signature
+  llvm::Constant *BitcastFn = cast<llvm::Constant>(
+      CGF.Builder.CreateBitCast(Fn.getCallee(), CGM.getTypes().ConvertTypeForMem(TmpResultType)));
+
    rvalue  = CommonFunctionCall( CGF,
-                                 Fn,
+                                 BitcastFn,
+                                 SignatureForCall,
                                  Return,
                                  ResultType,
-                                 TmpResultType,
-                                 SignatureForCall,
-                                 Receiver,
                                  CallArgs,
                                  ActualArgs,
                                  Arg0,
@@ -2900,7 +2901,22 @@ CGObjCMulleRuntime::GenerateMessageSendSuper(CodeGen::CodeGenFunction &CGF,
 
    Fn = IsClassMessage ? ObjCTypes.getMessageSendMetaSuperFn( optLevel)
                        : ObjCTypes.getMessageSendSuperFn( optLevel);
-   return( CommonMessageSend( CGF, Fn, Return, ResultType, Receiver, CallArgs, ActualArgs, Arg0, Method, false));
+
+   MessageSendInfo MSI = getMessageSendInfo( Method, ResultType, ActualArgs, true);
+
+   // Cast function to proper signature
+   llvm::Constant *BitcastFn = cast<llvm::Constant>(
+      CGF.Builder.CreateBitCast(Fn.getCallee(), MSI.MessengerType));
+
+   return( CommonFunctionCall( CGF,
+                               BitcastFn,
+                               MSI.CallInfo,
+                               Return,
+                               ResultType,
+                               CallArgs,
+                               ActualArgs,
+                               Arg0,
+                               Method));
 }
 
 

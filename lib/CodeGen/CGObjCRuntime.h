@@ -343,7 +343,8 @@ public:
 
   MessageSendInfo getMessageSendInfo(const ObjCMethodDecl *method,
                                      QualType resultType,
-                                     CallArgList &callArgs);
+                                     CallArgList &callArgs,
+                                     bool isSuper = false);
 
   // FIXME: This probably shouldn't be here, but the code to compute
   // it is here.

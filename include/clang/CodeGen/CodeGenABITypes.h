@@ -52,7 +52,8 @@ class CodeGenModule;
 
 const CGFunctionInfo &arrangeObjCMessageSendSignature(CodeGenModule &CGM,
                                                       const ObjCMethodDecl *MD,
-                                                      QualType receiverType);
+                                                      QualType receiverType,
+                                                      bool isSuper = false);
 
 const CGFunctionInfo &arrangeFreeFunctionType(CodeGenModule &CGM,
                                               CanQual<FunctionProtoType> Ty);

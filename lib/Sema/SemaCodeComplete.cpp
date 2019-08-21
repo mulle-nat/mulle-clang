@@ -6101,6 +6101,10 @@ void Sema::CodeCompleteObjCPropertyFlags(Scope *S, ObjCDeclSpec &ODS) {
     Results.AddResult(CodeCompletionResult("nonserializable"));
   if (!ObjCPropertyFlagConflicts(Attributes, ObjCDeclSpec::DQ_PR_container))
     Results.AddResult(CodeCompletionResult("container"));
+  if (!ObjCPropertyFlagConflicts(Attributes, ObjCDeclSpec::DQ_PR_observable))
+    Results.AddResult(CodeCompletionResult("observable"));
+  if (!ObjCPropertyFlagConflicts(Attributes, ObjCDeclSpec::DQ_PR_relationship))
+    Results.AddResult(CodeCompletionResult("relationship"));
   // @mulle-objc@ new property attributes serializable, container, dynamic <
 
   // Only suggest "weak" if we're compiling for ARC-with-weak-references or GC.

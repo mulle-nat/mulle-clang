@@ -907,6 +907,8 @@ void Parser::ParseObjCPropertyAttribute(ObjCDeclSpec &DS) {
              II->isStr("serializable") ||
              II->isStr("nonserializable") ||
              II->isStr("container") ||
+             II->isStr("relationship") ||
+             II->isStr("observable") ||
              II->isStr("adder") ||
              II->isStr("remover") ||
              II->isStr("getter") ||
@@ -949,6 +951,10 @@ void Parser::ParseObjCPropertyAttribute(ObjCDeclSpec &DS) {
       DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_nonserializable);
     else if (II->isStr("container"))
       DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_container);
+    else if (II->isStr("observable"))
+      DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_observable);
+    else if (II->isStr("relationship"))
+      DS.setPropertyAttributes(ObjCDeclSpec::DQ_PR_relationship);
     else if (II->isStr("getter") || II->isStr("setter")  || II->isStr("adder")  || II->isStr("remover")) {
       char methodType = II->getNameStart()[0];
 

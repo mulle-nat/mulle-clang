@@ -397,7 +397,7 @@ CGObjCRuntimeLifetimeMarker   CGObjCRuntime::GenerateCallArgs( CodeGenFunction &
 {
    CGObjCRuntimeLifetimeMarker  Marker;
    CGF.EmitCallArgs( Args, method, Expr->arguments());
-   
+
    Marker.SizeV = nullptr;
    Marker.Addr  = nullptr;
    return( Marker);
@@ -409,7 +409,7 @@ CGObjCRuntimeLifetimeMarker   CGObjCRuntime::ConvertToMetaABIArgsIfNeeded( CodeG
                                                                            CallArgList &Args)
 {
    CGObjCRuntimeLifetimeMarker  Marker;
-   
+
    Marker.SizeV = nullptr;
    Marker.Addr  = nullptr;
    return( Marker);
@@ -453,14 +453,28 @@ CodeGen::RValue  CGObjCRuntime::EmitFastEnumeratorCall( CodeGen::CodeGenFunction
    return( RValue::get( Receiver));  // bogus, this code is never used
 }
 
+// @mulle-objc@ new property attributes container, observable >>>
+llvm::FunctionCallee CGObjCRuntime::GetWillChangeFunction()
+{
+   return( 0);
+}
+
+// @mulle-objc@ new property attributes container, observable >>>
+llvm::FunctionCallee CGObjCRuntime::GetWillReadRelationshipFunction()
+{
+   return( 0);
+}
+
+
 /// Return the runtime function for adding to container properties.
 llvm::FunctionCallee  CGObjCRuntime::GetPropertyContainerAddFunction()
 {
-   abort();
+   return( 0);
 }
 
 /// Return the runtime function for removing from container properties.
 llvm::FunctionCallee  CGObjCRuntime::GetPropertyContainerRemoveFunction()
 {
-   abort();
+   return( 0);
 }
+  // @mulle-objc@ new property attributes container, observable <<<

@@ -1540,6 +1540,18 @@ void DeclPrinter::VisitObjCPropertyDecl(ObjCPropertyDecl *PDecl) {
       Out << (first ? ' ' : ',') << "container";
       first = false;
     }
+
+    if (PDecl->getPropertyAttributes() &
+        ObjCPropertyDecl::OBJC_PR_observable) {
+      Out << (first ? ' ' : ',') << "observable";
+      first = false;
+    }
+
+    if (PDecl->getPropertyAttributes() &
+        ObjCPropertyDecl::OBJC_PR_relationship) {
+      Out << (first ? ' ' : ',') << "relationship";
+      first = false;
+    }
     // @mulle-objc@ new property attributes serializable, container, dynamic <
 
     if (PDecl->getPropertyAttributes() &

@@ -6523,6 +6523,10 @@ ASTContext::getObjCEncodingForPropertyDecl(const ObjCPropertyDecl *PD,
     S += ",K";
   if ( PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_serializable)
     S += ",E";
+  if ( PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_observable)
+    S += ",O";
+  if ( PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_relationship)
+    S += ",>";
   // @mulle-objc@ new property attributes serializable, container, dynamic <
 
   if (PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_nonatomic)

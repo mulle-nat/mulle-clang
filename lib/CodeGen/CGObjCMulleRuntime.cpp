@@ -326,6 +326,37 @@ namespace {
          return( fn);
       }
 
+      llvm::FunctionCallee getWillChangeFn() {
+         CodeGen::CodeGenTypes &Types = CGM.getTypes();
+         ASTContext &Ctx = CGM.getContext();
+
+         // void mulle_objc_object_will_change( id)
+         SmallVector<CanQualType,1> Params;
+         CanQualType IdType = Ctx.getCanonicalParamType(Ctx.getObjCIdType());
+         Params.push_back(IdType);
+         llvm::FunctionType *FTy =
+         Types.GetFunctionType(Types.arrangeLLVMFunctionInfo(
+                                                             Ctx.VoidTy, false, false, Params, FunctionType::ExtInfo(), {},
+                                                              RequiredArgs::All));
+         return CGM.CreateRuntimeFunction(FTy, "mulle_objc_object_will_change");
+      }
+
+      llvm::FunctionCallee getWillReadRelationshipFn() {
+         CodeGen::CodeGenTypes &Types = CGM.getTypes();
+         ASTContext &Ctx = CGM.getContext();
+
+         // void mulle_objc_object_will_read_relationship( id, ptrdiff_t)
+         SmallVector<CanQualType,2> Params;
+         CanQualType IdType = Ctx.getCanonicalParamType(Ctx.getObjCIdType());
+         Params.push_back(IdType);
+         Params.push_back(Ctx.getPointerDiffType()->getCanonicalTypeUnqualified());
+         llvm::FunctionType *FTy =
+         Types.GetFunctionType(Types.arrangeLLVMFunctionInfo(
+                                                             Ctx.VoidTy, false, false, Params, FunctionType::ExtInfo(), {},
+                                                             RequiredArgs::All));
+         return CGM.CreateRuntimeFunction(FTy, "mulle_objc_object_will_read_relationship");
+      }
+
       llvm::FunctionCallee getGetPropertyFn() {
          CodeGen::CodeGenTypes &Types = CGM.getTypes();
          ASTContext &Ctx = CGM.getContext();
@@ -1372,6 +1403,8 @@ namespace {
                                             uint64_t recSize,
                                             QualType  rvalTy,
                                             bool hasRvalTy);
+      llvm::FunctionCallee GetWillChangeFunction() override;
+      llvm::FunctionCallee GetWillReadRelationshipFunction() override;
       llvm::FunctionCallee GetPropertyGetFunction() override;
       llvm::FunctionCallee GetPropertySetFunction() override;
       llvm::FunctionCallee GetPropertyContainerAddFunction() override;
@@ -4607,6 +4640,8 @@ void  CGObjCCommonMulleRuntime::SetPropertyInfoToEmit( const ObjCPropertyDecl *P
    bits      |= (PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_dynamic)         ? 0x00400 : 0x0;
    bits      |= (PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_nonserializable) ? 0x00800 : 0x0;
    bits      |= (PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_container)       ? 0x01000 : 0x0;
+   bits      |= (PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_relationship)    ? 0x02000 : 0x0;
+   bits      |= (PD->getPropertyAttributes() & ObjCPropertyDecl::OBJC_PR_observable)      ? 0x04000 : 0x0;
 
    if( type->hasPointerRepresentation())
    {
@@ -5566,6 +5601,14 @@ llvm::Function *CGObjCMulleRuntime::ModuleInitFunction() {
   Builder.CreateRetVoid();
 
   return LoadFunction;
+}
+
+llvm::FunctionCallee CGObjCMulleRuntime::GetWillChangeFunction() {
+   return ObjCTypes.getWillChangeFn();
+}
+
+llvm::FunctionCallee CGObjCMulleRuntime::GetWillReadRelationshipFunction() {
+   return ObjCTypes.getWillReadRelationshipFn();
 }
 
 llvm::FunctionCallee CGObjCMulleRuntime::GetPropertyGetFunction() {

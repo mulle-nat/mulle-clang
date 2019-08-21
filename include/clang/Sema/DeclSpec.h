@@ -835,12 +835,14 @@ public:
     DQ_PR_null_resettable = 0x2000,
     DQ_PR_class = 0x4000
   // @mulle-objc@ new property attributes serializable and dynamic >
-    , DQ_PR_dynamic = 0x8000
-    , DQ_PR_serializable = 0x10000
+    , DQ_PR_dynamic         = 0x8000
+    , DQ_PR_serializable    = 0x10000
     , DQ_PR_nonserializable = 0x20000
-    , DQ_PR_container = 0x40000
-    , DQ_PR_adder = 0x80000
-    , DQ_PR_remover = 0x100000
+    , DQ_PR_container       = 0x40000
+    , DQ_PR_relationship    = 0x80000
+    , DQ_PR_observable      = 0x100000
+    , DQ_PR_adder           = 0x200000
+    , DQ_PR_remover         = 0x400000
   // MEMO: add to property bits below if you add something
   // @mulle-objc@ new property attributes serializable and dynamic <
   };
@@ -934,7 +936,7 @@ private:
 
   // NOTE: VC++ treats enums as signed, avoid using ObjCPropertyAttributeKind
   // @mulle-objc@ new property attributes serializable, container, dynamic >
-  unsigned PropertyAttributes : 21;  // added 6 bits
+  unsigned PropertyAttributes : 23;  // mulle-objc added 8 bits
   // @mulle-objc@ new property attributes serializable, container, dynamic <
 
   unsigned Nullability : 2;

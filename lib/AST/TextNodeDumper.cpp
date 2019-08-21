@@ -1919,6 +1919,8 @@ void TextNodeDumper::VisitObjCPropertyDecl(const ObjCPropertyDecl *D) {
       OS << " nonserializable";
     if (Attrs & ObjCPropertyDecl::OBJC_PR_container)
       OS << " container";
+    if (Attrs & ObjCPropertyDecl::OBJC_PR_observable)
+      OS << " observable";
     // @mulle-objc@ new property attributes serializable, container, dynamic <
     if (Attrs & ObjCPropertyDecl::OBJC_PR_class)
       OS << " class";

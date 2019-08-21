@@ -369,8 +369,12 @@ makePropertyAttributesAsWritten(unsigned Attributes) {
     attributesAsWritten |= ObjCPropertyDecl::OBJC_PR_serializable;
   if (Attributes & ObjCDeclSpec::DQ_PR_nonserializable)
     attributesAsWritten |= ObjCPropertyDecl::OBJC_PR_nonserializable;
-  if (Attributes & ObjCDeclSpec::DQ_PR_nonserializable)
+  if (Attributes & ObjCDeclSpec::DQ_PR_container)
     attributesAsWritten |= ObjCPropertyDecl::OBJC_PR_container;
+  if (Attributes & ObjCDeclSpec::DQ_PR_observable)
+    attributesAsWritten |= ObjCPropertyDecl::OBJC_PR_observable;
+  if (Attributes & ObjCDeclSpec::DQ_PR_relationship)
+    attributesAsWritten |= ObjCPropertyDecl::OBJC_PR_relationship;
   if (Attributes & ObjCDeclSpec::DQ_PR_adder)
     attributesAsWritten |= ObjCPropertyDecl::OBJC_PR_adder;
   if (Attributes & ObjCDeclSpec::DQ_PR_remover)
@@ -802,6 +806,10 @@ ObjCPropertyDecl *Sema::CreatePropertyDecl(Scope *S,
     PDecl->setPropertyAttributes(ObjCPropertyDecl::OBJC_PR_nonserializable);
   if (Attributes & ObjCDeclSpec::DQ_PR_container)
     PDecl->setPropertyAttributes(ObjCPropertyDecl::OBJC_PR_container);
+  if (Attributes & ObjCDeclSpec::DQ_PR_observable)
+    PDecl->setPropertyAttributes(ObjCPropertyDecl::OBJC_PR_observable);
+  if (Attributes & ObjCDeclSpec::DQ_PR_relationship)
+    PDecl->setPropertyAttributes(ObjCPropertyDecl::OBJC_PR_relationship);
   if (Attributes & ObjCDeclSpec::DQ_PR_adder)
     PDecl->setPropertyAttributes(ObjCPropertyDecl::OBJC_PR_adder);
   if (Attributes & ObjCDeclSpec::DQ_PR_remover)

@@ -1327,11 +1327,52 @@ static void emitCPPObjectAtomicGetterCall(CodeGenFunction &CGF,
                callee, ReturnValueSlot(), args);
 }
 
+// @mulle-objc@ new property attribute relationship >>>
+
+//
+// this should output a _foo = willReadRelationship( self, _foo) statement
+// only works if _foo is void pointer compatible (which we should check)
+//
+static void  emitWillReadRelationship( CodeGenFunction &CGF,
+                                       const ObjCImplementationDecl *classImpl,
+                                       const ObjCPropertyImplDecl *propImpl)
+{
+    llvm::FunctionCallee getWillReadRelationshipFn =
+        CGF.CGM.getObjCRuntime().GetWillReadRelationshipFunction();
+    if (!getWillReadRelationshipFn) {
+      CGF.CGM.ErrorUnsupported(propImpl, "Obj-C relationship requires willReadRelationship function");
+      return;
+    }
+
+    // this sets up the function call, by loading "self" and reading "ivar"
+    CGCallee callee = CGCallee::forDirect(getWillReadRelationshipFn);
+
+    llvm::Value  *self       = CGF.Builder.CreateBitCast( CGF.LoadObjCSelf(), CGF.VoidPtrTy);
+    ObjCIvarDecl *ivar       = propImpl->getPropertyIvarDecl();
+    llvm::Value  *ivarOffset = CGF.EmitIvarOffset(classImpl->getClassInterface(), ivar);
+
+    CallArgList args;
+
+    args.add(RValue::get(self), CGF.getContext().getObjCIdType());
+    args.add(RValue::get(ivarOffset), CGF.getContext().getPointerDiffType());
+
+    llvm::CallBase *CallInstruction;
+    CGF.EmitCall( CGF.getTypes().arrangeBuiltinFunctionCall(
+                              CGF.getContext().VoidTy, args),
+                         callee, ReturnValueSlot(), args, &CallInstruction);
+}
+// @mulle-objc@ new property attribute relationship <<<
+
 void
 CodeGenFunction::generateObjCGetterBody(const ObjCImplementationDecl *classImpl,
                                         const ObjCPropertyImplDecl *propImpl,
                                         const ObjCMethodDecl *GetterMethodDecl,
                                         llvm::Constant *AtomicHelperFn) {
+  // @mulle-objc@ new property attribute relationship >
+  if( propImpl->getPropertyDecl()->isRelationship())
+    emitWillReadRelationship( *this, classImpl, propImpl);
+  // @mulle-objc@ new property attribute relationship <
+
   // If there's a non-trivial 'get' expression, we just have to emit that.
   if (!hasTrivialGetExpr(propImpl)) {
     if (!AtomicHelperFn) {
@@ -1531,6 +1572,29 @@ CodeGenFunction::generateObjCGetterBody(const ObjCImplementationDecl *classImpl,
   llvm_unreachable("bad @property implementation strategy!");
 }
 
+static void  emitWillChange( CodeGenFunction &CGF, const ObjCPropertyImplDecl *propImpl)
+{
+    llvm::FunctionCallee getWillChangeFn =
+        CGF.CGM.getObjCRuntime().GetWillChangeFunction();
+    if (!getWillChangeFn) {
+      CGF.CGM.ErrorUnsupported(propImpl, "Obj-C observable requires willChange function");
+      return;
+    }
+
+    CGCallee callee = CGCallee::forDirect(getWillChangeFn);
+
+    llvm::Value *self = CGF.Builder.CreateBitCast( CGF.LoadObjCSelf(), CGF.VoidPtrTy);
+
+    CallArgList args;
+
+    args.add(RValue::get(self), CGF.getContext().getObjCIdType());
+
+    llvm::CallBase *CallInstruction;
+    CGF.EmitCall( CGF.getTypes().arrangeBuiltinFunctionCall(
+                              CGF.getContext().VoidTy, args),
+                         callee, ReturnValueSlot(), args, &CallInstruction);
+}
+
 /// emitStructSetterCall - Call the runtime function to store the value
 /// from the first formal parameter into the given ivar.
 static void emitStructSetterCall(CodeGenFunction &CGF, ObjCMethodDecl *OMD,
@@ -1690,6 +1754,11 @@ CodeGenFunction::generateObjCSetterBody(const ObjCImplementationDecl *classImpl,
   const ObjCPropertyDecl *prop = propImpl->getPropertyDecl();
   ObjCIvarDecl *ivar = propImpl->getPropertyIvarDecl();
   ObjCMethodDecl *setterMethod = prop->getSetterMethodDecl();
+
+  // @mulle-objc@ new property attribute observable >
+  if( prop->isObservable())
+    emitWillChange( *this, propImpl);
+  // @mulle-objc@ new property attribute observable <
 
   // Just use the setter expression if Sema gave us one and it's
   // non-trivial.
@@ -1907,6 +1976,14 @@ CodeGenFunction::generateObjCContainerMethodBody(const ObjCImplementationDecl *c
                                         ObjCMethodDecl *method,
                                         llvm::FunctionCallee propertyFn) {
   ObjCIvarDecl *ivar = propImpl->getPropertyIvarDecl();
+  const ObjCPropertyDecl *prop = propImpl->getPropertyDecl();
+
+  // @mulle-objc@ new property attributes observable, relationship >
+  if( prop->isObservable())
+    emitWillChange( *this, propImpl);
+  if( prop->isRelationship())
+    emitWillReadRelationship( *this, classImpl, propImpl);
+  // @mulle-objc@ new property attributes observable, relationship <
 
   //
   // Emit either:

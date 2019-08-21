@@ -786,8 +786,10 @@ public:
     , OBJC_PR_serializable    = 0x10000
     , OBJC_PR_nonserializable = 0x20000
     , OBJC_PR_container       = 0x40000
-    , OBJC_PR_adder           = 0x80000
-    , OBJC_PR_remover         = 0x100000
+    , OBJC_PR_relationship    = 0x80000
+    , OBJC_PR_observable      = 0x100000
+    , OBJC_PR_adder           = 0x200000
+    , OBJC_PR_remover         = 0x400000
     // MEMO: change NumPropertyAttrsBits below when adding
     // @mulle-objc@ new property attributes serializable, container, dynamic <
     // Adding a property should change NumPropertyAttrsBits
@@ -796,7 +798,7 @@ public:
   enum {
     /// Number of bits fitting all the property attributes.
     // @mulle-objc@ new property attributes serializable, container, dynamic >
-    NumPropertyAttrsBits = 21
+    NumPropertyAttrsBits = 23
     // @mulle-objc@ new property attributes serializable, container, dynamic <
   };
 
@@ -940,11 +942,19 @@ public:
             (OBJC_PR_retain | OBJC_PR_strong | OBJC_PR_copy));
   }
 
-  // @mulle-objc@ new property attribute container >
+  // @mulle-objc@ new property attributes: container, observable, relationship >
   bool isContainer() const {
     return (PropertyAttributes & OBJC_PR_container);
   }
-  // @mulle-objc@ new property attribute container <
+
+  bool isObservable() const {
+    return (PropertyAttributes & OBJC_PR_observable);
+  }
+
+  bool isRelationship() const {
+    return (PropertyAttributes & OBJC_PR_relationship);
+  }
+  // @mulle-objc@ new property attributes: container, observable, relationship <
 
   bool isInstanceProperty() const { return !isClassProperty(); }
   bool isClassProperty() const { return PropertyAttributes & OBJC_PR_class; }

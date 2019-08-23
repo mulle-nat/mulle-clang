@@ -11,7 +11,7 @@
 # You have three options
 #
 # STRICT   : stuff will be placed into src/llvm/tools
-# SEPARATE : stuff will be parallel to src/llvm and build there
+# SEPERATE : stuff will be parallel to src/llvm and build there
 # HACK     : like STRICT, but place symlinks into src/llvm/tools and build there
 
 BY_THE_BOOK="HACK"
@@ -67,7 +67,7 @@ EOF
    --no-ninja           : use make instead of ninja
    --clang-debug        : build clang debug
    --lldb-debug         : build lldb with debug
-   --separate           : place mulle-clang outside of src/llvm (implied -no-lldb)
+   --seperate           : place mulle-clang outside of src/llvm (implied -no-lldb)
    -n                   : dry run
    -v                   : be verbose
 EOF
@@ -1212,7 +1212,7 @@ _build_llvm()
    # if on windows you notice that lldb doesnt compile
    # you want to throw it away with --no-lldb
    #
-   if [ "${BUILD_LLDB}" = "NO" -a "${BY_THE_BOOK}" != "SEPARATE" ]
+   if [ "${BUILD_LLDB}" = "NO" -a "${BY_THE_BOOK}" != "SEPERATE" ]
    then
       if [ -d "${MULLE_LLDB_DIR}" ]
       then
@@ -1351,7 +1351,7 @@ download()
 # instead of downloading llvm first for an hour...
 # but this won't work if we are doing it by the book
 #
-   if [ "${BUILD_LLVM}" = "YES" -a "${BY_THE_BOOK}" != "SEPARATE" ]
+   if [ "${BUILD_LLVM}" = "YES" -a "${BY_THE_BOOK}" != "SEPERATE" ]
    then
       download_llvm
    fi
@@ -1396,7 +1396,7 @@ download()
 
 # should check if llvm is installed, if yes
 # check proper version and then use it
-   if [ "${BUILD_LLVM}" = "YES" -a "${BY_THE_BOOK}" = "SEPARATE" ]
+   if [ "${BUILD_LLVM}" = "YES" -a "${BY_THE_BOOK}" = "SEPERATE" ]
    then
       download_llvm
    fi
@@ -1417,7 +1417,7 @@ _build()
       fi
    fi
 
-   if [ "${BUILD_CLANG}" = "YES" -a "${BY_THE_BOOK}" = "SEPARATE" ]
+   if [ "${BUILD_CLANG}" = "YES" -a "${BY_THE_BOOK}" = "SEPERATE" ]
    then
       _build_clang "${MAKE_INSTALL_COMMAND}"
    fi
@@ -1696,8 +1696,8 @@ main()
             BY_THE_BOOK="HACK"
          ;;
 
-         --separate)
-            BY_THE_BOOK="SEPARATE"
+         --seperate)
+            BY_THE_BOOK="SEPERATE"
             BUILD_LLDB="NO"  # implies
          ;;
 
@@ -1862,12 +1862,7 @@ main()
          MULLE_LLDB_DIR="${LLVM_DIR}/tools/lldb"
       ;;
 
-      'HACK'|'SEPARATE')
-         MULLE_CLANG_DIR="${SRC_DIR}/mulle-clang"
-         MULLE_LLDB_DIR="${SRC_DIR}/mulle-lldb"
-      ;;
-
-      'SEPARATE')
+      'HACK'|'SEPERATE')
          MULLE_CLANG_DIR="${SRC_DIR}/mulle-clang"
          MULLE_LLDB_DIR="${SRC_DIR}/mulle-lldb"
       ;;
@@ -1930,7 +1925,7 @@ ${C_INFO}See: https://www.llvm.org/docs/HowToCrossCompileLLVM.html"
       ;;
    esac
 
-   # modify this so clang build separate picks up llvm_config
+   # modify this so clang build seperate picks up llvm_config
    PATH="${PREFIX}/bin:${HOST_PATH}"; export PATH
 
    # shouldn't this be CC /CXX ?
@@ -2004,20 +1999,20 @@ ${C_INFO}See: https://www.llvm.org/docs/HowToCrossCompileLLVM.html"
       RUN_LLVM_CMAKE="YES"
    fi
 
-   if [ "${BY_THE_BOOK}" = "SEPARATE" ]
+   if [ "${BY_THE_BOOK}" = "SEPERATE" ]
    then
       if [ "${BUILD_LLDB}" = "YES" ]
       then
-         fail "You can't use --separate with --with-lldb"
+         fail "You can't use --seperate with --with-lldb"
       fi
    else
       if [ "${BUILD_CLANG}" = "YES" -a "${LLVM_BUILD_TYPE}" != "${MULLE_CLANG_BUILD_TYPE}"  ]
       then
-         fail "You need --separate to specify differing build types for llvm and clang"
+         fail "You need --seperate to specify differing build types for llvm and clang"
       fi
       if [ "${BUILD_LLDB}" = "YES" -a "${LLVM_BUILD_TYPE}" != "${LLDB_BUILD_TYPE}"  ]
       then
-         fail "You need --separate to specify differing build types for llvm and lldb"
+         fail "You need --seperate to specify differing build types for llvm and lldb"
       fi
    fi
 

@@ -1256,7 +1256,7 @@ namespace {
       const CGFunctionInfo   &GenerateFunctionInfo( QualType arg0Ty,
                                                     QualType rvalTy);
       CodeGen::RValue CommonFunctionCall(CodeGen::CodeGenFunction &CGF,
-                                         llvm::Constant *Fn,
+                                         const CGCallee &Fn,
                                          const CGFunctionInfo &FI,
                                          ReturnValueSlot Return,
                                          QualType ResultType,
@@ -1264,7 +1264,6 @@ namespace {
                                          CallArgList   &ActualArgs,
                                          llvm::Value   *Arg0,
                                          const ObjCMethodDecl *Method);
-
       CodeGen::RValue CommonMessageSend(CodeGen::CodeGenFunction &CGF,
                                         llvm::FunctionCallee Fn,
                                         ReturnValueSlot Return,
@@ -1275,7 +1274,6 @@ namespace {
                                         llvm::Value   *Arg0,
                                         const ObjCMethodDecl *Method,
                                         bool isDispatchFn);
-
       CodeGen::RValue GenerateMessageSend(CodeGen::CodeGenFunction &CGF,
                                           ReturnValueSlot Return,
                                           QualType ResultType,
@@ -2686,7 +2684,7 @@ const CGFunctionInfo   &CGObjCMulleRuntime::GenerateFunctionInfo( QualType arg0T
 
 // @mulle-objc@ MetaABI: CommonFunctionCall, send message to self and super
 CodeGen::RValue   CGObjCMulleRuntime::CommonFunctionCall(CodeGen::CodeGenFunction &CGF,
-                                                         llvm::Constant *Fn,
+                                                         const CGCallee &Callee,
                                                          const CGFunctionInfo &FI,
                                                          ReturnValueSlot Return,
                                                          QualType ResultType,
@@ -2700,7 +2698,6 @@ CodeGen::RValue   CGObjCMulleRuntime::CommonFunctionCall(CodeGen::CodeGenFunctio
    if (CGM.ReturnSlotInterferesWithArgs( FI))
       nullReturn.init( CGF, Arg0);
 
-   CGCallee Callee = CGCallee::forDirect(Fn);
    RValue rvalue = CGF.EmitCall( FI, Callee, Return, ActualArgs);
 
    RValue param = ActualArgs.size() >= 3 ? ActualArgs[ 2].getKnownRValue() : rvalue; // rvalue is just bogus, wont be used then
@@ -2780,8 +2777,10 @@ CodeGen::RValue CGObjCMulleRuntime::CommonMessageSend(CodeGen::CodeGenFunction &
    llvm::Constant *BitcastFn = cast<llvm::Constant>(
       CGF.Builder.CreateBitCast(Fn.getCallee(), MSI.MessengerType));
 
+   CGCallee Callee = CGCallee::forDirect(BitcastFn);
+
    return( CommonFunctionCall( CGF,
-                               BitcastFn,
+                               Callee,
                                MSI.CallInfo,
                                Return,
                                ResultType,
@@ -2881,11 +2880,12 @@ CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction
    const CGFunctionInfo &SignatureForCall = CGM.getTypes().arrangeCall( CallInfo, ActualArgs);
 
   // Cast function to proper signature
-  llvm::Constant *BitcastFn = cast<llvm::Constant>(
-      CGF.Builder.CreateBitCast(Fn.getCallee(), CGM.getTypes().ConvertTypeForMem(TmpResultType)));
+  // llvm::Constant *BitcastFn = cast<llvm::Constant>(
+  //    CGF.Builder.CreateBitCast(Fn.getCallee(), CGM.getTypes().ConvertTypeForMem(TmpResultType)));
+   CGCallee Callee = CGCallee::forDirect(Fn);
 
    rvalue  = CommonFunctionCall( CGF,
-                                 BitcastFn,
+                                 Callee,
                                  SignatureForCall,
                                  Return,
                                  ResultType,
@@ -2975,8 +2975,10 @@ CGObjCMulleRuntime::GenerateMessageSendSuper(CodeGen::CodeGenFunction &CGF,
    llvm::Constant *BitcastFn = cast<llvm::Constant>(
       CGF.Builder.CreateBitCast(Fn.getCallee(), MSI.MessengerType));
 
+   CGCallee Callee = CGCallee::forDirect(BitcastFn);
+
    return( CommonFunctionCall( CGF,
-                               BitcastFn,
+                               Callee,
                                MSI.CallInfo,
                                Return,
                                ResultType,

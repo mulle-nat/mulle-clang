@@ -206,6 +206,7 @@ main()
             -DCMAKE_OSX_DEPLOYMENT_TARGET=10.10 \
             -DCMAKE_INSTALL_PREFIX="${MULLE_CLANG_INSTALL_PREFIX}" \
             -DCMAKE_BUILD_TYPE="${CONFIGURATION}" \
+            -DLLVM_MAIN_SRC_DIR="../../src/llvm" \
             -G "${GENERATOR}" "../../${SRC}"
 
       if [ $? -ne 0 ]

@@ -2593,7 +2593,8 @@ void  Sema::VerifyPropertyNonGetterMethod( ObjCPropertyDecl *property,
 
 ObjCMethodDecl  *Sema::CreatePropertyNonGetterMethod( ObjCContainerDecl *CD,
                                                       ObjCPropertyDecl *property,
-                                                      Selector Selector)
+                                                      Selector Selector,
+                                                      bool isSetter)
 {
    ObjCMethodDecl  *Method;
 
@@ -2618,7 +2619,10 @@ ObjCMethodDecl  *Sema::CreatePropertyNonGetterMethod( ObjCContainerDecl *CD,
 
    // Remove all qualifiers from the setter's parameter type.
    QualType paramTy =
-         property->getType().getUnqualifiedType().getAtomicUnqualifiedType();
+   // @mulle-objc@ addTo: and removeFrom: operate on id, not on the propertyTyp which is NSArray >
+         isSetter ? property->getType().getUnqualifiedType().getAtomicUnqualifiedType()
+                  : Context.getObjCIdType();
+   // @mulle-objc@ addTo: and removeFrom: operate on id, not on the propertyTyp which is NSArray <
 
    // If the property is null_resettable, the setter accepts a
    // nullable value.
@@ -2840,7 +2844,7 @@ void Sema::ProcessPropertyDecl(ObjCPropertyDecl *property) {
 
     // @mulle-objc@ new property attribute container >>>
     if (!AdderMethod) {
-      AdderMethod = CreatePropertyNonGetterMethod( CD, property, property->getAdderName());
+      AdderMethod = CreatePropertyNonGetterMethod( CD, property, property->getAdderName(), false);
     } else
       // A user declared setter will be synthesize when @synthesize of
       // the property with the same name is seen in the @implementation
@@ -2848,7 +2852,7 @@ void Sema::ProcessPropertyDecl(ObjCPropertyDecl *property) {
     property->setAdderMethodDecl(AdderMethod);
 
     if (!RemoverMethod) {
-      RemoverMethod = CreatePropertyNonGetterMethod( CD, property, property->getRemoverName());
+      RemoverMethod = CreatePropertyNonGetterMethod( CD, property, property->getRemoverName(), false);
     } else
       // A user declared setter will be synthesize when @synthesize of
       // the property with the same name is seen in the @implementation

@@ -8448,7 +8448,8 @@ public:
 
   ObjCMethodDecl  *CreatePropertyNonGetterMethod( ObjCContainerDecl *CD,
                                                   ObjCPropertyDecl *property,
-                                                  Selector Selector);
+                                                  Selector Selector,
+                                                  bool isSetter = true);
 // @mulle-objc@ new property attribute container <
 
 

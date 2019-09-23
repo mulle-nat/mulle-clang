@@ -409,7 +409,7 @@ namespace {
          Types.GetFunctionType(Types.arrangeLLVMFunctionInfo(
                                                              Ctx.VoidTy, false, false, Params, FunctionType::ExtInfo(), {},
                                                              RequiredArgs::All));
-         return CGM.CreateRuntimeFunction(FTy, "mulle_eo_object_add_to_container");
+         return CGM.CreateRuntimeFunction(FTy, "mulle_objc_object_add_to_container");
       }
 
       llvm::FunctionCallee getContainerRemovePropertyFn() {
@@ -425,7 +425,7 @@ namespace {
          Types.GetFunctionType(Types.arrangeLLVMFunctionInfo(
                                                              Ctx.VoidTy, false, false, Params, FunctionType::ExtInfo(), {},
                                                              RequiredArgs::All));
-         return CGM.CreateRuntimeFunction(FTy, "mulle_eo_object_remove_from_container");
+         return CGM.CreateRuntimeFunction(FTy, "mulle_objc_object_remove_from_container");
       }
 
       // this is not really used

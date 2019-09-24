@@ -2777,7 +2777,7 @@ CodeGen::RValue CGObjCMulleRuntime::CommonMessageSend(CodeGen::CodeGenFunction &
    llvm::Constant *BitcastFn = cast<llvm::Constant>(
       CGF.Builder.CreateBitCast(Fn.getCallee(), MSI.MessengerType));
 
-   CGCallee Callee = CGCallee::forDirect(BitcastFn);
+   CGCallee Callee = CGCallee::forDirect(BitcastFn, CGCalleeInfo( nullptr, Method));
 
    return( CommonFunctionCall( CGF,
                                Callee,
@@ -2882,7 +2882,7 @@ CodeGen::RValue CGObjCMulleRuntime::GenerateMessageSend(CodeGen::CodeGenFunction
   // Cast function to proper signature
   // llvm::Constant *BitcastFn = cast<llvm::Constant>(
   //    CGF.Builder.CreateBitCast(Fn.getCallee(), CGM.getTypes().ConvertTypeForMem(TmpResultType)));
-   CGCallee Callee = CGCallee::forDirect(Fn);
+   CGCallee Callee = CGCallee::forDirect(Fn, CGCalleeInfo( nullptr, Method));
 
    rvalue  = CommonFunctionCall( CGF,
                                  Callee,
@@ -2975,7 +2975,7 @@ CGObjCMulleRuntime::GenerateMessageSendSuper(CodeGen::CodeGenFunction &CGF,
    llvm::Constant *BitcastFn = cast<llvm::Constant>(
       CGF.Builder.CreateBitCast(Fn.getCallee(), MSI.MessengerType));
 
-   CGCallee Callee = CGCallee::forDirect(BitcastFn);
+   CGCallee Callee = CGCallee::forDirect(BitcastFn, CGCalleeInfo( nullptr, Method));
 
    return( CommonFunctionCall( CGF,
                                Callee,

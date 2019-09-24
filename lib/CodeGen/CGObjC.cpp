@@ -107,8 +107,8 @@ CodeGenFunction::EmitObjCBoxedExpr(const ObjCBoxedExpr *E) {
     Args.add(RValue::get(Cast), EncodingQT);
   } else {
     // @mulle-objc@ >> MetaABI: ugly hack for literals
-    if( ! getContext().typeNeedsMetaABIAlloca( ArgQT))
-        ArgQT =getContext().VoidPtrTy;
+    // if( ! getContext().typeNeedsMetaABIAlloca( ArgQT))
+    //     ArgQT =getContext().VoidPtrTy;
 
     Args.add(EmitAnyExpr(SubExpr), ArgQT);
   }

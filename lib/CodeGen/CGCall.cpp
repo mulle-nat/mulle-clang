@@ -4243,7 +4243,7 @@ RValue CodeGenFunction::EmitCall(const CGFunctionInfo &CallInfo,
 
           if( CD)
             MD = dyn_cast<ObjCMethodDecl>( CD);
-          if( ! CD || (MD && ! MD->getParamDecl()))
+          if( MD && ! MD->getParamDecl())
     	    {
                    // promote all non pointers to uintptr_t and make them pointers
             if( ! V->getType()->isPointerTy())

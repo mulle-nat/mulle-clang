@@ -1,6 +1,6 @@
-=======================================
-Clang 9.0.0 (In-Progress) Release Notes
-=======================================
+=========================
+Clang 9.0.0 Release Notes
+=========================
 
 .. contents::
    :local:
@@ -8,11 +8,6 @@ Clang 9.0.0 (In-Progress) Release Notes
 
 Written by the `LLVM Team <https://llvm.org/>`_
 
-.. warning::
-
-   These are in-progress notes for the upcoming Clang 9 release.
-   Release notes for previous releases can be found on
-   `the Download Page <https://releases.llvm.org/download.html>`_.
 
 Introduction
 ============
@@ -30,10 +25,6 @@ For more information about Clang or LLVM, including information about the
 latest release, please see the `Clang Web Site <https://clang.llvm.org>`_ or the
 `LLVM Web Site <https://llvm.org>`_.
 
-Note that if you are reading this file from a Subversion checkout or the
-main Clang web page, this document applies to the *next* release, not
-the current one. To see the release notes for a specific release, please
-see the `releases page <https://llvm.org/releases/>`_.
 
 What's New in Clang 9.0.0?
 ==========================
@@ -46,12 +37,9 @@ sections with improvements to Clang's support for those languages.
 Major New Features
 ------------------
 
-- ...
+- Experimental support for :ref:`C++ for OpenCL <openclcpp>` has been
+  added.
 
-Improvements to Clang's diagnostics
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-- ...
 
 Non-comprehensive list of changes in this release
 -------------------------------------------------
@@ -62,38 +50,23 @@ Non-comprehensive list of changes in this release
   However, to retrieve Clang's version, please favor the one of the macro
   defined in :ref:`clang namespaced version macros <languageextensions-builtin-macros>`.
 
-- ...
-
 
 New Compiler Flags
 ------------------
 
-- ...
+- ``-ftime-trace`` and ``ftime-trace-granularity=N``
+  Emits flame chart style compilation time report in chrome://tracing and
+  speedscope.app compatible format. A trace .json file is written next to the
+  compiled object file, containing hierarchical time information about frontend
+  activities (file parsing, template instantiation) and backend activities
+  (modules and functions being optimized, optimization passes).
 
-Deprecated Compiler Flags
--------------------------
-
-The following options are deprecated and ignored. They will be removed in
-future versions of Clang.
-
-- ...
 
 Modified Compiler Flags
 -----------------------
 
 - ``clang -dumpversion`` now returns the version of Clang itself.
 
-- ...
-
-New Pragmas in Clang
---------------------
-
-- ...
-
-Attribute Changes in Clang
---------------------------
-
-- ...
 
 Windows Support
 ---------------
@@ -101,6 +74,9 @@ Windows Support
 - clang-cl now treats non-existent files as possible typos for flags,
   ``clang-cl /diagnostic:caret /c test.cc`` for example now produces
   ``clang: error: no such file or directory: '/diagnostic:caret'; did you mean '/diagnostics:caret'?``
+
+- clang now parses the ``__declspec(allocator)`` specifier and generates debug
+  information, so that memory usage can be tracked in Visual Studio.
 
 - The ``-print-search-dirs`` option now separates elements with semicolons,
   as is the norm for path lists on Windows
@@ -113,7 +89,7 @@ Windows Support
 C Language Changes in Clang
 ---------------------------
 
-- ``__FILE_NAME__`` macro has been added as a Clang specific extension supported
+- The ``__FILE_NAME__`` macro has been added as a Clang specific extension supported
   in all C-family languages. This macro is similar to ``__FILE__`` except it
   will always provide the last path component when possible.
 
@@ -123,44 +99,113 @@ C Language Changes in Clang
   still a few unsupported corner cases in Clang's integrated assembler and
   IfConverter. Please file bugs for any issues you run into.
 
-- ...
-
-C11 Feature Support
-^^^^^^^^^^^^^^^^^^^
-
-...
 
 C++ Language Changes in Clang
 -----------------------------
 
-- ...
+- Support for the address space attribute in various C++ features was improved,
+  refer to :ref:`C++ for OpenCL <openclcpp>` for more details. The following
+  features deviated from OpenCL:
 
-C++1z Feature Support
-^^^^^^^^^^^^^^^^^^^^^
+  (1) Address spaces as method qualifiers are not accepted yet;
 
-...
+  (2) There is no address space deduction.
+
 
 Objective-C Language Changes in Clang
 -------------------------------------
 
 - Fixed encoding of ObjC pointer types that are pointers to typedefs.
 
-.. code-block:: objc
+  .. code-block:: objc
 
       typedef NSArray<NSObject *> MyArray;
 
       // clang used to encode this as "^{NSArray=#}" instead of "@".
       const char *s0 = @encode(MyArray *);
 
-OpenCL C Language Changes in Clang
-----------------------------------
+OpenCL Kernel Language Changes in Clang
+---------------------------------------
 
-...
+OpenCL C
+^^^^^^^^
 
-ABI Changes in Clang
---------------------
+- Enabled use of variadic macro as a Clang extension.
 
-- ...
+- Added initial support for implicitly including OpenCL builtin
+  fuctions using efficient trie lookup generated by TableGen.
+  A corresponding frontend-only flag ``-fdeclare-opencl-builtins``
+  has been added to enable trie during parsing.
+
+- Refactored header file to be used for common parts between
+  regular header added using ``-finclude-default-header`` and trie
+  based declarations added using ``-fdeclare-opencl-builtins``.
+
+- Improved string formatting diagnostics in printf for vector types.
+
+- Simplified the internal representation of blocks, including their
+  generation in IR. Furthermore, indirect calls to block function
+  has been changed to direct function calls.
+
+- Added diagnostics for conversions of nested pointers with
+  different address spaces.
+
+- Added ``cl_arm_integer_dot_product`` extension.
+
+- Fixed global samplers in OpenCL v2.0.
+
+- Improved math builtin functions with parameters of type ``long
+  long`` for x86.
+
+.. _openclcpp:
+
+C++ for OpenCL
+^^^^^^^^^^^^^^
+
+Experimental support for C++17 features in OpenCL has been added
+and backwards compatibility with OpenCL C v2.0 was enabled.
+The documentation has been added for supported language features
+into :doc:`LanguageExtensions` and :doc:`UsersManual`.
+
+Implemented features are:
+
+- Address space behavior is improved in majority of C++ features:
+
+  - Templates parameters and arguments;
+
+  - Reference types;
+
+  - Type deduction;
+
+  - Objects and member functions, including special member
+    functions;
+
+  - Builtin operators;
+
+  - Method qualifiers now include address space;
+
+  - Address space deduction has been extended for C++ use cases;
+
+  - Improved overload ranking rules;
+
+  - All standard cast operators now prevent converting address
+    spaces (except for conversions allowed implicitly). They
+    can still be cast using C-style cast.
+
+- Vector types as in OpenCL C, including compound vector
+  initialization.
+
+- OpenCL-specific types: images, samplers, events, pipes, are
+  accepted. Note that blocks are not supported yet.
+
+- OpenCL standard header in Clang can be compiled in C++ mode.
+
+- Global constructors can be invoked from the host side using
+  a specific, compiler-generated kernel.
+
+- Overloads with generic address space are added to all atomic
+  builtin functions, including the ones prior to OpenCL v2.0.
+
 
 OpenMP Support in Clang
 -----------------------
@@ -200,27 +245,21 @@ release of Clang. Users of the build system should adjust accordingly.
   library instead of statically linking clang's components. This option will
   reduce the size of binary distributions at the expense of compiler performance.
 
-- ...
-
-AST Matchers
-------------
-
-- ...
 
 clang-format
 ------------
 
 - Add language support for clang-formatting C# files.
 - Add Microsoft coding style to encapsulate default C# formatting style.
-- Added new option `PPDIS_BeforeHash` (in configuration: `BeforeHash`) to
-  `IndentPPDirectives` which indents preprocessor directives before the hash.
-- Added new option `AlignConsecutiveMacros` to align the C/C++ preprocessor
+- Added new option ``PPDIS_BeforeHash`` (in configuration: ``BeforeHash``) to
+  ``IndentPPDirectives`` which indents preprocessor directives before the hash.
+- Added new option ``AlignConsecutiveMacros`` to align the C/C++ preprocessor
   macros of consecutive lines.
 
 libclang
 --------
 
-- When `CINDEXTEST_INCLUDE_ATTRIBUTED_TYPES` is not provided when making a
+- When ``CINDEXTEST_INCLUDE_ATTRIBUTED_TYPES`` is not provided when making a
   CXType, the equivalent type of the AttributedType is returned instead of the
   modified type if the user does not want attribute sugar. The equivalent type
   represents the minimally-desugared type which the AttributedType is
@@ -230,37 +269,58 @@ libclang
 Static Analyzer
 ---------------
 
+- Fixed a bug where an incorrect checker name would be displayed for a bug
+  report.
+
+- New checker: ``security.insecureAPI.DeprecatedOrUnsafeBufferHandling`` to detect
+  uses of unsafe/deprecated buffer handling functions for C code using the C11
+  standard or newer.
+
+- New checker: ``osx.MIGChecker`` to find violations of the Mach Interface
+  Generator calling convention
+
+- New checker: ``optin.osx.OSObjectCStyleCast`` to find C-style casts of of XNU
+  libkern OSObjects
+
+- New package: ``apiModeling.llvm`` contains modeling checkers to improve the
+  accuracy of reports on LLVM's own codebase.
+
+- The Static Analyzer received
+  :ref:`developer documentation <clang-static-analyzer-docs>`.
+
 - The UninitializedObject checker is now considered as stable.
-  (moved from the 'alpha.cplusplus' to the 'optin.cplusplus' package)
+  (moved from the ``alpha.cplusplus`` to the ``optin.cplusplus`` package)
 
-...
+- New frontend flags: The list of available checkers are now split into 3
+  different frontend flags:
 
-.. _release-notes-ubsan:
+  - ``-analyzer-checker-help``: The list of user-facing, stable checkers.
 
-Undefined Behavior Sanitizer (UBSan)
-------------------------------------
+  - ``-analyzer-checker-help-alpha``: The list of in-development
+    checkers not yet advised to be turned on.
 
-- ...
+  - ``-analyzer-checker-help-developer``: Checkers never meant to be
+    enabled/disabled by hand + development checkers.
 
-Core Analysis Improvements
-==========================
+- New frontend flags: While they have always been around, for the first time,
+  checker and package options are listable:
 
-- ...
+  - ``-analyzer-checker-option-help``: The list of user-facing, stable checker
+    and package options.
 
-New Issues Found
-================
+  - ``-analyzer-checker-option-help-alpha``: The list of in-development checker
+    options not yet advised to be used.
 
-- ...
+  - ``-analyzer-checker-option-help-developer``: Options never meant to be
+    enabled/disabled by hand + development options.
 
-Python Binding Changes
-----------------------
+- New frontend flag: ``-analyzer-werror`` to turn analyzer warnings into errors.
 
-The following methods have been added:
+- Numerous fixes to increase the stability of the experimental cross translation
+  unit analysis (CTU).
 
--  ...
+- CTU now handles virtual functions as well.
 
-Significant Known Problems
-==========================
 
 Linux Kernel
 ============

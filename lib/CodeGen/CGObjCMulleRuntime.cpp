@@ -5233,6 +5233,15 @@ llvm::GlobalVariable *CGObjCCommonMulleRuntime::CreateMetadataVar(Twine Name,
                                                          bool AddToSymbolTable,
                                                          bool AddToUsed) {
    llvm::Type *Ty = Init->getType();
+   //
+   // See: https://llvm.org/doxygen/GlobalValue_8h_source.html
+   //
+   // InternalLinkage,    ///< Rename collisions when linking (static functions).
+   // PrivateLinkage,     ///< Like Internal, but omit from symbol table.
+   //
+   // InternalLinkage should show up in the debugger symbol table. The
+   // debugger than "knows" that OBJC_CLASS_ (with _ prefix) is a class
+   //
    llvm::GlobalVariable *GV =
    new llvm::GlobalVariable( CGM.getModule(),
                              Ty,

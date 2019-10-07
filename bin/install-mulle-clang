@@ -6,8 +6,26 @@
 
 [ "${TRACE}" = "YES" ] && set -x && : "$0" "$@"
 
+#
+# Set these variables, if you DONT want mulle-clang but plain clang/lldb
+# or use --llvm-clang --llvm-lldb (will also set BY_THE_BOOK to STRICT)
+#
+USE_LLVM_CLANG="NO"
+USE_LLVM_LLDB="NO"
+
+# required LLVM version
+LLVM_VERSION="9.0.0"
+#LLVM_RC="2" # leave empty for releases
+
+# our compiler version
+MULLE_CLANG_VERSION="${LLVM_VERSION}.0"
+# MULLE_CLANG_RC="2"
+MULLE_LLDB_VERSION="${LLVM_VERSION}.0"
+# MULLE_LLDB_RC="2"
+
+
 # STRICT means compile it like LLVM does (everything all the time)
-# only useful if you're creating installers IMO
+# only useful if you're creating installers IMO. I
 # You have three options
 #
 # STRICT   : stuff will be placed into src/llvm/tools
@@ -16,21 +34,6 @@
 
 BY_THE_BOOK="HACK"
 
-#
-# Set these variables, if you DONT want mulle-clang but plain clang/lldb
-#
-USE_LLVM_CLANG="NO"
-USE_LLVM_LLDB="NO"
-
-# our compiler version
-MULLE_CLANG_VERSION="9.0.0.0"
-# MULLE_CLANG_RC="2"
-MULLE_LLDB_VERSION="9.0.0.0"
-# MULLE_LLDB_RC="2"
-
-# required LLVM version
-LLVM_VERSION="9.0.0"
-LLVM_RC="2" # leave empty for releases
 
 #
 # cmake min for 7 is 3.4.2 (so still good), try to keep as low as possible
@@ -76,14 +79,16 @@ EOF
       cat <<EOF
    --clang-debug        : build clang as debug only
    --clang-prefix <dir> : install prefix for clang
-   --lldb-prefix <dir>  : install prefix for lldb
-   --llvm-prefix <dir>  : install prefix for llvm
-   --llvm-debug         : build llvm debug
-   --target-arch <arch> : currently only ARM is supported on Ubuntu
    --debug              : build everything DEBUG (not recommended)
+   --lldb-prefix <dir>  : install prefix for lldb
+   --llvm-debug         : build llvm debug
+   --llvm-prefix <dir>  : install prefix for llvm
    --no-libcxx          : do not build libcxx
    --no-warn            : do not warn if a previous build exists
+   --no-python          : disable python (for lldb)
+   --python             : enable python (for lldb)
    --prefix <dir>       : default install prefix
+   --target-arch <arch> : currently only ARM is supported on Ubuntu
    --vs32bit            : compile for Visual Studo 32 bit
 EOF
       fi
@@ -1024,21 +1029,21 @@ download_llvm()
 
    if [ "${USE_LLVM_CLANG}" = "YES" ]
    then
-      if [ ! -d "${LLVM_DIR}/projects/clang" ]
+      if [ ! -d "${LLVM_DIR}/tools/clang" ]
       then
-         _llvm_module_download "clang" "${CLANG_ARCHIVE}" "${LLVM_DIR}/projects/clang"
+         _llvm_module_download "clang" "${CLANG_ARCHIVE}" "${LLVM_DIR}/tools/clang"
       else
-         log_fluff "\"${LLVM_DIR}/projects/clang\" already exists"
+         log_fluff "\"${LLVM_DIR}/tools/clang\" already exists"
       fi
    fi
 
    if [ "${USE_LLVM_LLDB}" = "YES" ]
    then
-      if [ ! -d "${LLVM_DIR}/projects/lldb" ]
+      if [ ! -d "${LLVM_DIR}/tools/lldb" ]
       then
-         _llvm_module_download "lldb" "${LLDB_ARCHIVE}" "${LLVM_DIR}/projects/lldb"
+         _llvm_module_download "lldb" "${LLDB_ARCHIVE}" "${LLVM_DIR}/tools/lldb"
       else
-         log_fluff "\"${LLVM_DIR}/projects/lldb\" already exists"
+         log_fluff "\"${LLVM_DIR}/tools/lldb\" already exists"
       fi
    fi
 }
@@ -1212,17 +1217,20 @@ _build_llvm()
    # if on windows you notice that lldb doesnt compile
    # you want to throw it away with --no-lldb
    #
-   if [ "${BUILD_LLDB}" = "NO" -a "${BY_THE_BOOK}" != "SEPERATE" ]
-   then
-      if [ -d "${MULLE_LLDB_DIR}" ]
-      then
-         exekutor rm -rf "${MULLE_LLDB_DIR}"
-         if [ -f "${LLVM_BUILD_DIR}/CMakeCache.txt" ]
-         then
-            exekutor rm "${LLVM_BUILD_DIR}/CMakeCache.txt"
-         fi
-      fi
-   fi
+
+# This is weird old code.
+# Better to specify LLVM_ENABLE_PROJECTS="clang, libcxx, libcxxabi, compiler-rt, lld, polly" ?
+#   if [ "${BUILD_LLDB}" = "NO" -a "${BY_THE_BOOK}" != "SEPERATE" ]
+#   then
+#      if [ -d "${MULLE_LLDB_DIR}" ]
+#      then
+#         exekutor rm -rf "${MULLE_LLDB_DIR}"
+#         if [ -f "${LLVM_BUILD_DIR}/CMakeCache.txt" ]
+#         then
+#            exekutor rm "${LLVM_BUILD_DIR}/CMakeCache.txt"
+#         fi
+#      fi
+#   fi
 
    #
    # Build llvm
@@ -1250,8 +1258,12 @@ _build_llvm()
 
       cmdline="${cmdline} \
 -DCMAKE_BUILD_TYPE='${LLVM_BUILD_TYPE}' \
--DCMAKE_INSTALL_PREFIX='${LLVM_INSTALL_PREFIX}' \
--DLLDB_DISABLE_PYTHON:BOOL='ON'"    # much less problems w/o phyton
+-DCMAKE_INSTALL_PREFIX='${LLVM_INSTALL_PREFIX}'"
+
+      if [ "${ENABLE_PYTHON}" = 'NO' ]
+      then
+         cmdline="${cmdline} -DLLDB_DISABLE_PYTHON:BOOL='ON'"    # much less problems w/o phyton
+      fi
 
       cmdline="${cmdline} ${CMAKE_FLAGS} '${BUILD_RELATIVE}/../${LLVM_DIR}'"
 
@@ -1653,6 +1665,7 @@ main()
    local TARGET_ARCH=
    local OPTION_TARGETS='DEFAULT'
    local OPTION_PARALLEL='DEFAULT'
+   local ENABLE_PYTHON='DEFAULT'
 
    while [ $# -ne 0 ]
    do
@@ -1709,6 +1722,14 @@ main()
             BUILD_CLANG="YES"
          ;;
 
+         --python)
+            ENABLE_PYTHON="YES"
+         ;;
+
+         --no-python)
+            ENABLE_PYTHON="NO"
+         ;;
+
          --linker)
             [ $# -eq 1 ] && fail "missing argument to $1"
             shift
@@ -1753,6 +1774,18 @@ main()
          --release)
             LLVM_BUILD_TYPE="Release"
             MULLE_CLANG_BUILD_TYPE="Release"
+         ;;
+
+         --release-version|-rv)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+            LLVM_VERSION="$1"
+         ;;
+
+         --release-candidate|-rc)
+            [ $# -eq 1 ] && fail "missing argument to $1"
+            shift
+            LLVM_RC="$1"
          ;;
 
          --prefix)
@@ -1880,6 +1913,10 @@ main()
          then
             PREFIX="${OWD}/${osxversion}"
          fi
+         if [ "${ENABLE_PYTHON}" = "DEFAULT" ]
+         then
+            ENABLE_PYTHON='NO'
+         fi
       ;;
 
       mingw)
@@ -1889,6 +1926,11 @@ main()
          fi
       ;;
    esac
+
+   if [ "${ENABLE_PYTHON}" = "DEFAULT" ]
+   then
+      ENABLE_PYTHON='YES'  # for vscode plugin
+   fi
 
    if [ "${PREFIX}" = "DEFAULT" ]
    then

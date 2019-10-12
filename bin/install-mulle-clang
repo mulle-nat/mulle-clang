@@ -71,6 +71,7 @@ EOF
    --clang-debug        : build clang debug
    --lldb-debug         : build lldb with debug
    --seperate           : place mulle-clang outside of src/llvm (implied -no-lldb)
+   --wsl                : build for windows inside the WSL
    -n                   : dry run
    -v                   : be verbose
 EOF
@@ -584,7 +585,7 @@ check_cmake_version()
    local minor
    local version
 
-   version="`cmake -version 2> /dev/null | awk '{ print $3 }'`"
+   version="`cmake${BUILD_EXE_EXTENSION} -version 2> /dev/null | awk '{ print $3 }'`"
    if [ -z "${version}" ]
    then
       log_fluff "The cmake is not installed."
@@ -611,7 +612,7 @@ check_and_build_cmake()
 {
    if [ -z "${BUILD_CMAKE}" ]
    then
-      install_binary_if_missing "cmake" "https://cmake.org/download/"
+      install_binary_if_missing "cmake${BUILD_EXE_EXTENSION}" "https://cmake.org/download/"
    fi
 
    check_cmake_version
@@ -696,13 +697,13 @@ get_mulle_clang_version()
    if [ -z "${version}" ]
    then
       log_warning "Could not find MULLE_CLANG_VERSION in download, using default"
-      echo "${fallback}"
+      eval echo "${fallback}"
    else
       if [ -z "${rc}" ]
       then
-         echo "${version}"
+         eval echo "${version}"
       else
-         echo "${version}-RC${rc}"
+         eval echo "${version}-RC${rc}"
       fi
    fi
 }
@@ -732,7 +733,7 @@ get_clang_vendor()
       fail "Could not determine runtime load version"
    fi
 
-   echo "mulle-clang ${compiler_version} (runtime-load-version: `eval echo ${runtime_load_version}`)"
+   echo "mulle-clang `eval echo ${compiler_version}` (runtime-load-version: `eval echo ${runtime_load_version}`)"
 }
 
 
@@ -745,7 +746,10 @@ setup_build_environment()
    local minor
    local major
 
-   install_binary_if_missing "python" "https://www.python.org/downloads/release"
+   if [ "${OPTION_PYTHON}" = 'YES' ]
+   then
+      install_binary_if_missing "python${BUILD_EXE_EXTENSION}" "https://www.python.org/downloads/release"
+   fi
 
    #
    # Ninja is probably preferable if installed
@@ -753,10 +757,12 @@ setup_build_environment()
    # Unfortunately on mingw, compile errors in libcxx
    # as ninja picks up the wrong c.
    #
-   if [ "${OPTION_NINJA}" = "YES" -a ! -z "`command -v ninja`" ]
+   if [ "${OPTION_NINJA}" = "YES" ]
    then
+      install_binary_if_missing "ninja${BUILD_EXE_EXTENSION}" "https://github.com/ninja-build/ninja/releases"
+
       CMAKE_GENERATOR="Ninja"
-      MAKE="ninja"
+      MAKE="ninja${BUILD_EXE_EXTENSION}"
       MAKEFILE="build.ninja"
       MAKE_INSTALL_COMMAND="install"
 
@@ -833,11 +839,11 @@ setup_build_environment()
 
    if [ -z "${MAKE}" ]
    then
-      install_binary_if_missing "make" "somewhere"
+      install_binary_if_missing "make${BUILD_EXE_EXTENSION}" "somewhere"
 
       CMAKE_GENERATOR="Unix Makefiles"
       MAKEFILE="Makefile"
-      MAKE="make"
+      MAKE="make${BUILD_EXE_EXTENSION}"
       if [ "${OPTION_PARALLEL}" = "NO" ]
       then
          MAKE_FLAGS="-B -j `get_core_count`"
@@ -850,25 +856,25 @@ setup_build_environment()
 
    check_and_build_cmake
 
-   if [ "${CXX_COMPILER}" = "g++" ]
+   if [ "${CXX_COMPILER}" = "g++${BUILD_EXE_EXTENSION}" ]
    then
-      install_binary_if_missing "g++" "https://gcc.gnu.org/install/download.html"
+      install_binary_if_missing "g++${BUILD_EXE_EXTENSION}" "https://gcc.gnu.org/install/download.html"
    else
-      if [ "${CXX_COMPILER}" = "clang++" ]
+      if [ "${CXX_COMPILER}" = "clang++${BUILD_EXE_EXTENSION}" ]
       then
-         install_binary_if_missing "clang++" "http://clang.llvm.org/get_started.html"
+         install_binary_if_missing "clang++${BUILD_EXE_EXTENSION}" "http://clang.llvm.org/get_started.html"
       else
          install_binary_if_missing "${CXX_COMPILER}" "somewhere (cpp compiler)"
       fi
    fi
 
-   if [ "${C_COMPILER}" = "gcc" ]
+   if [ "${C_COMPILER}" = "gcc${BUILD_EXE_EXTENSION}" ]
    then
-      install_binary_if_missing "gcc" "https://gcc.gnu.org/install/download.html"
+      install_binary_if_missing "gcc${BUILD_EXE_EXTENSION}" "https://gcc.gnu.org/install/download.html"
    else
-      if [ "${C_COMPILER}" = "clang" ]
+      if [ "${C_COMPILER}" = "clang${BUILD_EXE_EXTENSION}" ]
       then
-         install_binary_if_missing "clang" "http://clang.llvm.org/get_started.html"
+         install_binary_if_missing "clang${BUILD_EXE_EXTENSION}" "http://clang.llvm.org/get_started.html"
       else
          install_binary_if_missing "${C_COMPILER}" "somewhere (c compiler)"
       fi
@@ -876,7 +882,7 @@ setup_build_environment()
 
    if [ "${BUILD_LLDB}" = "YES" ]
    then
-      install_binary_if_missing "swig" "http://swig.org/download.html"
+      install_binary_if_missing "swig${BUILD_EXE_EXTENSION}" "http://swig.org/download.html"
 
       case "${MULLE_UNAME}" in
          darwin)
@@ -1105,10 +1111,20 @@ r_generic_cmake_options()
    RVAL="\
 -Wno-dev \
 -G '${CMAKE_GENERATOR}' \
--DCMAKE_INSTALL_MESSAGE="LAZY" \
--DCMAKE_C_COMPILER='${C_COMPILER}' \
--DCMAKE_CXX_COMPILER='${CXX_COMPILER}' \
+-DCMAKE_INSTALL_MESSAGE='LAZY' \
 "
+
+   case "${MULLE_UNAME}" in 
+      windows)
+      ;;
+
+      *)
+         RVAL="${RVAL} \
+-DCMAKE_C_COMPILER='${C_COMPILER}' \
+-DCMAKE_CXX_COMPILER='${CXX_COMPILER}'"
+      ;;
+   esac
+
    case "${MULLE_UNAME}" in
       linux)
          if [ "${OPTION_LINKER}" = "ld" ]
@@ -1127,7 +1143,7 @@ r_generic_clang_options()
 
    links="mulle-clang;mulle-clang-cl;mulle-clang-cpp"
    case "${MULLE_UNAME}" in
-      mingw*)
+      windowd|mingw*)
          links="${links};../msbuild-bin/cl"
       ;;
    esac
@@ -1179,9 +1195,18 @@ r_generic_llvm_options()
 {
    RVAL="\
 -DLLVM_OPTIMIZED_TABLEGEN='ON' \
--DLLVM_USE_LINKER='${OPTION_LINKER}' \
--DLLVM_ENABLE_CXX1Y:BOOL='OFF' \
-"
+-DLLVM_ENABLE_CXX1Y:BOOL='OFF'"
+
+   case "${MULLE_UNAME}" in 
+      windows)
+      ;;
+
+      *)
+         RVAL="${RVAL} \
+-DLLVM_USE_LINKER='${OPTION_LINKER}'"
+      ;;
+   esac
+
 # -DBUILD_SHARED_LIBS=ON is broken in 7.0 due to gtest dependency
    if [ "${OPTION_TARGETS}" = "DEFAULT" ]
    then
@@ -1243,7 +1268,7 @@ _build_llvm()
       local cmdline
       local RVAL
 
-      cmdline="cmake"
+      cmdline="cmake${BUILD_EXE_EXTENSION}"
       r_generic_cmake_options
       cmdline="${cmdline} ${RVAL}"
       r_generic_llvm_options
@@ -1280,7 +1305,7 @@ _build_llvm()
    ) || exit 1
 
    case "${MULLE_UNAME}" in
-      mingw*)
+      windows|mingw*)
          if [ ! -x "${MULLE_CLANG_INSTALL_PREFIX}/bin/mulle-scan-build.bat" ]
          then
             log_verbose "Creating mulle-lldb link ..."
@@ -1319,7 +1344,7 @@ _build_clang()
       local cmdline
       local RVAL
 
-      cmdline="cmake"
+      cmdline="cmake${BUILD_EXE_EXTENSION}"
       r_generic_cmake_options
       cmdline="${cmdline} ${RVAL}"
       r_generic_llvm_options
@@ -1547,7 +1572,7 @@ before you can install"
                       "mulle-scan-build"
 
    case "${MULLE_UNAME}" in
-      mingw*)
+      windows|mingw*)
          install_file "${MULLE_CLANG_INSTALL_PREFIX}/bin/mulle-scan-build.bat" \
                             "mulle-scan-build.bat"
       ;;
@@ -1859,6 +1884,12 @@ main()
             BY_THE_BOOK="STRICT"
          ;;
 
+         --wsl)
+            MULLE_UNAME="windows"
+            EXE_EXTENSION=".exe"
+            BUILD_EXE_EXTENSION=".exe"
+         ;;
+
          -*)
             echo "unknown option $1" >&2
             exit 1
@@ -1994,12 +2025,27 @@ ${C_INFO}See: https://www.llvm.org/docs/HowToCrossCompileLLVM.html"
       CXX_COMPILER="g++"
    fi
 
+   #
+   # override for wsl
+   # but this gets ignore eventually anyway
+   #
+   case "${MULLE_UNAME}" in
+      windows)
+         C_COMPILER="cl.exe"
+         CXX_COMPILER="cl.exe"
+      ;;
+   esac
+
    if [ "${OPTION_LINKER}" = "DEFAULT" ]
    then
       local linker
       local linkerpreferences
 
       case "${MULLE_UNAME}" in
+         windows)
+            linkerpreferences="link.exe"
+         ;;
+
          mingw*)
             # todo: untested
             linkerpreferences="lld ld.lld ld link.exe"

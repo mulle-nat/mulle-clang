@@ -164,6 +164,8 @@ Function                                            | Memo
 `_mulle_objc_object_inlinesupercall`                | `[super foo:bar]`
 
 
+<!-- Not yet
+
 ## Install
 
 ### OS X
@@ -178,9 +180,10 @@ brew install codeon-gmbh/software/mulle-clang
 > built from source. This takes a long time! On my Macbook Air the build
 > took about 30 minutes, even with the prerequisite llvm downloaded as a bottle.
 
+
 ### Ubuntu
 
-You can install mulle-clang with mulle-lldb via **apt-get** on Ubuntu trusty:
+You can install mulle-clang with mulle-lldb via **apt-get** on Ubuntu:
 
 ```
 sudo apt-get update &&
@@ -199,18 +202,19 @@ You can install on Debian (and Ubuntu) with:
 
 ```
 OS="`lsb_release -s -c`" \
-curl -O -L http://download.codeon.de/dists/${OS}/main/binary-amd64/mulle-clang-7.0.0.0-${OS}-amd64.deb && \
-sudo dpkg --install mulle-clang-7.0.0.0-${OS}-amd64.deb
+curl -O -L http://download.codeon.de/dists/${OS}/main/binary-amd64/mulle-clang-9.0.0.0-${OS}-amd64.deb && \
+sudo dpkg --install mulle-clang-9.0.0.0-${OS}-amd64.deb
 ```
 
 OS     | `shasum -b -a 256` 
 -------|-----------------------------------------------------------------
-trusty | d976ee9f1dec4e264f5678fd86cd1c5f606486fa152f768cadd49abeed839816
-bionic | dde8ced948847f4f647d5f4a90800615dbc7e2c8b5c9e3bbb2a082b27938e6a9
-cosmic | 8f900d4177df23ce1b042fe532fbfb1d452dd3cc6aefb827ca203814fdf6cae5
+trusty | not-yet
+bionic | not-yet
+cosmic | not-yet
 
-### FreeBSD, Windows and others
+-->
 
+## Build
 * [How to Build](BUILD_MULLE_CLANG.md)
 
 Afterwards head on over to [mulle-objc](//github.com/mulle-objc) to get the

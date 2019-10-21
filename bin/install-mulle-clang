@@ -1205,8 +1205,11 @@ r_generic_llvm_options()
       ;;
 
       *)
-         RVAL="${RVAL} \
+	 if [ ! -z "${OPTION_LINKER}" ]
+         then
+            RVAL="${RVAL} \
 -DLLVM_USE_LINKER='${OPTION_LINKER}'"
+	 fi
       ;;
    esac
 
@@ -2044,10 +2047,16 @@ ${C_INFO}See: https://www.llvm.org/docs/HowToCrossCompileLLVM.html"
       ;;
    esac
 
+   #
+   # since g++9/clang 9. or so -use-ld is not understood anymore
+   # or passed incorrectly
+   #
    if [ "${OPTION_LINKER}" = "DEFAULT" ]
    then
       local linker
       local linkerpreferences
+      
+      unset OPTION_LINKER
 
       case "${MULLE_UNAME}" in
          windows)
@@ -2066,12 +2075,19 @@ ${C_INFO}See: https://www.llvm.org/docs/HowToCrossCompileLLVM.html"
 
       for linker in ${linkerpreferences}
       do
-         if [ ! -z "`command -v "${linker}"`" ]
-         then
-            OPTION_LINKER="${linker}"
-            log_verbose "Use linker=${linker}"
-            break
-         fi
+	 case "${CXX_COMPILER}" in
+             g++)
+             ;;
+	     
+             *)
+               if [ ! -z "`command -v "${linker}"`" ]
+               then
+                  OPTION_LINKER="${linker}"
+                  log_verbose "Use linker=${linker}"
+                  break
+               fi
+	    ;;
+	 esac
       done
    fi
 

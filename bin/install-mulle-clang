@@ -64,7 +64,7 @@ Options:
 EOF
    (
       cat <<EOF
-   --all-in-one         : place mulle-clang inside src/llvm/tools (default)
+   --all-in-one         : place mulle-clang inside src/llvm/tools
    --no-clang           : do not build clang
    --no-lldb            : do not build mulle-lldb
    --no-ninja           : use make instead of ninja
@@ -78,6 +78,7 @@ EOF
       if [ "${VERBOSE}" = "YES" ]
       then
       cat <<EOF
+   --all-in-one-with-symlinks : symlink mulle-clang into src/llvm/tools
    --clang-debug        : build clang as debug only
    --clang-prefix <dir> : install prefix for clang
    --debug              : build everything DEBUG (not recommended)
@@ -727,7 +728,6 @@ get_clang_vendor()
    local src="$1"
    local compiler_version="$2"
 
-   local compiler_version
    local runtime_load_version
 
    runtime_load_version="`get_runtime_load_version "${src}"`"
@@ -2001,7 +2001,12 @@ ${C_INFO}See: https://www.llvm.org/docs/HowToCrossCompileLLVM.html"
       ;;
    esac
 
+   #
    # modify this so clang build seperate picks up llvm_config
+   # the disadvantage here is that on a subsequent run the new
+   # compiler will be picked up, it will be different than the
+   # host compiler and this will force a rebuild (that fails)
+   #
    PATH="${PREFIX}/bin:${HOST_PATH}"; export PATH
 
    # shouldn't this be CC /CXX ?

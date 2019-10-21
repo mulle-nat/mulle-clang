@@ -44,7 +44,7 @@ as this project is huge.
 ```
 mkdir mulle-clang
 cd mulle-clang
-curl -L -O "https://raw.githubusercontent.com/Codeon-GmbH/mulle-clang/mulle_objclang_70/bin/install-mulle-clang"
+curl -L -O "https://raw.githubusercontent.com/Codeon-GmbH/mulle-clang/mulle_objclang_90/bin/install-mulle-clang"
 ```
 
 2. Build the compiler. Here is an example, where the compiler is installed into
@@ -62,13 +62,6 @@ prerequisites.
 
 ## Windows: Installing further prerequisites
 
->
-> This method uses [MINGW](http://mingw.org/) on Windows. Things will
-> be easier with [WSL/bash](https://msdn.microsoft.com/en-us/commandline/wsl/about)
-> but the resultant executables would not be usable with Visual Studio. With WSL/bash just use the [Common generic instructions](#common-generic).
->
-
-
 First, ensure that your username does not contain anything else than
 characters and underscores.
 
@@ -84,6 +77,7 @@ characters and underscores.
 * [Python 2 for Windows](//www.python.org/downloads/windows/). **Make sure that python is installed in **PATH**, which is not the default**
 * [CMake for Windows](//cmake.org/download/). CMake should also add itself to **PATH**.
 * [Ninja](https://github.com/ninja-build/ninja/releases). Get Ninja and put it in your **PATH**
+* [Swig](http://www.swig.org/download.html). This may be optional. But put it in your **PATH** anyway.
 
 Reboot, so that Windows picks up the **PATH** changes (Voodoo).
 

@@ -488,7 +488,10 @@ install_library_if_missing()
    esac
 }
 
-
+#
+# third parameter is hackish apt-get install <name>
+# hacked for ninja, should do this properly though
+#
 install_binary_if_missing()
 {
    if command -v "$1" > /dev/null 2>&1
@@ -509,7 +512,7 @@ install_binary_if_missing()
             if command -v "apt-get" > /dev/null 2>&1
             then
                log_info "You may get asked for your password to install $1"
-               sudo_if_needed apt-get install "$1" || exit 1
+               sudo_if_needed apt-get install "${3:-$1}" || exit 1
             else
                if command -v "yum" > /dev/null 2>&1
                then
@@ -759,7 +762,7 @@ setup_build_environment()
    #
    if [ "${OPTION_NINJA}" = "YES" ]
    then
-      install_binary_if_missing "ninja${BUILD_EXE_EXTENSION}" "https://github.com/ninja-build/ninja/releases"
+      install_binary_if_missing "ninja${BUILD_EXE_EXTENSION}" "https://github.com/ninja-build/ninja/releases" "ninja-build"
 
       CMAKE_GENERATOR="Ninja"
       MAKE="ninja${BUILD_EXE_EXTENSION}"

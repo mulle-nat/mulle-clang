@@ -1029,6 +1029,18 @@ download_llvm()
       if [ ! -d "${LLVM_DIR}/projects/libcxxabi" ]
       then
          _llvm_module_download "libcxxabi" "${LIBCXXABI_ARCHIVE}" "${LLVM_DIR}/projects/libcxxabi"
+
+# PATCH for MACOS needed for 10.13 at least assume all lower
+         case "${MULLE_UNAME}" in
+            darwin)
+               case "`sw_vers -productVersion`" in
+                  10\.[0-9]\.*|10\.1[0123]*\.*)
+                     log_verbose "Patching out missing symbols for MacOS from libc++abi"
+                     sed -i.bak -e '/^__Z.*Du$/d' "${LLVM_DIR}/projects/libcxxabi/lib/itanium-base.exp"
+                  ;;
+               esac
+            ;;
+         esac
       else
          log_fluff "\"${LLVM_DIR}/projects/libcxxabi\" already exists"
       fi
@@ -1117,7 +1129,7 @@ r_generic_cmake_options()
 -DCMAKE_INSTALL_MESSAGE='LAZY' \
 "
 
-   case "${MULLE_UNAME}" in 
+   case "${MULLE_UNAME}" in
       windows)
       ;;
 
@@ -1200,7 +1212,7 @@ r_generic_llvm_options()
 -DLLVM_OPTIMIZED_TABLEGEN='ON' \
 -DLLVM_ENABLE_CXX1Y:BOOL='OFF'"
 
-   case "${MULLE_UNAME}" in 
+   case "${MULLE_UNAME}" in
       windows)
       ;;
 
@@ -2055,7 +2067,7 @@ ${C_INFO}See: https://www.llvm.org/docs/HowToCrossCompileLLVM.html"
    then
       local linker
       local linkerpreferences
-      
+
       unset OPTION_LINKER
 
       case "${MULLE_UNAME}" in
@@ -2078,7 +2090,7 @@ ${C_INFO}See: https://www.llvm.org/docs/HowToCrossCompileLLVM.html"
 	 case "${CXX_COMPILER}" in
              g++)
              ;;
-	     
+
              *)
                if [ ! -z "`command -v "${linker}"`" ]
                then

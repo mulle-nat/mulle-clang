@@ -212,7 +212,7 @@ bionic | b51a638ef49af327138b12902f189baaa66c7c95893ed227d02a6e1ced7c3ac9
 disco  | c323367fbfb16756b2aa51daaffee7f81032cf468177f856a316de713f81d316
 eoan   | 2ae6a367e608d1dc41e0146c38a9303fc422a91a4a4d407c14df56e68e73ae3d
 
--->
+<!-  -->
 
 ## Build
 * [How to Build](BUILD_MULLE_CLANG.md)

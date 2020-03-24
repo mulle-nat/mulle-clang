@@ -997,7 +997,7 @@ void JSONNodeDumper::VisitObjCPropertyDecl(const ObjCPropertyDecl *D) {
   case ObjCPropertyDecl::Required: JOS.attribute("control", "required"); break;
   case ObjCPropertyDecl::Optional: JOS.attribute("control", "optional"); break;
   }
-  
+
   ObjCPropertyDecl::PropertyAttributeKind Attrs = D->getPropertyAttributes();
   if (Attrs != ObjCPropertyDecl::OBJC_PR_noattr) {
     if (Attrs & ObjCPropertyDecl::OBJC_PR_getter)
@@ -1023,6 +1023,14 @@ void JSONNodeDumper::VisitObjCPropertyDecl(const ObjCPropertyDecl *D) {
                         Attrs & ObjCPropertyDecl::OBJC_PR_nullability);
     attributeOnlyIfTrue("null_resettable",
                         Attrs & ObjCPropertyDecl::OBJC_PR_null_resettable);
+    // @mulle-objc@ new property attributes serializable, container, dynamic >
+    attributeOnlyIfTrue("dynamic", Attrs & ObjCPropertyDecl::OBJC_PR_dynamic);
+    attributeOnlyIfTrue("serializable", Attrs & ObjCPropertyDecl::OBJC_PR_serializable);
+    attributeOnlyIfTrue("nonserializable", Attrs & ObjCPropertyDecl::OBJC_PR_nonserializable);
+    attributeOnlyIfTrue("container", Attrs & ObjCPropertyDecl::OBJC_PR_container);
+    attributeOnlyIfTrue("observable", Attrs & ObjCPropertyDecl::OBJC_PR_observable);
+    attributeOnlyIfTrue("relationship", Attrs & ObjCPropertyDecl::OBJC_PR_relationship);
+    // @mulle-objc@ new property attributes serializable, container, dynamic <
   }
 }
 

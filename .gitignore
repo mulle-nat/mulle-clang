@@ -16,6 +16,9 @@
 .*.sw?
 .sw?
 
+# Apple HFS cruft
+.DS_Store
+
 #==============================================================================#
 # Explicit files to ignore (only matches one).
 #==============================================================================#
@@ -38,3 +41,4 @@ test/debuginfo-tests
 .vscode
 .vs
 
+mulle-clang

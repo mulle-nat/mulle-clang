@@ -94,8 +94,6 @@ def err_no_external_assembler : Error<
   "there is no external assembler that can be used on this platform">;
 def err_drv_unable_to_remove_file : Error<
   "unable to remove file: %0">;
-def err_drv_unable_to_set_working_directory : Error <
-  "unable to set working directory: %0">;
 def err_drv_command_failure : Error<
   "unable to execute command: %0">;
 def err_drv_invalid_darwin_version : Error<
@@ -228,6 +226,7 @@ def err_drv_invalid_cf_runtime_abi
           "'objc', 'standalone', 'swift', 'swift-5.0', 'swift-4.2', 'swift-4.1'">;
 def err_drv_gnustep_objc_runtime_incompatible_binary : Error<
   "GNUstep Objective-C runtime version %0 incompatible with target binary format">;
+
 def err_drv_emit_llvm_link : Error<
    "-emit-llvm cannot be used when linking">;
 def err_drv_optimization_remark_pattern : Error<

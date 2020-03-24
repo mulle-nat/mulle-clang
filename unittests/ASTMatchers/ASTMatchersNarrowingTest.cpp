@@ -1071,6 +1071,35 @@ TEST(isConstexpr, MatchesConstexprDeclarations) {
                          LanguageMode::Cxx17OrLater));
 }
 
+TEST(hasInitStatement, MatchesSelectionInitializers) {
+  EXPECT_TRUE(matches("void baz() { if (int i = 1; i > 0) {} }",
+                      ifStmt(hasInitStatement(anything())),
+                      LanguageMode::Cxx17OrLater));
+  EXPECT_TRUE(notMatches("void baz() { if (int i = 1) {} }",
+                         ifStmt(hasInitStatement(anything()))));
+  EXPECT_TRUE(notMatches("void baz() { if (1 > 0) {} }",
+                         ifStmt(hasInitStatement(anything()))));
+  EXPECT_TRUE(matches(
+      "void baz(int i) { switch (int j = i; j) { default: break; } }",
+      switchStmt(hasInitStatement(anything())), LanguageMode::Cxx17OrLater));
+  EXPECT_TRUE(notMatches("void baz(int i) { switch (i) { default: break; } }",
+                         switchStmt(hasInitStatement(anything()))));
+}
+
+TEST(hasInitStatement, MatchesRangeForInitializers) {
+  EXPECT_TRUE(matches("void baz() {"
+                      "int items[] = {};"
+                      "for (auto &arr = items; auto &item : arr) {}"
+                      "}",
+                      cxxForRangeStmt(hasInitStatement(anything())),
+                      LanguageMode::Cxx2aOrLater));
+  EXPECT_TRUE(notMatches("void baz() {"
+                         "int items[] = {};"
+                         "for (auto &item : items) {}"
+                         "}",
+                         cxxForRangeStmt(hasInitStatement(anything()))));
+}
+
 TEST(TemplateArgumentCountIs, Matches) {
   EXPECT_TRUE(
     matches("template<typename T> struct C {}; C<int> c;",
@@ -1491,6 +1520,21 @@ TEST(Matcher, HasNameSupportsFunctionScope) {
   EXPECT_TRUE(matches(code, fieldDecl(hasName("::a::F(int)::S::m"))));
 }
 
+TEST(Matcher, HasNameQualifiedSupportsLinkage) {
+  // https://bugs.llvm.org/show_bug.cgi?id=42193
+  std::string code = R"cpp(namespace foo { extern "C" void test(); })cpp";
+  EXPECT_TRUE(matches(code, functionDecl(hasName("test"))));
+  EXPECT_TRUE(matches(code, functionDecl(hasName("foo::test"))));
+  EXPECT_TRUE(matches(code, functionDecl(hasName("::foo::test"))));
+  EXPECT_TRUE(notMatches(code, functionDecl(hasName("::test"))));
+
+  code = R"cpp(namespace foo { extern "C" { void test(); } })cpp";
+  EXPECT_TRUE(matches(code, functionDecl(hasName("test"))));
+  EXPECT_TRUE(matches(code, functionDecl(hasName("foo::test"))));
+  EXPECT_TRUE(matches(code, functionDecl(hasName("::foo::test"))));
+  EXPECT_TRUE(notMatches(code, functionDecl(hasName("::test"))));
+}
+
 TEST(Matcher, HasAnyName) {
   const std::string Code = "namespace a { namespace b { class C; } }";
 
@@ -1835,6 +1879,27 @@ TEST(EachOf, BehavesLikeAnyOfUnlessBothMatch) {
     "class A { int c; int d; };",
     recordDecl(eachOf(has(fieldDecl(hasName("a")).bind("v")),
                       has(fieldDecl(hasName("b")).bind("v"))))));
+}
+
+TEST(Optionally, SubmatchersDoNotMatch) {
+  EXPECT_TRUE(matchAndVerifyResultFalse(
+      "class A { int a; int b; };",
+      recordDecl(optionally(has(fieldDecl(hasName("c")).bind("v")),
+                            has(fieldDecl(hasName("d")).bind("v")))),
+      std::make_unique<VerifyIdIsBoundTo<FieldDecl>>("v")));
+}
+
+TEST(Optionally, SubmatchersMatch) {
+  EXPECT_TRUE(matchAndVerifyResultTrue(
+      "class A { int a; int c; };",
+      recordDecl(optionally(has(fieldDecl(hasName("a")).bind("v")),
+                            has(fieldDecl(hasName("b")).bind("v")))),
+      std::make_unique<VerifyIdIsBoundTo<FieldDecl>>("v", 1)));
+  EXPECT_TRUE(matchAndVerifyResultTrue(
+      "class A { int c; int b; };",
+      recordDecl(optionally(has(fieldDecl(hasName("c")).bind("v")),
+                            has(fieldDecl(hasName("b")).bind("v")))),
+      std::make_unique<VerifyIdIsBoundTo<FieldDecl>>("v", 2)));
 }
 
 TEST(IsTemplateInstantiation, MatchesImplicitClassTemplateInstantiation) {

@@ -372,6 +372,9 @@ def fsanitize_coverage_no_prune
 def fsanitize_coverage_stack_depth
     : Flag<["-"], "fsanitize-coverage-stack-depth">,
       HelpText<"Enable max stack depth tracing">;
+def fpatchable_function_entry_offset_EQ
+    : Joined<["-"], "fpatchable-function-entry-offset=">, MetaVarName<"<M>">,
+      HelpText<"Generate M NOPs before function entry">;
 def fprofile_instrument_EQ : Joined<["-"], "fprofile-instrument=">,
     HelpText<"Enable PGO instrumentation. The accepted value is clang, llvm, "
              "or none">, Values<"none,clang,llvm">;
@@ -387,8 +390,6 @@ def flto_visibility_public_std:
 def flto_unit: Flag<["-"], "flto-unit">,
     HelpText<"Emit IR to support LTO unit features (CFI, whole program vtable opt)">;
 def fno_lto_unit: Flag<["-"], "fno-lto-unit">;
-def fthin_link_bitcode_EQ : Joined<["-"], "fthin-link-bitcode=">,
-    HelpText<"Write minimized bitcode to <file> for the ThinLTO thin link only">;
 def femit_debug_entry_values : Flag<["-"], "femit-debug-entry-values">,
     HelpText<"Enables debug info about call site parameter's entry values">;
 def fdebug_pass_manager : Flag<["-"], "fdebug-pass-manager">,
@@ -402,6 +403,10 @@ def msign_return_address_key_EQ : Joined<["-"], "msign-return-address-key=">,
     Values<"a_key,b_key">;
 def mbranch_target_enforce : Flag<["-"], "mbranch-target-enforce">;
 def fno_dllexport_inlines : Flag<["-"], "fno-dllexport-inlines">;
+def cfguard_no_checks : Flag<["-"], "cfguard-no-checks">,
+    HelpText<"Emit Windows Control Flow Guard tables only (no checks)">;
+def cfguard : Flag<["-"], "cfguard">,
+    HelpText<"Emit Windows Control Flow Guard tables and checks">;
 
 //===----------------------------------------------------------------------===//
 // Dependency Output Options
@@ -551,7 +556,10 @@ def ftest_module_file_extension_EQ :
   HelpText<"introduce a module file extension for testing purposes. "
            "The argument is parsed as blockname:major:minor:hashed:user info">;
 def fconcepts_ts : Flag<["-"], "fconcepts-ts">,
-  HelpText<"Enable C++ Extensions for Concepts.">;
+  HelpText<"Enable C++ Extensions for Concepts. (deprecated - use -std=c++2a)">;
+def fno_concept_satisfaction_caching : Flag<["-"],
+                                            "fno-concept-satisfaction-caching">,
+  HelpText<"Disable satisfaction caching for C++2a Concepts.">;
 
 let Group = Action_Group in {
 
@@ -851,6 +859,8 @@ def detailed_preprocessing_record : Flag<["-"], "detailed-preprocessing-record">
   HelpText<"include a detailed record of preprocessing actions">;
 def setup_static_analyzer : Flag<["-"], "setup-static-analyzer">,
   HelpText<"Set up preprocessor for static analyzer (done automatically when static analyzer is run).">;
+def disable_pragma_debug_crash : Flag<["-"], "disable-pragma-debug-crash">,
+  HelpText<"Disable any #pragma clang __debug that can lead to crashing behavior. This is meant for testing.">;
 
 //===----------------------------------------------------------------------===//
 // OpenCL Options

@@ -46,6 +46,7 @@
 #include "llvm/Support/Host.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/Process.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetRegistry.h"
@@ -353,7 +354,9 @@ static bool ExecuteAssembler(AssemblerInvocation &Opts,
   std::unique_ptr<MCRegisterInfo> MRI(TheTarget->createMCRegInfo(Opts.Triple));
   assert(MRI && "Unable to create target register info!");
 
-  std::unique_ptr<MCAsmInfo> MAI(TheTarget->createMCAsmInfo(*MRI, Opts.Triple));
+  MCTargetOptions MCOptions;
+  std::unique_ptr<MCAsmInfo> MAI(
+      TheTarget->createMCAsmInfo(*MRI, Opts.Triple, MCOptions));
   assert(MAI && "Unable to create target asm info!");
 
   // Ensure MCAsmInfo initialization occurs before any use, otherwise sections
@@ -377,7 +380,6 @@ static bool ExecuteAssembler(AssemblerInvocation &Opts,
   // MCObjectFileInfo needs a MCContext reference in order to initialize itself.
   std::unique_ptr<MCObjectFileInfo> MOFI(new MCObjectFileInfo());
 
-  MCTargetOptions MCOptions;
   MCContext Ctx(MAI.get(), MRI.get(), MOFI.get(), &SrcMgr, &MCOptions);
 
   bool PIC = false;
@@ -546,7 +548,7 @@ static void LLVMErrorHandler(void *UserData, const std::string &Message,
   Diags.Report(diag::err_fe_error_backend) << Message;
 
   // We cannot recover from llvm errors.
-  exit(1);
+  sys::Process::Exit(1);
 }
 
 int cc1as_main(ArrayRef<const char *> Argv, const char *Argv0, void *MainAddr) {

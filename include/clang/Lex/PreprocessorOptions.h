@@ -13,6 +13,8 @@
 #include "clang/Lex/PreprocessorExcludedConditionalDirectiveSkipMapping.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
+#include <functional>
+#include <map>
 #include <memory>
 #include <set>
 #include <string>
@@ -173,6 +175,9 @@ public:
   /// build it again.
   std::shared_ptr<FailedModulesSet> FailedModules;
 
+  /// A prefix map for __FILE__ and __BASE_FILE__.
+  std::map<std::string, std::string, std::greater<std::string>> MacroPrefixMap;
+
   /// Contains the currently active skipped range mappings for skipping excluded
   /// conditional directives.
   ///
@@ -183,6 +188,9 @@ public:
 
   /// Set up preprocessor for RunAnalysis action.
   bool SetUpStaticAnalyzer = false;
+
+  /// Prevents intended crashes when using #pragma clang __debug. For testing.
+  bool DisablePragmaDebugCrash = false;
 
 public:
   PreprocessorOptions() : PrecompiledPreambleBytes(0, false) {}

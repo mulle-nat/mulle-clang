@@ -13,7 +13,7 @@ def note_expr_divide_by_zero : Note<"division by zero">;
 def note_constexpr_invalid_cast : Note<
   "%select{reinterpret_cast|dynamic_cast|cast that performs the conversions of"
   " a reinterpret_cast|cast from %1}0 is not allowed in a constant expression"
-  "%select{| in C++ standards before C++2a||}0">;
+  "%select{| in C++ standards before C++20||}0">;
 def note_constexpr_invalid_downcast : Note<
   "cannot cast object of dynamic type %0 to type %1">;
 def note_constexpr_overflow : Note<
@@ -33,7 +33,7 @@ def note_constexpr_no_return : Note<
   "control reached end of constexpr function">;
 def note_constexpr_virtual_call : Note<
   "cannot evaluate call to virtual function in a constant expression "
-  "in C++ standards before C++2a">;
+  "in C++ standards before C++20">;
 def note_constexpr_pure_virtual_call : Note<
   "pure virtual function %q0 called">;
 def note_constexpr_polymorphic_unknown_dynamic_type : Note<
@@ -70,6 +70,8 @@ def note_constexpr_pointer_subtraction_not_same_array : Note<
   "subtracted pointers are not elements of the same array">;
 def note_constexpr_pointer_subtraction_zero_size : Note<
   "subtraction of pointers to type %0 of zero size">;
+def note_constexpr_pointer_comparison_unspecified : Note<
+  "comparison has unspecified value">;
 def note_constexpr_pointer_comparison_base_classes : Note<
   "comparison of addresses of subobjects of different base classes "
   "has unspecified value">;
@@ -100,7 +102,7 @@ def note_constexpr_var_init_non_constant : Note<
   "initializer of %0 is not a constant expression">;
 def note_constexpr_typeid_polymorphic : Note<
   "typeid applied to expression of polymorphic type %0 is "
-  "not allowed in a constant expression in C++ standards before C++2a">;
+  "not allowed in a constant expression in C++ standards before C++20">;
 def note_constexpr_void_comparison : Note<
   "comparison between unequal pointers to void has unspecified result">;
 def note_constexpr_temporary_here : Note<"temporary created here">;
@@ -216,6 +218,14 @@ def note_constexpr_baa_insufficient_alignment : Note<
 def note_constexpr_baa_value_insufficient_alignment : Note<
   "value of the aligned pointer (%0) is not a multiple of the asserted %1 "
   "%plural{1:byte|:bytes}1">;
+def note_constexpr_invalid_alignment : Note<
+  "requested alignment %0 is not a positive power of two">;
+def note_constexpr_alignment_too_big : Note<
+  "requested alignment must be %0 or less for type %1; %2 is invalid">;
+def note_constexpr_alignment_compute : Note<
+  "cannot constant evaluate whether run-time alignment is at least %0">;
+def note_constexpr_alignment_adjust : Note<
+  "cannot constant evaluate the result of adjusting alignment to %0">;
 def note_constexpr_destroy_out_of_lifetime : Note<
   "destroying object '%0' whose lifetime has already ended">;
 def note_constexpr_unsupported_destruction : Note<
@@ -328,6 +338,10 @@ def warn_integer_constant_overflow : Warning<
 // in Sema.
 def note_unimplemented_constexpr_lambda_feature_ast : Note<
     "unimplemented constexpr lambda feature: %0 (coming soon!)">;
+
+def warn_is_constant_evaluated_always_true_constexpr : Warning<
+  "'%0' will always evaluate to 'true' in a manifestly constant-evaluated expression">,
+  InGroup<DiagGroup<"constant-evaluated">>;
 
 // inline asm related.
 let CategoryName = "Inline Assembly Issue" in {

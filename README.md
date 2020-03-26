@@ -207,9 +207,9 @@ sudo dpkg --install mulle-clang-10.0.0.0-${OS}-amd64.deb
 
 OS     | `shasum -b -a 256`
 -------|-----------------------------------------------------------------
-xenial |
+xenial | not-yet
 bionic | not-yet
-disco  |
+disco  | not-yet
 eoan   | not-yet
 
 -->

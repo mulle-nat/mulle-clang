@@ -414,7 +414,7 @@ public:
     return llvm::map_iterator(param_end(), GetTypeFn());
   }
 
-  // @mulle-objc@ MetaABI: paramRecord, paramDecl accessors
+  // @mulle-objc@ MetaABI: paramRecord, paramDecl accessors >
   // struct {}
   RecordDecl   *getParamRecord() const { return ParamRecord; }
   void setParamRecord( RecordDecl  *RD) { ParamRecord = RD; }
@@ -430,9 +430,8 @@ public:
   RecordDecl   *getRvalRecord() const { return RvalRecord; }
   void setRvalRecord( RecordDecl  *RD) { RvalRecord = RD; }
 
-
-  // @mulle-objc@ MetaABI:  method FindParamRecordField for parameters
   FieldDecl  *FindParamRecordField( IdentifierInfo *II);
+  // @mulle-objc@ MetaABI: paramRecord, paramDecl accessors <
 
   /// createImplicitParams - Used to lazily create the self and cmd
   /// implict parameters. This must be called prior to using getSelfDecl()

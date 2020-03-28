@@ -2,28 +2,34 @@
 
 [ "${TRACE}" = "YES" ] && set -x && : "$0" "$@"
 
+#
+# optimally these are the only difference between mulle-clang and mulle-lldb
+# migration
+#
+LLVM_PROJECT="clang"                    # lldb for lldb
+SOURCEDIRS="include/ lib/"              # include/ source/ for lldb
+
 # our old branches
 OLD_LLVM_BRANCH="release_90"
 OLD_MULLE_DEV_BRANCH="mulle_objclang_90"
 
-# on the llvm server
-NEW_CLANG_ARCHIVE="https://github.com/llvm/llvm-project/releases/download/llvmorg-10.0.0/clang-10.0.0.src.tar.xz"
-# will be placed into our and the committed
+# where we mirror whats happening in llvm
 NEW_LLVM_BRANCH="release_100"
-
 # our new branch
 NEW_MULLE_DEV_BRANCH="mulle_objclang_100"
 
-# out git remove
-LLVM_REMOTE="llvm"
+# usually don't edit these
 
+# on the llvm server
+NEW_ARCHIVE="https://github.com/llvm/llvm-project/releases/download/llvmorg-10.0.0/${LLVM_PROJECT}-10.0.0.src.tar.xz"
+
+# check files used by this script
 BEFOREFILE=.before-markers.txt
 AFTERFILE=.after-markers.txt
-SOURCEDIRS="include/ lib/"
 
 
 #
-# this function should be identical in mulle-clang/mulle-lldb
+# these functions should be identical in mulle-clang/mulle-lldb
 # If you edit them edit the corresponding file too
 #
 
@@ -39,25 +45,34 @@ download_new_sources_and_merge()
    local dst
 
    dst="${PWD}"
-   filename="`basename -- "${NEW_CLANG_ARCHIVE}"`"
-   name="${name%.tar.xz}"
+   filename="`basename -- "${NEW_ARCHIVE}"`"
+   name="${filename%.tar.xz}"
 
    # copy new source over old, also doing the proper deletions
-   # but don't clobbet .git accidentally
+   # but don't clobber .git accidentally
    if ! (
       cd /tmp  &&
-      curl -L -O "${NEW_CLANG_ARCHIVE}" &&
+      curl -L -O "${NEW_ARCHIVE}" &&
       tar xfJ "${filename}" &&
-      cd "${name}" &&
+      cd "${name}" || exit 1
+
+      local rval
+
       rsync -a --filter=':e .git' --delete-after . "${dst}/"
+      rval=$?
+
+      echo "rsync: $rval" >&2
+      return $rval
    )
    then
+      git reset --hard
+      git checkout  "${OLD_LLVM_BRANCH}"
       git branch -d "${NEW_LLVM_BRANCH}"
       exit 1
    fi
 
    git add . &&
-   git commit -m "${NEW_LLVM_BRANCH} added from \"${NEW_CLANG_ARCHIVE}\""
+   git commit -m "${NEW_LLVM_BRANCH} added from \"${NEW_ARCHIVE}\""
 }
 
 
@@ -75,8 +90,6 @@ migrate()
    then
       download_new_sources_and_merge || exit 1
    fi
-
-   exit 1
 
    #
    # remove garbage tmp if present
@@ -147,7 +160,7 @@ migrate()
    #
    echo "### 8: Checkout" >&2
 
-   git checkout -b "${NEW_MULLE_DEV_BRANCH}" "${LLVM_REMOTE}/${NEW_LLVM_BRANCH}" || exit 1
+   git checkout -b "${NEW_MULLE_DEV_BRANCH}" "${NEW_LLVM_BRANCH}" || exit 1
 
 
    echo "### 9: Cherry pick" >&2

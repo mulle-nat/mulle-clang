@@ -884,6 +884,17 @@ Sema::NameClassification Sema::ClassifyName(Scope *S, CXXScopeSpec &SS,
   // FIXME: This lookup really, really needs to be folded in to the normal
   // unqualified lookup mechanism.
   if (SS.isEmpty() && CurMethod && !isResultTypeOrTemplate(Result, NextToken)) {
+   // @mulle-objc@ MetaABI: Lookup _param-><name> >
+   if( getLangOpts().ObjCRuntime.hasMulleMetaABI())
+   {
+      FieldDecl   *FD;
+
+      FD = CurMethod->FindParamRecordField( Name);
+      if( FD) // proba
+        return( NameClassification::ContextIndependentExpr( GetMulle_paramFieldExpr( FD, S, SS, SourceLocation())));
+   }
+   // @mulle-objc@ MetaABI: Lookup _param-><name> <
+
     DeclResult Ivar = LookupIvarInObjCMethod(Result, S, Name);
     if (Ivar.isInvalid())
       return NameClassification::Error();

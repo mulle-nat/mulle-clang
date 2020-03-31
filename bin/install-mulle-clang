@@ -18,7 +18,7 @@ LLVM_VERSION="10.0.0"
 #LLVM_RC="2" # leave empty for releases
 
 # our compiler version
-MULLE_CLANG_VERSION="${LLVM_VERSION}.1"
+MULLE_CLANG_VERSION="${LLVM_VERSION}.2"
 MULLE_CLANG_RC="prerelease"
 MULLE_LLDB_VERSION="${LLVM_VERSION}.0"
 MULLE_LLDB_RC="prerelease"

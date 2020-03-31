@@ -1444,7 +1444,7 @@ namespace {
 }
 
 /// A helper class for performing the null-initialization of a return
-/// value.
+/// value. (Basically not used, unless you have a unusual CPU architecture)
 struct NullReturnState {
   llvm::BasicBlock *NullBB;
   NullReturnState() : NullBB(nullptr) {}
@@ -1491,20 +1491,20 @@ struct NullReturnState {
     // Okay, start emitting the null-receiver block.
     CGF.EmitBlock(NullBB);
 
-    // Release any consumed arguments we've got.
-    if (Method) {
-      CallArgList::const_iterator I = CallArgs.begin();
-      for (ObjCMethodDecl::param_const_iterator i = Method->param_begin(),
-           e = Method->param_end(); i != e; ++i, ++I) {
-        const ParmVarDecl *ParamDecl = (*i);
-        if (ParamDecl->hasAttr<NSConsumedAttr>()) {
-          RValue RV = I->getRValue(CGF);
-          assert(RV.isScalar() &&
-                 "NullReturnState::complete - arg not on object");
-          CGF.EmitARCRelease(RV.getScalarVal(), ARCImpreciseLifetime);
-        }
-      }
-    }
+//   // Release any consumed arguments we've got.
+//   if (Method) {
+//     CallArgList::const_iterator I = CallArgs.begin();
+//     for (ObjCMethodDecl::param_const_iterator i = Method->param_begin(),
+//          e = Method->param_end(); i != e; ++i, ++I) {
+//       const ParmVarDecl *ParamDecl = (*i);
+//       if (ParamDecl->hasAttr<NSConsumedAttr>()) {
+//         RValue RV = I->getRValue(CGF);
+//         assert(RV.isScalar() &&
+//                "NullReturnState::complete - arg not on object");
+//         // CGF.EmitARCRelease(RV.getScalarVal(), ARCImpreciseLifetime);
+//       }
+//     }
+//   }
 
     // The phi code below assumes that we haven't needed any control flow yet.
     assert(CGF.Builder.GetInsertBlock() == NullBB);
@@ -1531,6 +1531,7 @@ struct NullReturnState {
       phi->addIncoming(null, NullBB);
       return RValue::get(phi);
     }
+
 
     // If we've got an aggregate return, null the buffer out.
     // FIXME: maybe we should be doing things differently for all the
@@ -2696,15 +2697,18 @@ CodeGen::RValue   CGObjCMulleRuntime::CommonFunctionCall(CodeGen::CodeGenFunctio
    if( ! Return.isUnused())
    {
       // metaABI needs it too
-      if( (Method && Method->getRvalRecord()) ||
-         CGM.ReturnSlotInterferesWithArgs( FI) ||
-         CGM.ReturnTypeUsesSRet( FI))
+      if( CGM.ReturnSlotInterferesWithArgs( FI) ||
+          CGM.ReturnTypeUsesSRet( FI))
       {
          nullReturn.init(CGF, Arg0);
       }
    }
 
    RValue rvalue = CGF.EmitCall( FI, Callee, Return, ActualArgs);
+
+   // this is the null return completion for obscure ABI code, not our stuff really
+   // ResultType should probably be void * ?
+   rvalue = nullReturn.complete( CGF, Return, rvalue, ResultType, CallArgs, nullptr);
 
    RValue param = ActualArgs.size() >= 3 ? ActualArgs[ 2].getKnownRValue() : rvalue; // rvalue is just bogus, wont be used then
 
@@ -2714,7 +2718,7 @@ CodeGen::RValue   CGObjCMulleRuntime::CommonFunctionCall(CodeGen::CodeGenFunctio
    // but this is done elsewhere, as not to disturb the method signatures
    // too much
 
-   return nullReturn.complete( CGF, Return, rvalue, ResultType, CallArgs, nullptr);
+   return( rvalue);
 }
 
 
@@ -4108,9 +4112,7 @@ LValue  CGObjCMulleRuntime::GenerateMetaABIRecordAlloca( CodeGenFunction &CGF,
                                                          RecordDecl   *RV,
                                                          CGObjCRuntimeLifetimeMarker &Marker)
 {
-   RecordDecl *UD = CreateMetaABIUnionDecl( CGF,
-                                           RD,
-                                           RV);
+   RecordDecl *UD = CreateMetaABIUnionDecl( CGF, RD, RV);
    LValue Union = GenerateAlloca( CGF, UD);
 
    //
@@ -4121,8 +4123,15 @@ LValue  CGObjCMulleRuntime::GenerateMetaABIRecordAlloca( CodeGenFunction &CGF,
    Marker.SizeV = CGF.EmitLifetimeStart( get_size_of_type( &CGM, Union.getType()), Marker.Addr);
 
    // now get record out of union again
-   LValue Record = CGF.EmitLValueForField( Union, *UD->field_begin());
+   RecordDecl::field_iterator   CurField = UD->field_begin();
 
+   LValue Record = CGF.EmitLValueForField( Union, *CurField);
+   // zero out return value ahead of call, this doesn't work because its a union!!
+//  if( RV)
+//  {
+//     LValue Rval   = CGF.EmitLValueForField( Union, *CurField);
+//     CGF.EmitNullInitialization( Rval.getAddress( CGF), CGM.getContext().getTagDeclType( RV));
+//  }
    return( Record);
 }
 

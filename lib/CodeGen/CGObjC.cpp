@@ -976,6 +976,7 @@ CodeGen::RValue   CodeGenFunction::EmitMetaABIReadReturnValue( const ObjCMethodD
    // now cast this to actual return value
    // figure out, what we get back
    RecordDecl  *RV = nullptr;
+
    if( Method)
       RV = Method->getRvalRecord();
 
@@ -989,34 +990,41 @@ CodeGen::RValue   CodeGenFunction::EmitMetaABIReadReturnValue( const ObjCMethodD
       // be optimized away by the compiler.
       //
       V = Param.getScalarVal();
-      if( ResultType->isStructureOrClassType())
+      // use return value slot, which is an allocaed aggregate of proper type
+      Address   Dst = Return.getValue();
+
+      // is this ever used ?
+      if( ! Dst.isValid())
       {
-         // use return value slot, which is an allocaed aggregate of proper type
-         Address   Dst = Return.getValue();
-
-         if( ! Dst.isValid())
-         {
-            llvm::AllocaInst  *alloca = Builder.CreateAlloca( getTypes().ConvertTypeForMem( ResultType));
-            Dst = Address( alloca, Alignment);
-         }
-         //
-         // memcpy stuff from _param
-         //
-
+         llvm::AllocaInst  *alloca = Builder.CreateAlloca( getTypes().ConvertTypeForMem( ResultType));
+         Dst = Address( alloca, Alignment);
+      }
+      //
+      // memcpy stuff from _param
+      //
+      llvm::BasicBlock *copyBlock = createBasicBlock("msgSend.metaABIcopy");
+      llvm::BasicBlock *zeroBlock = createBasicBlock("msgSend.metaABIzero");
+      llvm::BasicBlock *doneBlock = createBasicBlock("msgSend.metaABIdone");
+      llvm::Value      *isNull    = Builder.CreateIsNull( Rvalue.getScalarVal());
+      Builder.CreateCondBr( isNull, zeroBlock, copyBlock);
+      EmitBlock(zeroBlock);
+      {
+         EmitNullInitialization( Dst, ResultType);
+         Builder.CreateBr(doneBlock);
+      }
+      EmitBlock(copyBlock);
+      {
          LValue SrcLV = MakeAddrLValue( Address( V, Alignment), ResultType);
          LValue DstLV = MakeAddrLValue( Dst, ResultType);
-
          EmitAggregateCopy( DstLV, SrcLV,  ResultType, getOverlapForReturnValue());  // copy/paste
-         Rvalue = RValue::getAggregate( Dst); // I hope this works fine...
       }
+      EmitBlock(doneBlock);
+
+      if( ResultType->isStructureOrClassType())
+         Rvalue = RValue::getAggregate( Dst); // I hope this works fine...
       else
       {
-        // retrieve from pointer
-         QualType PtrResultType = getContext().getPointerType(ResultType);
-         V = Builder.CreateBitOrPointerCast( V, getTypes().ConvertTypeForMem( PtrResultType));
-
-         Address VA = Address( V, Alignment);
-         V = Builder.CreateLoad( VA);
+         V = Builder.CreateLoad( Dst);
          Rvalue = RValue::get(V);
       }
    }

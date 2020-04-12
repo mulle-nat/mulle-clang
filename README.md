@@ -201,18 +201,16 @@ You can install on Debian (and Ubuntu) with:
 
 ```
 OS="`lsb_release -s -c`" \
-curl -O -L http://download.codeon.de/dists/${OS}/main/binary-amd64/mulle-clang-10.0.0.0-${OS}-amd64.deb && \
-sudo dpkg --install mulle-clang-10.0.0.0-${OS}-amd64.deb
+curl -O -L http://download.codeon.de/dists/${OS}/main/binary-amd64/mulle-clang-10.0.0.2-${OS}-amd64.deb && \
+sudo dpkg --install mulle-clang-10.0.0.2-${OS}-amd64.deb
 ```
 
 OS     | `shasum -b -a 256`
 -------|-----------------------------------------------------------------
-xenial | not-yet
-bionic | not-yet
-disco  | not-yet
-eoan   | not-yet
+xenial | e0cfb43302cf9073786590f663a38e304b0350fe11e9f07b1cfd04bab23a56e9
+bionic | 189eab94308b4fa0e04057d0d0f521992bbe28c518ac7a813e0e21a885bd6d93
+eoan   | 3d54a5398d4f3884372094199fea7f4e99c5aea9c0bd066009d855685623b97e
 
--->
 
 ## Build
 * [How to Build](BUILD_MULLE_CLANG.md)
